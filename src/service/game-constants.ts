@@ -39,7 +39,7 @@ export const RAGE_CONFIG = {
   fanOffsetWidth: 0.85,      // Độ rộng trải ngang ở đầu nòng
 
   // Tốc độ & điểm tích nộ khi chiến đấu
-  regenPerSecond: 0,         // Nộ tự hồi mỗi giây (đặt > 0 nếu muốn tự hồi theo thời gian)
+  regenPerSecond: 1,         // Nộ tự hồi mỗi giây (đặt > 0 nếu muốn tự hồi theo thời gian)
   gainMultiplier: 2,         // Hệ số nhân tốc độ hồi nộ chung (VD: 2 = hồi nhanh gấp đôi)
   gainPerHit: 10,
   gainPerCannonHit: 2,

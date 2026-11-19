@@ -31,7 +31,7 @@ export default function HomePage() {
         ref={containerRef}
         className={
           isInGame
-            ? "fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-slate-950"
+            ? "fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-slate-950 touch-none select-none"
             : "relative h-[calc(100vh-11rem)] min-h-[600px] w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-xl"
         }
       >

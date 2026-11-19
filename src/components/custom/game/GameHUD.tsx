@@ -84,6 +84,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     togglePause,
     activateRage,
     setCameraMode,
+    cycleCameraMode,
     toggleAutoFire,
     toggleMute,
     clearRewardBanner,
@@ -269,12 +270,14 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   }, []);
 
   const isInMenu = gameStatus === "MENU";
+  const currentCameraLabel =
+    CAMERA_MODES.find((item) => item.mode === cameraMode)?.label || cameraMode;
 
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-10 flex flex-col ${
-        isInMenu ? "items-center justify-center" : "justify-between"
-      } p-3 sm:p-4 transition-shadow duration-300 ${
+        isInMenu ? "items-center justify-center p-3 sm:p-4" : "justify-between p-2 sm:p-4"
+      } transition-shadow duration-300 ${
         rageActive
           ? "shadow-[inset_0_0_70px_rgba(245,158,11,0.32)] ring-2 ring-inset ring-amber-400/50"
           : ""
@@ -282,25 +285,25 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     >
       {/* Thanh trạng thái trên cùng (chỉ hiện khi đã vào game) */}
       {!isInMenu && (
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-3">
           {/* Trái: Tên + Máu + Màn + Điểm */}
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="pointer-events-auto flex flex-wrap items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-950/80 px-3.5 py-2 text-white shadow-lg backdrop-blur-md"
+            className="pointer-events-auto flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-950/80 px-2.5 py-1.5 sm:justify-start sm:gap-2.5 sm:px-3.5 sm:py-2 text-white shadow-lg backdrop-blur-md"
           >
             {playerName && (
-              <div className="flex items-center gap-1.5 border-r border-slate-700 pr-2.5 text-xs font-bold text-sky-300">
+              <div className="hidden sm:flex items-center gap-1.5 border-r border-slate-700 pr-2.5 text-xs font-bold text-sky-300">
                 <User className="h-3.5 w-3.5 text-sky-400" />
                 <span className="max-w-[110px] truncate">{playerName}</span>
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 border-r border-slate-700 pr-3">
+            <div className="flex items-center gap-1 sm:gap-1.5 border-r border-slate-700 pr-2 sm:pr-3">
               {Array.from({ length: maxHp }).map((_, i) => (
                 <Heart
                   key={i}
-                  className={`h-4 w-4 transition-transform ${
+                  className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform ${
                     i < hp
                       ? "fill-rose-500 text-rose-500 scale-100"
                       : "text-slate-600 scale-90"
@@ -309,7 +312,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               ))}
             </div>
 
-            <div className="flex items-center gap-3 text-xs sm:text-sm">
+            <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] sm:text-sm">
               <div>
                 <span className="text-slate-400 mr-1">Màn:</span>
                 <span className="font-black text-sky-300">
@@ -317,7 +320,8 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 mr-1">Quái màn này:</span>
+                <span className="hidden sm:inline text-slate-400 mr-1">Quái màn này:</span>
+                <span className="sm:hidden text-slate-400 mr-1">Quái:</span>
                 <span className="font-bold text-emerald-300">
                   {stageKills} / {stageTargetKills}
                 </span>
@@ -333,9 +337,25 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="pointer-events-auto flex flex-wrap items-center gap-2"
+            className="pointer-events-auto flex flex-wrap items-center justify-between gap-1.5 sm:justify-end sm:gap-2"
           >
-            <div className="flex items-center rounded-xl border border-slate-700/80 bg-slate-950/80 p-1 shadow-lg backdrop-blur-md">
+            {/* Mobile: 1 nút gọn bấm chuyển góc camera */}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                cycleCameraMode();
+              }}
+              className="sm:hidden h-7 gap-1 border-slate-700 bg-slate-950/80 px-2 text-[11px] font-semibold text-sky-300 backdrop-blur-md hover:bg-slate-800 hover:text-white"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              <span>{currentCameraLabel}</span>
+            </Button>
+
+            {/* Desktop/Tablet: thanh chọn 3 góc camera */}
+            <div className="hidden sm:flex items-center rounded-xl border border-slate-700/80 bg-slate-950/80 p-1 shadow-lg backdrop-blur-md">
               <Camera className="mx-1.5 h-3.5 w-3.5 text-sky-400" />
               {CAMERA_MODES.map((item) => (
                 <button
@@ -356,84 +376,93 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               ))}
             </div>
 
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleAutoFire();
-              }}
-              className={`h-8 border-slate-700 text-xs font-semibold backdrop-blur-md ${
-                autoFire
-                  ? "bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900/90 hover:text-emerald-200"
-                  : "bg-slate-950/80 text-slate-300 hover:bg-slate-800 hover:text-white"
-              }`}
-            >
-              <Crosshair className="h-3.5 w-3.5" />
-              {autoFire ? "Tự bắn: BẬT" : "Tự bắn: TẮT"}
-            </Button>
-
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleMute();
-              }}
-              className={`h-8 w-8 border-slate-700 backdrop-blur-md ${
-                isMuted
-                  ? "bg-rose-950/80 text-rose-300 hover:bg-rose-900/80 hover:text-rose-200"
-                  : "bg-slate-950/80 text-sky-300 hover:bg-slate-800 hover:text-white"
-              }`}
-            >
-              {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-            </Button>
-
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label={isFullscreen ? "Thu nhỏ màn hình" : "Toàn màn hình"}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleFullscreen();
-              }}
-              className="h-8 w-8 border-slate-700 bg-slate-950/80 text-sky-300 backdrop-blur-md hover:bg-slate-800 hover:text-white"
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-3.5 w-3.5" />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" />
-              )}
-            </Button>
-
-            {(gameStatus === "PLAYING" || gameStatus === "PAUSED") && (
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 onClick={(e) => {
                   e.currentTarget.blur();
-                  togglePause();
+                  toggleAutoFire();
                 }}
-                className="h-8 border-slate-700 bg-slate-950/80 text-xs font-semibold text-white backdrop-blur-md hover:bg-slate-800 hover:text-white"
+                className={`h-7 sm:h-8 px-2 sm:px-3 border-slate-700 text-[11px] sm:text-xs font-semibold backdrop-blur-md ${
+                  autoFire
+                    ? "bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900/90 hover:text-emerald-200"
+                    : "bg-slate-950/80 text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
               >
-                {gameStatus === "PAUSED" ? (
-                  <>
-                    <Play className="h-3.5 w-3.5" />
-                    {vi.game.resume}
-                  </>
+                <Crosshair className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">
+                  {autoFire ? "Tự bắn: BẬT" : "Tự bắn: TẮT"}
+                </span>
+                <span className="sm:hidden">{autoFire ? "Tự bắn" : "Thủ công"}</span>
+              </Button>
+
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  toggleMute();
+                }}
+                className={`h-7 w-7 sm:h-8 sm:w-8 border-slate-700 backdrop-blur-md ${
+                  isMuted
+                    ? "bg-rose-950/80 text-rose-300 hover:bg-rose-900/80 hover:text-rose-200"
+                    : "bg-slate-950/80 text-sky-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                {isMuted ? (
+                  <VolumeX className="h-3.5 w-3.5" />
                 ) : (
-                  <>
-                    <Pause className="h-3.5 w-3.5" />
-                    {vi.game.pause}
-                  </>
+                  <Volume2 className="h-3.5 w-3.5" />
                 )}
               </Button>
-            )}
+
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={isFullscreen ? "Thu nhỏ màn hình" : "Toàn màn hình"}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  toggleFullscreen();
+                }}
+                className="h-7 w-7 sm:h-8 sm:w-8 border-slate-700 bg-slate-950/80 text-sky-300 backdrop-blur-md hover:bg-slate-800 hover:text-white"
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+
+              {(gameStatus === "PLAYING" || gameStatus === "PAUSED") && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    togglePause();
+                  }}
+                  className="h-7 sm:h-8 px-2 sm:px-3 border-slate-700 bg-slate-950/80 text-[11px] sm:text-xs font-semibold text-white backdrop-blur-md hover:bg-slate-800 hover:text-white"
+                >
+                  {gameStatus === "PAUSED" ? (
+                    <>
+                      <Play className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{vi.game.resume}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Pause className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{vi.game.pause}</span>
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </motion.div>
         </div>
       )}
@@ -446,10 +475,42 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             initial={{ opacity: 0, scale: 0.85, y: -16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -12 }}
-            className="mx-auto flex items-center gap-2 rounded-full border border-amber-400/60 bg-slate-950/90 px-4 py-2 text-sm font-bold text-amber-300 shadow-xl backdrop-blur-md"
+            className="mx-auto flex max-w-[92vw] items-center gap-1.5 sm:gap-2 rounded-full border border-amber-400/60 bg-slate-950/90 px-3 py-1.5 sm:px-4 sm:py-2 text-center text-xs sm:text-sm font-bold text-amber-300 shadow-xl backdrop-blur-md"
           >
-            <Sparkles className="h-4 w-4 text-amber-400" />
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-amber-400" />
             <span>{rewardBanner}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Nút Bật Nộ / Phóng Tên Lửa cỡ lớn nổi giữa màn hình khi đầy 100% Nộ */}
+      <AnimatePresence>
+        {gameStatus === "PLAYING" && rageReady && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            className="pointer-events-auto mx-auto my-auto flex flex-col items-center"
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.currentTarget.blur();
+                activateRage();
+              }}
+              className="group flex animate-pulse items-center gap-2.5 rounded-2xl border-2 border-yellow-200 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-6 py-3.5 sm:px-8 sm:py-4 text-slate-950 shadow-[0_0_35px_rgba(245,158,11,0.7)] transition-transform hover:scale-105 active:scale-95 touch-none select-none"
+            >
+              <Flame className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 fill-yellow-200 text-slate-950" />
+              <div className="text-left">
+                <div className="text-base sm:text-xl font-black uppercase tracking-wide leading-none">
+                  {weapon.id === "icbm" ? "PHÓNG TÊN LỬA [R]" : "BẬT NỘ [R]"}
+                </div>
+                <div className="mt-1 text-[11px] sm:text-xs font-bold text-slate-900/90">
+                  Bấm phím R hoặc chạm để kích hoạt
+                </div>
+              </div>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -488,6 +549,16 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                         <p className="font-bold text-sky-400">Nâng Cấp Vũ Khí (Làn Phải)</p>
                         <p className="mt-0.5">
                           Lục → AKA → Súng Máy → Đại Bác (bắn hòm phải để mở khóa).
+                        </p>
+                      </div>
+                      <div className="col-span-2 border-t border-slate-800 pt-2">
+                        <p className="font-bold text-amber-300">Thanh Nộ &amp; Mưa Đạn [R]</p>
+                        <p className="mt-0.5">
+                          Bắn trúng quái để tích 100% Nộ, bấm{" "}
+                          <strong className="text-white">R</strong> (hoặc chạm nút{" "}
+                          <strong className="text-amber-300">BẬT NỘ</strong>) để xả Mưa Đạn x
+                          {RAGE_CONFIG.bulletCountMultiplier} tia, tốc bắn x
+                          {RAGE_CONFIG.fireRateMultiplier} trong {RAGE_CONFIG.durationSeconds}s.
                         </p>
                       </div>
                     </div>
@@ -809,27 +880,27 @@ export function GameHUD({ containerRef }: GameHUDProps) {
 
       {/* Thanh thông tin vũ khí & nút điều khiển bên dưới (chỉ hiện khi đã vào game) */}
       {!isInMenu && (
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3">
           {/* Thông số súng hiện tại & Tiến độ hòm bên phải */}
-          <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-950/80 px-3.5 py-2 text-xs text-white shadow-lg backdrop-blur-md">
-            <div>
-              <div className="flex items-center gap-1.5 font-bold text-sky-300">
-                <Zap className="h-3.5 w-3.5" />
-                <span>{weapon.name}</span>
+          <div className="pointer-events-auto flex w-full sm:w-auto items-center justify-between gap-2.5 sm:gap-3 rounded-xl border border-slate-700/80 bg-slate-950/80 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs text-white shadow-lg backdrop-blur-md">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 sm:gap-1.5 font-bold text-sky-300">
+                <Zap className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{weapon.name}</span>
                 {weapon.splashRadius > 0 && (
-                  <span className="rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
+                  <span className="shrink-0 rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
                     Nổ lan
                   </span>
                 )}
                 {overdriveLevel > 0 && (
-                  <span className="rounded bg-purple-500/30 px-1.5 py-0.5 text-[10px] text-purple-200">
+                  <span className="shrink-0 rounded bg-purple-500/30 px-1.5 py-0.5 text-[10px] text-purple-200">
                     Lv.+{overdriveLevel}
                   </span>
                 )}
               </div>
-              <div className="mt-0.5 text-[11px] text-slate-400">
-                Dame: <strong className="text-amber-300">{effectiveDamage}</strong> • Tốc bắn:{" "}
-                <strong className="text-emerald-300">{effectiveRate}</strong> phát/s
+              <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
+                Dame: <strong className="text-amber-300">{effectiveDamage}</strong> • Tốc:{" "}
+                <strong className="text-emerald-300">{effectiveRate}</strong>/s
                 {rageActive && (
                   <span className="ml-1.5 font-bold text-amber-300">
                     • x{RAGE_CONFIG.bulletCountMultiplier} Đạn
@@ -838,13 +909,22 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               </div>
             </div>
 
-            <div className="border-l border-slate-700 pl-3">
-              <div className="text-[11px] text-slate-400">
-                {nextWeapon
-                  ? `Hòm phải (Lên ${nextWeapon.name}):`
-                  : visibleLockedNext
-                    ? `Hòm phải (${visibleLockedNext.weapon.name}):`
-                    : "Trạng thái vũ khí:"}
+            <div className="shrink-0 border-l border-slate-700 pl-2.5 sm:pl-3 text-right sm:text-left">
+              <div className="text-[10px] sm:text-[11px] text-slate-400">
+                <span className="hidden sm:inline">
+                  {nextWeapon
+                    ? `Hòm phải (Lên ${nextWeapon.name}):`
+                    : visibleLockedNext
+                      ? `Hòm phải (${visibleLockedNext.weapon.name}):`
+                      : "Trạng thái vũ khí:"}
+                </span>
+                <span className="sm:hidden">
+                  {nextWeapon
+                    ? `Lên ${nextWeapon.name}:`
+                    : visibleLockedNext
+                      ? visibleLockedNext.weapon.name
+                      : "Vũ khí:"}
+                </span>
               </div>
               <div className="font-black text-amber-300">
                 {nextWeapon
@@ -857,39 +937,67 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           </div>
 
           {/* Nút bấm cảm ứng / chuột trái-phải + Kích hoạt Nộ chủ động + Hướng dẫn phím */}
-          <div className="pointer-events-auto flex items-center gap-2">
-            {gameStatus === "PLAYING" && (
-              <Button
-                type="button"
-                size="sm"
-                disabled={!rageReady}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.currentTarget.blur();
-                  activateRage();
-                }}
-                className={`h-10 gap-1.5 px-3 text-xs font-black transition-all ${
-                  rageActive || icbmAiming || icbmPending !== null
-                    ? "border border-amber-400 bg-amber-950/90 text-amber-300 opacity-100"
-                    : rageReady
-                      ? "animate-pulse bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-orange-500"
-                      : "border border-slate-700 bg-slate-950/80 text-slate-400"
-                }`}
-              >
-                <Flame className="h-4 w-4" />
-                {icbmAiming
-                  ? "Click sân chọn điểm!"
-                  : icbmPending
-                    ? "Tên lửa đang bay..."
-                    : rageActive
-                      ? `Mưa Đạn (${rageTimeLeft.toFixed(1)}s)`
+          <div className="pointer-events-auto flex w-full sm:w-auto items-center justify-between gap-2">
+            <div className="flex flex-1 sm:flex-none items-center gap-1.5">
+              {gameStatus === "PLAYING" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!rageReady}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.blur();
+                    activateRage();
+                  }}
+                  className={`h-11 sm:h-10 flex-1 sm:flex-none gap-1.5 px-3 text-xs font-black transition-all touch-none select-none ${
+                    rageActive || icbmAiming || icbmPending !== null
+                      ? "border border-amber-400 bg-amber-950/90 text-amber-300 opacity-100"
                       : rageReady
-                        ? weapon.id === "icbm"
-                          ? "PHÓNG TÊN LỬA [R]"
-                          : "BẬT NỘ [R]"
-                        : `Nộ ${ragePercent}%`}
-              </Button>
-            )}
+                        ? "animate-pulse bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-orange-500"
+                        : "border border-slate-700 bg-slate-950/80 text-slate-400"
+                  }`}
+                >
+                  <Flame className="h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {icbmAiming
+                      ? "Chạm sân chọn điểm!"
+                      : icbmPending
+                        ? "Tên lửa đang bay..."
+                        : rageActive
+                          ? `Mưa Đạn (${rageTimeLeft.toFixed(1)}s)`
+                          : rageReady
+                            ? weapon.id === "icbm"
+                              ? "PHÓNG TÊN LỬA [R]"
+                              : "BẬT NỘ [R]"
+                            : `Nộ ${ragePercent}%`}
+                  </span>
+                </Button>
+              )}
+
+              {!autoFire && gameStatus === "PLAYING" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    gameInput.fire = true;
+                  }}
+                  onPointerUp={() => {
+                    gameInput.fire = false;
+                  }}
+                  onPointerLeave={() => {
+                    gameInput.fire = false;
+                  }}
+                  onPointerCancel={() => {
+                    gameInput.fire = false;
+                  }}
+                  className="h-11 sm:h-10 px-3 border-rose-500/70 bg-rose-950/85 text-xs font-black text-rose-200 hover:bg-rose-900 active:scale-95 touch-none select-none"
+                >
+                  BẮN
+                </Button>
+              )}
+            </div>
 
             <span className="hidden lg:inline-block rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
               <strong className="text-white">A / D</strong> hoặc{" "}
@@ -901,13 +1009,14 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 : "Chọn Xoay chuột 3D để xoay tự do"}
             </span>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-1.5">
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
                 aria-label="Di chuyển trái"
-                onPointerDown={() => {
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   gameInput.left = true;
                 }}
                 onPointerUp={() => {
@@ -916,16 +1025,20 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 onPointerLeave={() => {
                   gameInput.left = false;
                 }}
-                className="h-10 w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95"
+                onPointerCancel={() => {
+                  gameInput.left = false;
+                }}
+                className="h-11 w-14 sm:h-10 sm:w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-6 w-6 sm:h-5 sm:w-5" />
               </Button>
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
                 aria-label="Di chuyển phải"
-                onPointerDown={() => {
+                onPointerDown={(e) => {
+                  e.preventDefault();
                   gameInput.right = true;
                 }}
                 onPointerUp={() => {
@@ -934,9 +1047,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 onPointerLeave={() => {
                   gameInput.right = false;
                 }}
-                className="h-10 w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95"
+                onPointerCancel={() => {
+                  gameInput.right = false;
+                }}
+                className="h-11 w-14 sm:h-10 sm:w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-6 w-6 sm:h-5 sm:w-5" />
               </Button>
             </div>
           </div>

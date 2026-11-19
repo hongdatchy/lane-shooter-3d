@@ -27,6 +27,23 @@ export function GameCamera({ runtimeRef }: GameCameraProps) {
 
     const delta = Math.min(rawDelta, 0.05);
     const { playerX, screenShake } = runtimeRef.current;
+    const aspect = state.size.width / Math.max(1, state.size.height);
+    const isPortrait = aspect < 1;
+
+    // Trên màn hình dọc điện thoại, tự động mở rộng góc nhìn và lùi nhẹ camera để thấy trọn 2 làn
+    const perspCam = state.camera as THREE.PerspectiveCamera;
+    if (perspCam.isPerspectiveCamera) {
+      const targetFov = isPortrait
+        ? THREE.MathUtils.clamp(46 + (1 - aspect) * 44, 46, 74)
+        : 46;
+      if (Math.abs(perspCam.fov - targetFov) > 0.1) {
+        perspCam.fov = targetFov;
+        perspCam.updateProjectionMatrix();
+      }
+    }
+    const portraitDistScale = isPortrait
+      ? THREE.MathUtils.clamp(1 + (1 - aspect) * 0.45, 1, 1.32)
+      : 1;
 
     // Rung nhẹ camera khi quái chạm vạch phòng thủ
     const shakeX = screenShake > 0 ? (Math.random() - 0.5) * screenShake * 0.8 : 0;
@@ -36,11 +53,19 @@ export function GameCamera({ runtimeRef }: GameCameraProps) {
       // Nghiêng nhẹ theo con trỏ chuột để tạo chiều sâu 3D ngay cả khi ở góc từ trên xuống
       const pointerTiltX = state.pointer.x * 1.25;
       const pointerTiltY = state.pointer.y * 0.55;
-      desiredPos.set(pointerTiltX + shakeX, 21.5 - pointerTiltY + shakeY, 20.5);
+      desiredPos.set(
+        pointerTiltX + shakeX,
+        (21.5 - pointerTiltY) * portraitDistScale + shakeY,
+        20.5 * portraitDistScale
+      );
       desiredLookAt.set(pointerTiltX * 0.25, 0, -4.5);
     } else {
       // THIRD_PERSON: Góc nhìn thấp sau vai nhân vật, bám theo trục X mượt mà
-      desiredPos.set(playerX * 0.65 + shakeX, 6.8 + shakeY, 17.5);
+      desiredPos.set(
+        playerX * 0.65 + shakeX,
+        6.8 * portraitDistScale + shakeY,
+        17.5 * portraitDistScale
+      );
       desiredLookAt.set(playerX * 0.45, 1.3, -11);
     }
 
