@@ -937,8 +937,32 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           </div>
 
           {/* Nút bấm cảm ứng / chuột trái-phải + Kích hoạt Nộ chủ động + Hướng dẫn phím */}
+          {/* Mobile: [◀ Trái] — [Nộ ở giữa] — [▶ Phải]; Desktop: [Nộ] [Hướng dẫn] [◀][▶] */}
           <div className="pointer-events-auto flex w-full sm:w-auto items-center justify-between gap-2">
-            <div className="flex flex-1 sm:flex-none items-center gap-1.5">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Di chuyển trái"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                gameInput.left = true;
+              }}
+              onPointerUp={() => {
+                gameInput.left = false;
+              }}
+              onPointerLeave={() => {
+                gameInput.left = false;
+              }}
+              onPointerCancel={() => {
+                gameInput.left = false;
+              }}
+              className="order-1 sm:order-3 h-14 w-20 sm:h-10 sm:w-10 shrink-0 rounded-xl sm:rounded-md border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
+            >
+              <ChevronLeft className="h-8 w-8 sm:h-5 sm:w-5" />
+            </Button>
+
+            <div className="order-2 sm:order-1 flex flex-1 sm:flex-none items-center gap-1.5 min-w-0">
               {gameStatus === "PLAYING" && (
                 <Button
                   type="button"
@@ -949,7 +973,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     e.currentTarget.blur();
                     activateRage();
                   }}
-                  className={`h-11 sm:h-10 flex-1 sm:flex-none gap-1.5 px-3 text-xs font-black transition-all touch-none select-none ${
+                  className={`h-14 sm:h-10 flex-1 sm:flex-none gap-1.5 px-3 text-xs sm:text-xs font-black rounded-xl sm:rounded-md transition-all touch-none select-none ${
                     rageActive || icbmAiming || icbmPending !== null
                       ? "border border-amber-400 bg-amber-950/90 text-amber-300 opacity-100"
                       : rageReady
@@ -992,14 +1016,14 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   onPointerCancel={() => {
                     gameInput.fire = false;
                   }}
-                  className="h-11 sm:h-10 px-3 border-rose-500/70 bg-rose-950/85 text-xs font-black text-rose-200 hover:bg-rose-900 active:scale-95 touch-none select-none"
+                  className="h-14 sm:h-10 px-3 rounded-xl sm:rounded-md border-rose-500/70 bg-rose-950/85 text-xs font-black text-rose-200 hover:bg-rose-900 active:scale-95 touch-none select-none"
                 >
                   BẮN
                 </Button>
               )}
             </div>
 
-            <span className="hidden lg:inline-block rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
+            <span className="hidden lg:inline-block lg:order-2 rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
               <strong className="text-white">A / D</strong> hoặc{" "}
               <strong className="text-white">← / →</strong> di chuyển •{" "}
               <strong className="text-amber-300">R</strong> bật Nộ •{" "}
@@ -1009,52 +1033,28 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 : "Chọn Xoay chuột 3D để xoay tự do"}
             </span>
 
-            <div className="flex shrink-0 items-center gap-2 sm:gap-1.5">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label="Di chuyển trái"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  gameInput.left = true;
-                }}
-                onPointerUp={() => {
-                  gameInput.left = false;
-                }}
-                onPointerLeave={() => {
-                  gameInput.left = false;
-                }}
-                onPointerCancel={() => {
-                  gameInput.left = false;
-                }}
-                className="h-11 w-14 sm:h-10 sm:w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
-              >
-                <ChevronLeft className="h-6 w-6 sm:h-5 sm:w-5" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label="Di chuyển phải"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  gameInput.right = true;
-                }}
-                onPointerUp={() => {
-                  gameInput.right = false;
-                }}
-                onPointerLeave={() => {
-                  gameInput.right = false;
-                }}
-                onPointerCancel={() => {
-                  gameInput.right = false;
-                }}
-                className="h-11 w-14 sm:h-10 sm:w-10 border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
-              >
-                <ChevronRight className="h-6 w-6 sm:h-5 sm:w-5" />
-              </Button>
-            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Di chuyển phải"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                gameInput.right = true;
+              }}
+              onPointerUp={() => {
+                gameInput.right = false;
+              }}
+              onPointerLeave={() => {
+                gameInput.right = false;
+              }}
+              onPointerCancel={() => {
+                gameInput.right = false;
+              }}
+              className="order-3 sm:order-4 h-14 w-20 sm:h-10 sm:w-10 shrink-0 rounded-xl sm:rounded-md border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
+            >
+              <ChevronRight className="h-8 w-8 sm:h-5 sm:w-5" />
+            </Button>
           </div>
         </div>
       )}
