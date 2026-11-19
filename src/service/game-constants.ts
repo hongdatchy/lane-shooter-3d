@@ -40,8 +40,8 @@ export const RAGE_CONFIG = {
 
   // Tốc độ & điểm tích nộ khi chiến đấu
   regenPerSecond: 0,         // Nộ tự hồi mỗi giây (đặt > 0 nếu muốn tự hồi theo thời gian)
-  gainMultiplier: 1,         // Hệ số nhân tốc độ hồi nộ chung (VD: 2 = hồi nhanh gấp đôi)
-  gainPerHit: 7,
+  gainMultiplier: 2,         // Hệ số nhân tốc độ hồi nộ chung (VD: 2 = hồi nhanh gấp đôi)
+  gainPerHit: 10,
   gainPerCannonHit: 2,
   gainPerNormalKill: 4,
   gainPerEliteKill: 10,
@@ -54,7 +54,7 @@ export const ICBM_CONFIG = {
   impactDelaySeconds: 2,   // Độ trễ từ lúc click chuột đến khi tên lửa rơi trúng mục tiêu (giây)
   explosionRadius: 7.5,    // Bán kính vùng nổ sát thương của tên lửa
   knockbackSpeed: 70,//28     // Lực đẩy văng quái ra xa tâm nổ tên lửa
-  knockbackDamping: 3,//6.5   // Độ hãm trượt sau khi bị đẩy
+  knockbackDamping: 5,//6.5   // Độ hãm trượt sau khi bị đẩy
 } as const;
 
 // Cấu hình âm thanh (Nếu muốn dùng file riêng, bỏ file vào public/sounds/ rồi điền đường dẫn vào src, VD: "/sounds/aka.mp3")

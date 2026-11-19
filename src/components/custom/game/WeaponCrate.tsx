@@ -15,6 +15,7 @@ interface WeaponCrateProps {
 }
 
 export function WeaponCrate({ runtimeRef }: WeaponCrateProps) {
+  const gameStatus = useGameStore((s) => s.gameStatus);
   const crateHits = useGameStore((s) => s.crateHits);
   const crateTargetHits = useGameStore((s) => s.crateTargetHits);
   const weaponIndex = useGameStore((s) => s.weaponIndex);
@@ -118,53 +119,56 @@ export function WeaponCrate({ runtimeRef }: WeaponCrateProps) {
         </group>
       )}
 
-      {/* Nhãn thông tin tên súng & tiến độ phóng to phía trên bệ */}
-      <Html
-        center
-        position={[0, nextWeapon ? 4.25 : 2.1, 0]}
-        distanceFactor={24}
-        style={{ pointerEvents: "none" }}
-      >
-        <div className="select-none whitespace-nowrap rounded-xl border-2 border-slate-600/90 bg-slate-950/95 px-4 py-2 text-center shadow-2xl backdrop-blur">
-          {nextWeapon ? (
-            <>
-              <div className="text-base sm:text-lg font-black uppercase tracking-wide text-sky-300 leading-tight">
-                {nextWeapon.name}
-              </div>
-              <div className="mt-0.5 text-sm sm:text-base font-black text-amber-300">
-                {crateHits} / {crateTargetHits} phát
-              </div>
-            </>
-          ) : visibleLockedNext ? (
-            <>
-              <div className="text-sm sm:text-base font-black uppercase tracking-wide text-amber-300 leading-tight">
-                {visibleLockedNext.weapon.name}
-              </div>
-              <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                Mở ở Màn {visibleLockedNext.minStage}
-              </div>
-            </>
-          ) : isAtMaxWeapon ? (
-            <>
-              <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
-                Đã đạt tối đa
-              </div>
-              <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                Sẵn sàng phóng Tên Lửa!
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
-                Đã đạt tối đa
-              </div>
-              <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                Sẵn sàng chiến đấu!
-              </div>
-            </>
-          )}
-        </div>
-      </Html>
+      {/* Nhãn thông tin tên súng & tiến độ phóng to phía trên bệ (chỉ hiện khi đang chơi, luôn nằm dưới HUD) */}
+      {gameStatus === "PLAYING" && (
+        <Html
+          center
+          position={[0, nextWeapon ? 4.25 : 2.1, 0]}
+          distanceFactor={24}
+          zIndexRange={[1, 0]}
+          style={{ pointerEvents: "none" }}
+        >
+          <div className="select-none whitespace-nowrap rounded-xl border-2 border-slate-600/90 bg-slate-950/95 px-4 py-2 text-center shadow-2xl backdrop-blur">
+            {nextWeapon ? (
+              <>
+                <div className="text-base sm:text-lg font-black uppercase tracking-wide text-sky-300 leading-tight">
+                  {nextWeapon.name}
+                </div>
+                <div className="mt-0.5 text-sm sm:text-base font-black text-amber-300">
+                  {crateHits} / {crateTargetHits} phát
+                </div>
+              </>
+            ) : visibleLockedNext ? (
+              <>
+                <div className="text-sm sm:text-base font-black uppercase tracking-wide text-amber-300 leading-tight">
+                  {visibleLockedNext.weapon.name}
+                </div>
+                <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
+                  Mở ở Màn {visibleLockedNext.minStage}
+                </div>
+              </>
+            ) : isAtMaxWeapon ? (
+              <>
+                <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
+                  Đã đạt tối đa
+                </div>
+                <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
+                  Sẵn sàng phóng Tên Lửa!
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
+                  Đã đạt tối đa
+                </div>
+                <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
+                  Sẵn sàng chiến đấu!
+                </div>
+              </>
+            )}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }

@@ -1183,7 +1183,13 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               />
               <meshBasicMaterial color="#fde047" transparent opacity={0.95} />
             </mesh>
-            <Html center position={[0, 1.4, 0]} distanceFactor={18} style={{ pointerEvents: "none" }}>
+            <Html
+              center
+              position={[0, 1.4, 0]}
+              distanceFactor={18}
+              zIndexRange={[1, 0]}
+              style={{ pointerEvents: "none" }}
+            >
               <div className="select-none whitespace-nowrap rounded-full border border-rose-400 bg-rose-950/95 px-3 py-1 text-xs font-black text-amber-300 shadow-xl">
                 TÊN LỬA RƠI SAU <span ref={icbmCountdownElRef}>{icbmPending.delaySeconds.toFixed(1)}s</span>
               </div>

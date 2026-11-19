@@ -16,6 +16,7 @@ interface PlayerUnitProps {
 
 export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
   function PlayerUnit({ weapon, muzzleFlashRef }, ref) {
+    const gameStatus = useGameStore((s) => s.gameStatus);
     const rage = useGameStore((s) => s.rage);
     const rageReady = useGameStore((s) => s.rageReady);
     const rageActive = useGameStore((s) => s.rageActive);
@@ -134,32 +135,40 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
           </mesh>
         </group>
 
-        {/* Nhãn trạng thái Nộ trên đầu nhân vật */}
-        <Html center position={[0, 2.38, 0]} distanceFactor={16} style={{ pointerEvents: "none" }}>
-          <div className="select-none whitespace-nowrap text-center">
-            {icbmAiming ? (
-              <span className="animate-pulse rounded-full border border-rose-300 bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white shadow-lg">
-                CLICK CHỌN ĐIỂM PHÓNG!
-              </span>
-            ) : icbmPending ? (
-              <span className="rounded-full border border-amber-300 bg-orange-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
-                TÊN LỬA ĐANG BAY!
-              </span>
-            ) : rageActive ? (
-              <span className="rounded-full border border-amber-300/80 bg-amber-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
-                MƯA ĐẠN {rageTimeLeft.toFixed(1)}s
-              </span>
-            ) : rageReady ? (
-              <span className="animate-pulse rounded-full border border-yellow-300 bg-amber-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg">
-                {weapon.id === "icbm" ? "TÊN LỬA SẴN SÀNG [R]" : "NỘ ĐẦY • BẤM [R]"}
-              </span>
-            ) : (
-              <span className="rounded bg-slate-950/85 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
-                NỘ {ragePercent}%
-              </span>
-            )}
-          </div>
-        </Html>
+        {/* Nhãn trạng thái Nộ trên đầu nhân vật (chỉ hiện khi đang chơi, luôn nằm dưới HUD) */}
+        {gameStatus === "PLAYING" && (
+          <Html
+            center
+            position={[0, 2.38, 0]}
+            distanceFactor={16}
+            zIndexRange={[1, 0]}
+            style={{ pointerEvents: "none" }}
+          >
+            <div className="select-none whitespace-nowrap text-center">
+              {icbmAiming ? (
+                <span className="animate-pulse rounded-full border border-rose-300 bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white shadow-lg">
+                  CLICK CHỌN ĐIỂM PHÓNG!
+                </span>
+              ) : icbmPending ? (
+                <span className="rounded-full border border-amber-300 bg-orange-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
+                  TÊN LỬA ĐANG BAY!
+                </span>
+              ) : rageActive ? (
+                <span className="rounded-full border border-amber-300/80 bg-amber-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
+                  MƯA ĐẠN {rageTimeLeft.toFixed(1)}s
+                </span>
+              ) : rageReady ? (
+                <span className="animate-pulse rounded-full border border-yellow-300 bg-amber-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg">
+                  {weapon.id === "icbm" ? "TÊN LỬA SẴN SÀNG [R]" : "NỘ ĐẦY • BẤM [R]"}
+                </span>
+              ) : (
+                <span className="rounded bg-slate-950/85 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
+                  NỘ {ragePercent}%
+                </span>
+              )}
+            </div>
+          </Html>
+        )}
       </group>
     );
   }

@@ -161,7 +161,7 @@ export const STAGE_CATALOG: StageConfigDTO[] = [
     normalSpeed: 1.85,
     eliteSpeed: 1.85,
     normalHp: 2600,
-    eliteHp: 200000,
+    eliteHp: 300000,
     normalScale: 5.2,
     eliteScale: 5.2,
     eliteChance: 1,
