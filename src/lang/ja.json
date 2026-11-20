@@ -106,7 +106,14 @@
     "youBadge": "あなた",
     "clearBadge": "Clear",
     "boardMeta": "ステージ {wave} • {kills} 撃破",
-    "pointsUnit": "点"
+    "pointsUnit": "点",
+    "filesUnit": "ファイル",
+    "loadingAssetsTitle": "ゲームリソースを読み込み中...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} ファイル)",
+    "loadingAssetsHint": "リソースはブラウザにキャッシュされ、次回以降高速に読み込まれます。",
+    "loadingAssetsError": "一部の3Dモデルを読み込めませんでした（ネットワークまたはR2のCORSエラー）。",
+    "loadingAssetsRetry": "再試行",
+    "loadingAssetsPlayAnyway": "基本モデルでプレイ"
   },
   "modals": {
     "pausedTitle": "一時停止中 (ステージ {stage})",

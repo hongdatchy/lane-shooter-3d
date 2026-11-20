@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { DEFAULT_R2_ASSET_URL } from "@/lib/utils";
 
-const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v1";
+export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v1";
 
 // Bật bộ nhớ đệm RAM nội bộ của Three.js trong suốt phiên chơi
 THREE.Cache.enabled = true;
@@ -15,7 +15,7 @@ interface CachedBufferPayload {
 
 const inFlightDownloads = new Map<string, Promise<CachedBufferPayload>>();
 
-function isModelAssetUrl(url: string): boolean {
+export function isModelAssetUrl(url: string): boolean {
   if (!url) return false;
   const cleanUrl = url.split("?")[0].toLowerCase();
   if (
@@ -34,7 +34,37 @@ function isModelAssetUrl(url: string): boolean {
   return Boolean(r2Base && cleanUrl.startsWith(r2Base));
 }
 
-function buildResponseFromBuffer(payload: CachedBufferPayload): Response {
+export function getLocalFallbackUrls(url: string): string[] {
+  try {
+    const cleanUrl = url.split("?")[0];
+    const r2Base = (
+      process.env.NEXT_PUBLIC_R2_ASSET_URL ?? DEFAULT_R2_ASSET_URL
+    )
+      .trim()
+      .replace(/\/+$/, "");
+
+    let rel = cleanUrl;
+    if (r2Base && cleanUrl.toLowerCase().startsWith(r2Base.toLowerCase())) {
+      rel = cleanUrl.slice(r2Base.length).replace(/^\/+/, "");
+    } else {
+      const parsed = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+      rel = parsed.pathname.replace(/^\/+/, "");
+    }
+
+    const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").trim().replace(/\/+$/, "");
+    const list: string[] = [];
+    if (basePath) {
+      list.push(`${basePath}/${rel}`);
+    }
+    list.push(`/${rel}`);
+    list.push(`./${rel}`);
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+export function buildResponseFromBuffer(payload: CachedBufferPayload): Response {
   return new Response(payload.buffer.slice(0), {
     status: 200,
     statusText: "OK",
@@ -47,9 +77,26 @@ function buildResponseFromBuffer(payload: CachedBufferPayload): Response {
 }
 
 /**
+ * Kiểm tra xem một URL model đã có sẵn trong CacheStorage của trình duyệt chưa
+ */
+export async function isModelCached(url: string): Promise<boolean> {
+  if (typeof window === "undefined" || !("caches" in window)) {
+    return false;
+  }
+  try {
+    const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
+    const match = await cache.match(url);
+    return Boolean(match && match.ok);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Kích hoạt bộ nhớ đệm 2 tầng cho toàn bộ file 3D (.glb, .fbx) từ Cloudflare R2:
  * 1. THREE.Cache (RAM): dùng lại ngay trong phiên chơi mà không parse/tải lại.
  * 2. Browser CacheStorage (Ổ cứng trình duyệt): lưu bền vững qua các lần F5 / đóng mở lại trình duyệt.
+ * Có cơ chế tự động thử fallback sang đường dẫn file local nếu R2 bị lỗi CORS hoặc mất mạng.
  */
 export function installModelBrowserCache(): void {
   if (typeof window === "undefined" || isFetchPatched) {
@@ -91,7 +138,7 @@ export function installModelBrowserCache(): void {
           return cachedRes;
         }
       } catch {
-        // Nếu trình duyệt chặn CacheStorage (ví dụ chế độ ẩn danh nghiêm ngặt) -> bỏ qua xuống bước tải mạng
+        // Bỏ qua nếu chế độ ẩn danh chặn
       }
     }
 
@@ -99,15 +146,44 @@ export function installModelBrowserCache(): void {
     let pending = inFlightDownloads.get(url);
     if (!pending) {
       pending = (async (): Promise<CachedBufferPayload> => {
-        const netRes = await nativeFetch(url, {
-          ...init,
-          method: "GET",
-          mode: "cors",
-          credentials: "omit",
-        });
+        let netRes: Response | null = null;
+        let lastError: unknown = null;
 
-        if (!netRes.ok) {
-          throw new Error(`Không tải được model từ R2 (${netRes.status}): ${url}`);
+        // Ưu tiên tải từ Cloudflare R2
+        try {
+          const res = await nativeFetch(url, {
+            ...init,
+            method: "GET",
+            mode: "cors",
+            credentials: "omit",
+          });
+          if (res.ok) {
+            netRes = res;
+          } else {
+            lastError = new Error(`R2 HTTP ${res.status}`);
+          }
+        } catch (err) {
+          lastError = err;
+        }
+
+        // Nếu R2 bị lỗi CORS hoặc không tải được -> thử fallback sang các đường dẫn local tương ứng
+        if (!netRes) {
+          const fallbacks = getLocalFallbackUrls(url);
+          for (const fbUrl of fallbacks) {
+            try {
+              const fbRes = await nativeFetch(fbUrl, init);
+              if (fbRes.ok) {
+                netRes = fbRes;
+                break;
+              }
+            } catch {
+              // Tiếp tục thử fallback tiếp theo
+            }
+          }
+        }
+
+        if (!netRes || !netRes.ok) {
+          throw lastError || new Error(`Không tải được model từ R2 hoặc local fallback: ${url}`);
         }
 
         const contentType =

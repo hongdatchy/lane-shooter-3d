@@ -106,7 +106,14 @@
     "youBadge": "Tú",
     "clearBadge": "Clear",
     "boardMeta": "Nivel {wave} • {kills} bajas",
-    "pointsUnit": "pts"
+    "pointsUnit": "pts",
+    "filesUnit": "archivos",
+    "loadingAssetsTitle": "Cargando recursos del juego...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} archivos)",
+    "loadingAssetsHint": "Los recursos se guardarán en la memoria del navegador para futuras partidas.",
+    "loadingAssetsError": "No se pudieron cargar algunos modelos 3D (Error de red o CORS en R2).",
+    "loadingAssetsRetry": "Reintentar",
+    "loadingAssetsPlayAnyway": "Jugar con modelos básicos"
   },
   "modals": {
     "pausedTitle": "En Pausa (Nivel {stage})",

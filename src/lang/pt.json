@@ -106,7 +106,14 @@
     "youBadge": "Você",
     "clearBadge": "Clear",
     "boardMeta": "Fase {wave} • {kills} abates",
-    "pointsUnit": "pts"
+    "pointsUnit": "pts",
+    "filesUnit": "arquivos",
+    "loadingAssetsTitle": "Carregando recursos do jogo...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} arquivos)",
+    "loadingAssetsHint": "Os recursos serão salvos no cache do navegador para as próximas partidas.",
+    "loadingAssetsError": "Falha ao carregar alguns modelos 3D (Erro de rede ou CORS no R2).",
+    "loadingAssetsRetry": "Tentar novamente",
+    "loadingAssetsPlayAnyway": "Jogar com modelos básicos"
   },
   "modals": {
     "pausedTitle": "Pausado (Fase {stage})",

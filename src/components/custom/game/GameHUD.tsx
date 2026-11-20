@@ -10,6 +10,7 @@ import {
   Crown,
   Flame,
   Heart,
+  Loader2,
   Maximize2,
   Minimize2,
   Moon,
@@ -38,6 +39,7 @@ import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
+import { startBackgroundPreload } from "@/service/asset-preloader";
 
 interface GameHUDProps {
   containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -76,6 +78,15 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     cameraMode,
     autoFire,
     isMuted,
+    assetsReady,
+    assetsLoading,
+    assetsLoadedCount,
+    assetsTotal,
+    assetsPercent,
+    assetsError,
+    assetsWaitingToStart,
+    setAssetsReady,
+    setAssetsWaitingToStart,
     hydrateProfile,
     setPlayerName,
     setLeaderboardData,
@@ -179,14 +190,31 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       setPlayerName(chosenName);
       setIsEditingName(false);
     }
+    if (!assetsReady) {
+      setAssetsWaitingToStart(true);
+      return;
+    }
     enterFullscreen();
     startGame();
   };
 
   const handleRestart = () => {
+    if (!assetsReady) {
+      setAssetsWaitingToStart(true);
+      return;
+    }
     enterFullscreen();
     startGame();
   };
+
+  // Tự động vào game nếu người chơi đã bấm "Chơi ngay" trong lúc đang chờ tải tài nguyên
+  useEffect(() => {
+    if (assetsWaitingToStart && assetsReady) {
+      setAssetsWaitingToStart(false);
+      enterFullscreen();
+      startGame();
+    }
+  }, [assetsWaitingToStart, assetsReady]);
 
   const handleBackToMenu = () => {
     exitFullscreen();
@@ -652,8 +680,20 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           size="lg"
                           className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
                         >
-                          <Play className="h-4 w-4 fill-current" />
-                          {trans.menu.playNow}
+                          {!assetsReady ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin text-sky-200" />
+                              <span>{trans.menu.playNow}</span>
+                              <span className="text-xs font-semibold text-sky-200/90">
+                                ({assetsPercent}%)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 fill-current" />
+                              <span>{trans.menu.playNow}</span>
+                            </>
+                          )}
                         </Button>
                       </form>
                     ) : (
@@ -690,8 +730,20 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           onClick={() => handlePlayNow()}
                           className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
                         >
-                          <Play className="h-4 w-4 fill-current" />
-                          {trans.menu.playNow}
+                          {!assetsReady ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin text-sky-200" />
+                              <span>{trans.menu.playNow}</span>
+                              <span className="text-xs font-semibold text-sky-200/90">
+                                ({assetsPercent}%)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 fill-current" />
+                              <span>{trans.menu.playNow}</span>
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}
@@ -1112,6 +1164,97 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           </div>
         </div>
       )}
+
+      {/* Modal chờ nạp tài nguyên game: hiện khi bấm Chơi ngay nhưng tải ngầm chưa hoàn thành 100% */}
+      <AnimatePresence>
+        {assetsWaitingToStart && !assetsReady && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-900/95 p-6 text-center text-white shadow-2xl"
+            >
+              <div className="relative mb-4 flex items-center justify-center">
+                <div className="absolute h-16 w-16 rounded-full border-4 border-sky-500/20" />
+                <Loader2 className="h-10 w-10 animate-spin text-sky-400" />
+              </div>
+
+              <h3 className="text-lg font-black tracking-wide text-sky-300">
+                {trans.menu.loadingAssetsTitle}
+              </h3>
+
+              <div className="mt-3 flex items-baseline justify-center gap-1.5">
+                <span className="text-3xl font-black text-amber-300">
+                  {assetsPercent}%
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  ({assetsLoadedCount}/{assetsTotal} {trans.menu.filesUnit})
+                </span>
+              </div>
+
+              <div className="mt-3.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 via-sky-400 to-amber-400 transition-all duration-300"
+                  style={{ width: `${assetsPercent}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                {trans.menu.loadingAssetsHint}
+              </p>
+
+              {assetsError && (
+                <div className="mt-4 w-full rounded-lg border border-rose-500/40 bg-rose-950/40 p-3 text-xs text-rose-300">
+                  <p className="font-semibold">{trans.menu.loadingAssetsError}</p>
+                  <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => startBackgroundPreload()}
+                      className="border-slate-700 bg-slate-800 text-xs text-white hover:bg-slate-700"
+                    >
+                      <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                      {trans.menu.loadingAssetsRetry}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setAssetsReady(true);
+                        setAssetsWaitingToStart(false);
+                        enterFullscreen();
+                        startGame();
+                      }}
+                      className="bg-amber-600 text-xs text-white hover:bg-amber-500"
+                    >
+                      {trans.menu.loadingAssetsPlayAnyway}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-5 w-full">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAssetsWaitingToStart(false)}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  {trans.menu.cancel}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

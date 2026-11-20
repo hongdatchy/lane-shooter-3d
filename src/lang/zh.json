@@ -106,7 +106,14 @@
     "youBadge": "你",
     "clearBadge": "通关",
     "boardMeta": "第 {wave} 关 • {kills} 击杀",
-    "pointsUnit": "分"
+    "pointsUnit": "分",
+    "filesUnit": "个文件",
+    "loadingAssetsTitle": "正在加载游戏资源...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} 个文件)",
+    "loadingAssetsHint": "资源将缓存在浏览器中，以便下次畅玩。",
+    "loadingAssetsError": "部分3D模型加载失败（网络或R2跨域CORS问题）。" ,
+    "loadingAssetsRetry": "重试",
+    "loadingAssetsPlayAnyway": "使用基础模型游玩"
   },
   "modals": {
     "pausedTitle": "已暂停 (第 {stage} 关)",

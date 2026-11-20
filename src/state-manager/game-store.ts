@@ -51,12 +51,25 @@ interface GameState {
   autoFire: boolean;
   isMuted: boolean;
   sessionId: number;
+
+  // Tải ngầm tài nguyên 3D & Chặn Start Game khi chưa xong
+  assetsReady: boolean;
+  assetsLoading: boolean;
+  assetsLoadedCount: number;
+  assetsTotal: number;
+  assetsPercent: number;
+  assetsError: string | null;
+  assetsWaitingToStart: boolean;
 }
 
 interface GameActions {
   hydrateProfile: () => void;
   setPlayerName: (name: string) => string;
   setLeaderboardData: (entries: LeaderboardEntryDTO[], source: LeaderboardSource) => void;
+  setAssetProgress: (loadedCount: number, total: number) => void;
+  setAssetsReady: (ready: boolean) => void;
+  setAssetsError: (error: string | null) => void;
+  setAssetsWaitingToStart: (waiting: boolean) => void;
   startGame: () => void;
   returnToMenu: () => void;
   pauseGame: () => void;
@@ -153,6 +166,33 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   autoFire: true,
   isMuted: false,
   sessionId: 0,
+
+  assetsReady: false,
+  assetsLoading: false,
+  assetsLoadedCount: 0,
+  assetsTotal: 6,
+  assetsPercent: 0,
+  assetsError: null,
+  assetsWaitingToStart: false,
+
+  setAssetProgress: (loadedCount, total) => {
+    const percent =
+      total > 0 ? Math.min(100, Math.round((loadedCount / total) * 100)) : 100;
+    set({
+      assetsLoadedCount: loadedCount,
+      assetsTotal: total,
+      assetsPercent: percent,
+      assetsReady: loadedCount >= total,
+      assetsLoading: loadedCount < total,
+      assetsError: null,
+    });
+  },
+
+  setAssetsReady: (ready) => set({ assetsReady: ready, assetsLoading: !ready }),
+
+  setAssetsError: (error) => set({ assetsError: error, assetsLoading: false }),
+
+  setAssetsWaitingToStart: (waiting) => set({ assetsWaitingToStart: waiting }),
 
   hydrateProfile: () => {
     const savedName = playerStorageService.getPlayerName();

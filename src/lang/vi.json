@@ -106,7 +106,14 @@
     "youBadge": "Bạn",
     "clearBadge": "Clear",
     "boardMeta": "Màn {wave} • {kills} quái",
-    "pointsUnit": "điểm"
+    "pointsUnit": "điểm",
+    "filesUnit": "tệp",
+    "loadingAssetsTitle": "Đang tải tài nguyên game...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} tệp)",
+    "loadingAssetsHint": "Tài nguyên sẽ được lưu vào bộ nhớ trình duyệt cho các lần chơi sau.",
+    "loadingAssetsError": "Không tải được một số model 3D (lỗi mạng hoặc CORS trên R2).",
+    "loadingAssetsRetry": "Thử lại",
+    "loadingAssetsPlayAnyway": "Chơi với mô hình cơ bản"
   },
   "modals": {
     "pausedTitle": "Đang tạm dừng (Màn {stage})",

@@ -6,6 +6,8 @@ import { Loader2 } from "lucide-react";
 import { GameHUD } from "@/components/custom/game/GameHUD";
 import { useGameStore } from "@/state-manager/game-store";
 import { useTransClientSide } from "@/lang/useTransClientSide";
+import "@/service/model-cache";
+import "@/service/asset-preloader";
 
 function ViewportLoading() {
   const trans = useTransClientSide();

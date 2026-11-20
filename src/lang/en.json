@@ -106,7 +106,14 @@
     "youBadge": "You",
     "clearBadge": "Clear",
     "boardMeta": "Stage {wave} • {kills} kills",
-    "pointsUnit": "pts"
+    "pointsUnit": "pts",
+    "filesUnit": "files",
+    "loadingAssetsTitle": "Loading game assets...",
+    "loadingAssetsProgress": "{percent}% ({loaded}/{total} files)",
+    "loadingAssetsHint": "Assets will be cached in your browser for future sessions.",
+    "loadingAssetsError": "Failed to load some 3D models (Network or CORS issue on R2).",
+    "loadingAssetsRetry": "Retry",
+    "loadingAssetsPlayAnyway": "Play with basic models"
   },
   "modals": {
     "pausedTitle": "Paused (Stage {stage})",
