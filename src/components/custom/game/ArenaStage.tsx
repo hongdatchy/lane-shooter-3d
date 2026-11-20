@@ -3,8 +3,11 @@
 import { useMemo } from "react";
 import { Stars } from "@react-three/drei";
 import { ARENA_CONFIG } from "@/service/game-constants";
+import { useAppStore } from "@/state-manager/app-store";
 
 export function ArenaStage() {
+  const theme = useAppStore((s) => s.theme);
+  const isLight = theme === "light";
   const dividerSegments = useMemo(() => {
     const list: number[] = [];
     for (let z = -34; z <= 10; z += 2.6) {
@@ -22,36 +25,41 @@ export function ArenaStage() {
 
   return (
     <group>
-      {/* Nền sao vũ trụ phía xa */}
-      <Stars radius={65} depth={35} count={1400} factor={3.2} saturation={0.2} fade speed={0.5} />
+      {/* Nền sao vũ trụ (chỉ hiện ở giao diện Tối) */}
+      {!isLight && (
+        <Stars radius={65} depth={35} count={1400} factor={3.2} saturation={0.2} fade speed={0.5} />
+      )}
 
       {/* Lưới nền không gian phía dưới sân đấu */}
-      <gridHelper args={[100, 50, "#1e293b", "#0f172a"]} position={[0, -0.35, -10]} />
+      <gridHelper
+        args={[100, 50, isLight ? "#94a3b8" : "#1e293b", isLight ? "#cbd5e1" : "#0f172a"]}
+        position={[0, -0.35, -10]}
+      />
 
       {/* Mặt sàn chính của cầu đấu 2 làn */}
       <mesh position={[0, -0.1, ARENA_CONFIG.centerZ]} receiveShadow>
         <boxGeometry args={[ARENA_CONFIG.width, 0.2, ARENA_CONFIG.length]} />
-        <meshStandardMaterial color="#111827" roughness={0.75} metalness={0.25} />
+        <meshStandardMaterial color={isLight ? "#cbd5e1" : "#111827"} roughness={0.75} metalness={0.25} />
       </mesh>
 
-      {/* Làn trái (rộng 3x): Khu vực quái (tông đỏ tối cảnh báo) */}
+      {/* Làn trái (rộng 3x): Khu vực quái */}
       <mesh
         position={[leftLaneCenterX, 0.005, ARENA_CONFIG.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
         <planeGeometry args={[leftLaneWidth - 0.25, ARENA_CONFIG.length - 1]} />
-        <meshStandardMaterial color="#1e131b" roughness={0.85} metalness={0.1} />
+        <meshStandardMaterial color={isLight ? "#f1e4e8" : "#1e131b"} roughness={0.85} metalness={0.1} />
       </mesh>
 
-      {/* Làn phải: Khu vực Hòm Item / Vũ khí (tông xanh công nghệ) */}
+      {/* Làn phải: Khu vực Hòm Item / Vũ khí */}
       <mesh
         position={[rightLaneCenterX, 0.005, ARENA_CONFIG.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
         <planeGeometry args={[rightLaneWidth - 0.25, ARENA_CONFIG.length - 1]} />
-        <meshStandardMaterial color="#0f1b2e" roughness={0.8} metalness={0.15} />
+        <meshStandardMaterial color={isLight ? "#e0f2fe" : "#0f1b2e"} roughness={0.8} metalness={0.15} />
       </mesh>
 
       {/* Vạch phân chia giữa 2 làn tại dividerX */}

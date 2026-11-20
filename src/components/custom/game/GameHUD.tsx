@@ -12,11 +12,13 @@ import {
   Heart,
   Maximize2,
   Minimize2,
+  Moon,
   Pause,
   Pencil,
   Play,
   RotateCcw,
   Sparkles,
+  Sun,
   Trophy,
   User,
   Volume2,
@@ -28,22 +30,20 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { CameraMode } from "@/dto/GameDTO";
 import { useGameStore } from "@/state-manager/game-store";
+import { useAppStore } from "@/state-manager/app-store";
 import { weaponService } from "@/service/weapon-service";
 import { leaderboardService } from "@/service/leaderboard-service";
 import { RAGE_CONFIG } from "@/service/game-constants";
 import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
-import { vi } from "@/lang/vi";
+import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
 
 interface GameHUDProps {
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const CAMERA_MODES: { mode: CameraMode; label: string }[] = [
-  { mode: "TOP_DOWN", label: vi.game.camera_labels.TOP_DOWN },
-  { mode: "THIRD_PERSON", label: vi.game.camera_labels.THIRD_PERSON },
-  { mode: "FREE_ORBIT", label: vi.game.camera_labels.FREE_ORBIT },
-];
+const CAMERA_ORDER: CameraMode[] = ["TOP_DOWN", "THIRD_PERSON", "FREE_ORBIT"];
 
 export function GameHUD({ containerRef }: GameHUDProps) {
   const {
@@ -94,6 +94,13 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameError, setNameError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const theme = useAppStore((s) => s.theme);
+  const toggleTheme = useAppStore((s) => s.toggleTheme);
+  const trans = useTransClientSide();
+  const cameraModes = CAMERA_ORDER.map((mode) => ({
+    mode,
+    label: trans.camera[mode],
+  }));
 
   const weapon = weaponService.getWeaponByIndex(weaponIndex);
   const nextWeapon = weaponService.getNextWeapon(weaponIndex, wave);
@@ -164,7 +171,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     if (e) e.preventDefault();
     const chosenName = needsNameInput ? nameDraft.trim() : playerName.trim();
     if (!chosenName) {
-      setNameError("Vui lòng nhập tên người chơi trước khi bắt đầu!");
+      setNameError(trans.menu.emptyNameError);
       return;
     }
     setNameError("");
@@ -270,8 +277,8 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   }, []);
 
   const isInMenu = gameStatus === "MENU";
-  const currentCameraLabel =
-    CAMERA_MODES.find((item) => item.mode === cameraMode)?.label || cameraMode;
+  const currentCameraLabel = trans.camera[cameraMode] || cameraMode;
+  const stageDisplay = wave >= maxWaves ? `${wave} / ${maxWaves}` : `${wave}`;
 
   return (
     <div
@@ -314,26 +321,26 @@ export function GameHUD({ containerRef }: GameHUDProps) {
 
             <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] sm:text-sm">
               <div>
-                <span className="text-slate-400 mr-1">Màn:</span>
-                <span className="font-black text-sky-300">
-                  {wave >= maxWaves ? `${wave} / ${maxWaves}` : wave}
-                </span>
+                <span className="text-slate-400 mr-1">{trans.hud.stage}:</span>
+                <span className="font-black text-sky-300">{stageDisplay}</span>
               </div>
               <div>
-                <span className="hidden sm:inline text-slate-400 mr-1">Quái màn này:</span>
-                <span className="sm:hidden text-slate-400 mr-1">Quái:</span>
+                <span className="hidden sm:inline text-slate-400 mr-1">
+                  {trans.hud.stageKillsLong}
+                </span>
+                <span className="sm:hidden text-slate-400 mr-1">{trans.hud.stageKillsShort}</span>
                 <span className="font-bold text-emerald-300">
                   {stageKills} / {stageTargetKills}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 mr-1">Điểm:</span>
+                <span className="text-slate-400 mr-1">{trans.hud.score}</span>
                 <span className="font-black text-amber-300">{score}</span>
               </div>
             </div>
           </motion.div>
 
-          {/* Phải: Đổi góc Camera + Tự bắn + Âm thanh + Toàn màn hình + Tạm dừng */}
+          {/* Phải: Đổi góc Camera + Tự bắn + Âm thanh + Ngôn ngữ + Theme + Toàn màn hình + Tạm dừng */}
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -357,7 +364,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             {/* Desktop/Tablet: thanh chọn 3 góc camera */}
             <div className="hidden sm:flex items-center rounded-xl border border-slate-700/80 bg-slate-950/80 p-1 shadow-lg backdrop-blur-md">
               <Camera className="mx-1.5 h-3.5 w-3.5 text-sky-400" />
-              {CAMERA_MODES.map((item) => (
+              {cameraModes.map((item) => (
                 <button
                   key={item.mode}
                   type="button"
@@ -393,16 +400,18 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               >
                 <Crosshair className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">
-                  {autoFire ? "Tự bắn: BẬT" : "Tự bắn: TẮT"}
+                  {autoFire ? trans.hud.autoFireOn : trans.hud.autoFireOff}
                 </span>
-                <span className="sm:hidden">{autoFire ? "Tự bắn" : "Thủ công"}</span>
+                <span className="sm:hidden">
+                  {autoFire ? trans.hud.autoFireShortOn : trans.hud.autoFireShortOff}
+                </span>
               </Button>
 
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
-                aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+                aria-label={isMuted ? trans.hud.unmute : trans.hud.mute}
                 onClick={(e) => {
                   e.currentTarget.blur();
                   toggleMute();
@@ -420,11 +429,31 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 )}
               </Button>
 
+              <LanguageSwitcher variant="hud" />
+
               <Button
                 type="button"
                 size="icon"
                 variant="outline"
-                aria-label={isFullscreen ? "Thu nhỏ màn hình" : "Toàn màn hình"}
+                aria-label={theme === "light" ? trans.app.toDark : trans.app.toLight}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  toggleTheme();
+                }}
+                className="h-7 w-7 sm:h-8 sm:w-8 border-slate-700 bg-slate-950/80 text-amber-300 backdrop-blur-md hover:bg-slate-800 hover:text-amber-200"
+              >
+                {theme === "light" ? (
+                  <Moon className="h-3.5 w-3.5" />
+                ) : (
+                  <Sun className="h-3.5 w-3.5" />
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={isFullscreen ? trans.hud.fullscreenExit : trans.hud.fullscreenEnter}
                 onClick={(e) => {
                   e.currentTarget.blur();
                   toggleFullscreen();
@@ -452,12 +481,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   {gameStatus === "PAUSED" ? (
                     <>
                       <Play className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{vi.game.resume}</span>
+                      <span className="hidden sm:inline">{trans.hud.resume}</span>
                     </>
                   ) : (
                     <>
                       <Pause className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{vi.game.pause}</span>
+                      <span className="hidden sm:inline">{trans.hud.pause}</span>
                     </>
                   )}
                 </Button>
@@ -504,10 +533,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               <Flame className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 fill-yellow-200 text-slate-950" />
               <div className="text-left">
                 <div className="text-base sm:text-xl font-black uppercase tracking-wide leading-none">
-                  {weapon.id === "icbm" ? "PHÓNG TÊN LỬA [R]" : "BẬT NỘ [R]"}
+                  {weapon.id === "icbm"
+                    ? trans.hud.rageButtonCenterIcbm
+                    : trans.hud.rageButtonCenter}
                 </div>
                 <div className="mt-1 text-[11px] sm:text-xs font-bold text-slate-900/90">
-                  Bấm phím R hoặc chạm để kích hoạt
+                  {trans.hud.rageCenterHint}
                 </div>
               </div>
             </button>
@@ -533,32 +564,34 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 <div className="flex flex-col justify-between gap-4">
                   <div>
                     <Badge variant="info" className="mb-2.5 bg-sky-500/20 text-sky-300">
-                      3D Demo Prototype
+                      {trans.menu.badge}
                     </Badge>
-                    <h2 className="text-2xl font-black tracking-tight">{vi.game.title}</h2>
-                    <p className="mt-1.5 text-xs sm:text-sm text-slate-300">{vi.game.subtitle}</p>
+                    <h2 className="text-2xl font-black tracking-tight">{trans.menu.title}</h2>
+                    <p className="mt-1.5 text-xs sm:text-sm text-slate-300">
+                      {trans.menu.subtitle}
+                    </p>
 
                     <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-300">
                       <div>
-                        <p className="font-bold text-rose-400">Thử Thách Tăng Dần</p>
-                        <p className="mt-0.5">
-                          Quái vật ở làn trái ngày càng đông, to và mạnh dần qua từng màn.
+                        <p className="font-bold text-rose-400">
+                          {trans.menu.cardChallengeTitle}
                         </p>
+                        <p className="mt-0.5">{trans.menu.cardChallengeDesc}</p>
                       </div>
                       <div>
-                        <p className="font-bold text-sky-400">Nâng Cấp Vũ Khí (Làn Phải)</p>
-                        <p className="mt-0.5">
-                          Lục → AKA → Súng Máy → Đại Bác (bắn hòm phải để mở khóa).
+                        <p className="font-bold text-sky-400">
+                          {trans.menu.cardWeaponsTitle}
                         </p>
+                        <p className="mt-0.5">{trans.menu.cardWeaponsDesc}</p>
                       </div>
                       <div className="col-span-2 border-t border-slate-800 pt-2">
-                        <p className="font-bold text-amber-300">Thanh Nộ &amp; Mưa Đạn [R]</p>
+                        <p className="font-bold text-amber-300">{trans.menu.cardRageTitle}</p>
                         <p className="mt-0.5">
-                          Bắn trúng quái để tích 100% Nộ, bấm{" "}
-                          <strong className="text-white">R</strong> (hoặc chạm nút{" "}
-                          <strong className="text-amber-300">BẬT NỘ</strong>) để xả Mưa Đạn x
-                          {RAGE_CONFIG.bulletCountMultiplier} tia, tốc bắn x
-                          {RAGE_CONFIG.fireRateMultiplier} trong {RAGE_CONFIG.durationSeconds}s.
+                          {formatText(trans.menu.cardRageDesc, {
+                            count: RAGE_CONFIG.bulletCountMultiplier,
+                            rate: RAGE_CONFIG.fireRateMultiplier,
+                            sec: RAGE_CONFIG.durationSeconds,
+                          })}
                         </p>
                       </div>
                     </div>
@@ -568,7 +601,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
                     {!profileLoaded ? (
                       <div className="py-5 text-center text-xs text-slate-400">
-                        Đang tải thông tin người chơi...
+                        {trans.menu.loadingProfile}
                       </div>
                     ) : needsNameInput ? (
                       <form onSubmit={handlePlayNow} className="space-y-3">
@@ -579,7 +612,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                               className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-300"
                             >
                               <User className="h-3.5 w-3.5" />
-                              Nhập tên người chơi
+                              {trans.menu.enterNameLabel}
                             </label>
                             {isEditingName && playerName && (
                               <button
@@ -591,7 +624,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                                 }}
                                 className="text-xs font-semibold text-slate-400 hover:text-white"
                               >
-                                Hủy
+                                {trans.menu.cancel}
                               </button>
                             )}
                           </div>
@@ -604,7 +637,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                               setNameDraft(e.target.value);
                               if (nameError) setNameError("");
                             }}
-                            placeholder="Nhập tên của bạn trước khi chơi..."
+                            placeholder={trans.menu.enterNamePlaceholder}
                             className="border-slate-700 bg-slate-950/90 text-white placeholder:text-slate-500 focus-visible:ring-sky-500"
                           />
                           {nameError && (
@@ -620,7 +653,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
                         >
                           <Play className="h-4 w-4 fill-current" />
-                          {vi.game.start}
+                          {trans.menu.playNow}
                         </Button>
                       </form>
                     ) : (
@@ -628,7 +661,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                         <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700/80 bg-slate-950/80 px-3 py-2.5">
                           <div className="min-w-0">
                             <span className="block text-[11px] font-medium text-slate-400">
-                              Người chơi
+                              {trans.menu.playerLabel}
                             </span>
                             <div className="flex items-center gap-1.5 truncate text-base font-black text-sky-300">
                               <User className="h-4 w-4 shrink-0 text-sky-400" />
@@ -647,7 +680,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                             className="h-8 shrink-0 gap-1 border-slate-700 bg-slate-900 text-xs text-slate-200 hover:bg-slate-800 hover:text-white"
                           >
                             <Pencil className="h-3 w-3" />
-                            Đổi tên
+                            {trans.menu.changeName}
                           </Button>
                         </div>
 
@@ -658,7 +691,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
                         >
                           <Play className="h-4 w-4 fill-current" />
-                          {vi.game.start}
+                          {trans.menu.playNow}
                         </Button>
                       </div>
                     )}
@@ -671,7 +704,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     <div className="flex items-center gap-2">
                       <Crown className="h-4 w-4 text-amber-400" />
                       <h3 className="text-sm font-black uppercase tracking-wide text-amber-300">
-                        Bảng xếp hạng
+                        {trans.menu.leaderboardTitle}
                       </h3>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -685,23 +718,25 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                         {leaderboardSource === "firebase" ? "Online" : "Local"}
                       </span>
                       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
-                        {leaderboard.length} người chơi
+                        {formatText(trans.menu.playersCount, {
+                          count: leaderboard.length,
+                        })}
                       </span>
                     </div>
                   </div>
 
                   {!profileLoaded ? (
                     <div className="flex flex-1 items-center justify-center py-8 text-xs text-slate-400">
-                      Đang tải bảng xếp hạng...
+                      {trans.menu.loadingBoard}
                     </div>
                   ) : leaderboard.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
                       <Trophy className="mb-2 h-8 w-8 text-slate-700" />
                       <p className="text-xs font-semibold text-slate-400">
-                        Chưa có thành tích nào được lưu.
+                        {trans.menu.emptyBoardTitle}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        Hoàn thành một lượt chơi để ghi danh lên bảng xếp hạng!
+                        {trans.menu.emptyBoardDesc}
                       </p>
                     </div>
                   ) : (
@@ -743,26 +778,31 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                                   </span>
                                   {isCurrentPlayer && (
                                     <span className="rounded bg-sky-500/25 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
-                                      Bạn
+                                      {trans.menu.youBadge}
                                     </span>
                                   )}
                                   {entry.victory && (
                                     <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                                      Clear
+                                      {trans.menu.clearBadge}
                                     </span>
                                   )}
                                 </div>
                                 <div className="text-[11px] text-slate-400">
-                                  Màn {entry.wave} • {entry.kills} quái
+                                  {formatText(trans.menu.boardMeta, {
+                                    wave: entry.wave,
+                                    kills: entry.kills,
+                                  })}
                                 </div>
                               </div>
                             </div>
 
                             <div className="shrink-0 text-right">
                               <span className="font-black text-amber-300">
-                                {entry.score.toLocaleString("vi-VN")}
+                                {entry.score.toLocaleString()}
                               </span>
-                              <span className="block text-[10px] text-slate-500">điểm</span>
+                              <span className="block text-[10px] text-slate-500">
+                                {trans.menu.pointsUnit}
+                              </span>
                             </div>
                           </div>
                         );
@@ -776,11 +816,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             {gameStatus === "PAUSED" && (
               <>
                 <h2 className="text-xl font-black">
-                  Đang tạm dừng (Màn {wave >= maxWaves ? `${wave}/${maxWaves}` : wave})
+                  {formatText(trans.modals.pausedTitle, { stage: stageDisplay })}
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  Bạn có thể thử đổi góc quay camera trong lúc tạm dừng.
-                </p>
+                <p className="mt-1 text-sm text-slate-400">{trans.modals.pausedDesc}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -788,7 +826,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     className="flex-1 gap-2 bg-blue-600 hover:bg-blue-500"
                   >
                     <Play className="h-4 w-4" />
-                    {vi.game.resume}
+                    {trans.hud.resume}
                   </Button>
                   <Button
                     type="button"
@@ -797,7 +835,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     className="gap-2 border-slate-700 bg-slate-900 text-white hover:bg-slate-800 hover:text-white"
                   >
                     <RotateCcw className="h-4 w-4" />
-                    Chơi lại
+                    {trans.modals.restartShort}
                   </Button>
                   <Button
                     type="button"
@@ -806,7 +844,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     className="w-full gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
                   >
                     <Trophy className="h-4 w-4 text-amber-400" />
-                    Về sảnh & Bảng xếp hạng
+                    {trans.modals.backToMenu}
                   </Button>
                 </div>
               </>
@@ -828,27 +866,27 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     gameStatus === "VICTORY" ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
-                  {gameStatus === "VICTORY" ? vi.game.victory : vi.game.game_over}
+                  {gameStatus === "VICTORY"
+                    ? formatText(trans.modals.victoryTitle, { max: maxWaves })
+                    : trans.modals.gameOverTitle}
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">
                   {playerName ? `${playerName} • ` : ""}
                   {gameStatus === "VICTORY"
-                    ? "Bạn đã hạ gục Boss Khổng Lồ và chinh phục toàn bộ thử thách!"
-                    : wave >= maxWaves
-                      ? `Dừng chân tại Màn ${wave} / ${maxWaves}`
-                      : `Dừng chân tại Màn ${wave}`}
+                    ? trans.modals.victoryDesc
+                    : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
                 </p>
                 <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
                   <div>
-                    <span className="block text-slate-400">Điểm</span>
+                    <span className="block text-slate-400">{trans.modals.score}</span>
                     <span className="text-base font-black text-amber-300">{score}</span>
                   </div>
                   <div>
-                    <span className="block text-slate-400">Kỷ lục</span>
+                    <span className="block text-slate-400">{trans.modals.highScore}</span>
                     <span className="text-base font-black text-sky-300">{highScore}</span>
                   </div>
                   <div>
-                    <span className="block text-slate-400">Tổng quái hạ</span>
+                    <span className="block text-slate-400">{trans.modals.totalKills}</span>
                     <span className="text-base font-black text-emerald-300">{kills}</span>
                   </div>
                 </div>
@@ -860,7 +898,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     size="lg"
                   >
                     <RotateCcw className="h-4 w-4" />
-                    {vi.game.restart}
+                    {trans.modals.restartFull}
                   </Button>
                   <Button
                     type="button"
@@ -869,7 +907,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     className="w-full gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
                   >
                     <Crown className="h-4 w-4 text-amber-400" />
-                    Về sảnh & Bảng xếp hạng
+                    {trans.modals.backToMenu}
                   </Button>
                 </div>
               </>
@@ -886,10 +924,10 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-1 sm:gap-1.5 font-bold text-sky-300">
                 <Zap className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{weapon.name}</span>
+                <span className="truncate">{trans.weapons[weapon.id]}</span>
                 {weapon.splashRadius > 0 && (
                   <span className="shrink-0 rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
-                    Nổ lan
+                    {trans.hud.splash}
                   </span>
                 )}
                 {overdriveLevel > 0 && (
@@ -899,11 +937,14 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 )}
               </div>
               <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
-                Dame: <strong className="text-amber-300">{effectiveDamage}</strong> • Tốc:{" "}
-                <strong className="text-emerald-300">{effectiveRate}</strong>/s
+                {trans.hud.damage}{" "}
+                <strong className="text-amber-300">{effectiveDamage}</strong> •{" "}
+                {trans.hud.fireRate}{" "}
+                <strong className="text-emerald-300">{effectiveRate}</strong>
+                {trans.hud.perSec}
                 {rageActive && (
                   <span className="ml-1.5 font-bold text-amber-300">
-                    • x{RAGE_CONFIG.bulletCountMultiplier} Đạn
+                    • x{RAGE_CONFIG.bulletCountMultiplier} {trans.hud.bulletsMultiplier}
                   </span>
                 )}
               </div>
@@ -913,25 +954,36 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               <div className="text-[10px] sm:text-[11px] text-slate-400">
                 <span className="hidden sm:inline">
                   {nextWeapon
-                    ? `Hòm phải (Lên ${nextWeapon.name}):`
+                    ? formatText(trans.hud.crateRightTo, {
+                        name: trans.weapons[nextWeapon.id],
+                      })
                     : visibleLockedNext
-                      ? `Hòm phải (${visibleLockedNext.weapon.name}):`
-                      : "Trạng thái vũ khí:"}
+                      ? formatText(trans.hud.crateRightLocked, {
+                          name: trans.weapons[visibleLockedNext.weapon.id],
+                        })
+                      : trans.hud.weaponStatus}
                 </span>
                 <span className="sm:hidden">
                   {nextWeapon
-                    ? `Lên ${nextWeapon.name}:`
+                    ? formatText(trans.hud.crateShortTo, {
+                        name: trans.weapons[nextWeapon.id],
+                      })
                     : visibleLockedNext
-                      ? visibleLockedNext.weapon.name
-                      : "Vũ khí:"}
+                      ? trans.weapons[visibleLockedNext.weapon.id]
+                      : trans.hud.weaponStatusShort}
                 </span>
               </div>
               <div className="font-black text-amber-300">
                 {nextWeapon
-                  ? `${crateHits} / ${crateTargetHits} phát`
+                  ? formatText(trans.hud.shotsProgress, {
+                      hits: crateHits,
+                      target: crateTargetHits,
+                    })
                   : visibleLockedNext
-                    ? `Mở ở Màn ${visibleLockedNext.minStage}`
-                    : "Đã đạt Max"}
+                    ? formatText(trans.hud.unlockAtStage, {
+                        stage: visibleLockedNext.minStage,
+                      })
+                    : trans.hud.maxReached}
               </div>
             </div>
           </div>
@@ -943,7 +995,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               type="button"
               size="icon"
               variant="outline"
-              aria-label="Di chuyển trái"
+              aria-label={trans.hud.moveLeft}
               onPointerDown={(e) => {
                 e.preventDefault();
                 gameInput.left = true;
@@ -984,16 +1036,18 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   <Flame className="h-4 w-4 shrink-0" />
                   <span className="truncate">
                     {icbmAiming
-                      ? "Chạm sân chọn điểm!"
+                      ? trans.hud.rageAimingShort
                       : icbmPending
-                        ? "Tên lửa đang bay..."
+                        ? trans.hud.rageMissileFlying
                         : rageActive
-                          ? `Mưa Đạn (${rageTimeLeft.toFixed(1)}s)`
+                          ? formatText(trans.hud.rageBulletRain, {
+                              time: rageTimeLeft.toFixed(1),
+                            })
                           : rageReady
                             ? weapon.id === "icbm"
-                              ? "PHÓNG TÊN LỬA [R]"
-                              : "BẬT NỘ [R]"
-                            : `Nộ ${ragePercent}%`}
+                              ? trans.hud.rageButtonCenterIcbm
+                              : trans.hud.rageButtonCenter
+                            : formatText(trans.hud.ragePercent, { pct: ragePercent })}
                   </span>
                 </Button>
               )}
@@ -1018,26 +1072,26 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   }}
                   className="h-14 sm:h-10 px-3 rounded-xl sm:rounded-md border-rose-500/70 bg-rose-950/85 text-xs font-black text-rose-200 hover:bg-rose-900 active:scale-95 touch-none select-none"
                 >
-                  BẮN
+                  {trans.hud.fireBtn}
                 </Button>
               )}
             </div>
 
             <span className="hidden lg:inline-block lg:order-2 rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
-              <strong className="text-white">A / D</strong> hoặc{" "}
-              <strong className="text-white">← / →</strong> di chuyển •{" "}
-              <strong className="text-amber-300">R</strong> bật Nộ •{" "}
-              <strong className="text-white">V</strong> đổi góc camera •{" "}
+              <strong className="text-white">A / D</strong> {trans.hud.keyOr}{" "}
+              <strong className="text-white">← / →</strong> {trans.hud.keyMove} •{" "}
+              <strong className="text-amber-300">R</strong> {trans.hud.keyRage} •{" "}
+              <strong className="text-white">V</strong> {trans.hud.keyCamera} •{" "}
               {cameraMode === "FREE_ORBIT"
-                ? "Kéo chuột để xoay góc 3D"
-                : "Chọn Xoay chuột 3D để xoay tự do"}
+                ? trans.hud.keyOrbitActive
+                : trans.hud.keyOrbitHint}
             </span>
 
             <Button
               type="button"
               size="icon"
               variant="outline"
-              aria-label="Di chuyển phải"
+              aria-label={trans.hud.moveRight}
               onPointerDown={(e) => {
                 e.preventDefault();
                 gameInput.right = true;

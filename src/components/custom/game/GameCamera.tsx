@@ -63,8 +63,8 @@ export function GameCamera({ runtimeRef }: GameCameraProps) {
       // THIRD_PERSON: Góc nhìn thấp sau vai nhân vật, bám theo trục X mượt mà
       desiredPos.set(
         playerX * 0.65 + shakeX,
-        6.8 * portraitDistScale + shakeY,
-        17.5 * portraitDistScale
+        6.4 * portraitDistScale + shakeY,
+        15.5 * portraitDistScale
       );
       desiredLookAt.set(playerX * 0.45, 1.3, -11);
     }

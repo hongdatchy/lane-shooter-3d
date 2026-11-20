@@ -5,17 +5,23 @@ import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { GameHUD } from "@/components/custom/game/GameHUD";
 import { useGameStore } from "@/state-manager/game-store";
+import { useTransClientSide } from "@/lang/useTransClientSide";
+
+function ViewportLoading() {
+  const trans = useTransClientSide();
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
+      <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
+      <p className="text-sm font-medium">{trans.app.loading3d}</p>
+    </div>
+  );
+}
 
 const GameViewport = dynamic(
   () => import("@/components/custom/game/GameViewport"),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-950 text-slate-300">
-        <Loader2 className="h-8 w-8 animate-spin text-sky-400" />
-        <p className="text-sm font-medium">Đang khởi tạo không gian 3D...</p>
-      </div>
-    ),
+    loading: () => <ViewportLoading />,
   }
 );
 

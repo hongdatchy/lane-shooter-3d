@@ -7,12 +7,12 @@ export const ARENA_CONFIG = {
   dividerX: 5, // Làn trái (-10 -> +5, rộng 15) = 3x làn phải (+5 -> +10, rộng 5)
 
   playerStartX: -2.5,
-  playerZ: 8.5,
+  playerZ: 6.5,
   playerMinX: -9.0,
   playerMaxX: 9.0,
-  playerSpeed: 16,
+  playerSpeed: 9,
 
-  defenseLineZ: 7.4,
+  defenseLineZ: 5.4,
   spawnZ: -32,
   bulletDespawnZ: -35,
 

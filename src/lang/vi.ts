@@ -1,7 +1,7 @@
 // Quản lý đa ngôn ngữ (Tiếng Việt)
 export const vi = {
-  app_name: "3D Demo",
-  app_subtitle: "2-Lane Arcade Shooter 3D (Three.js + R3F + Drei + Zustand)",
+  app_name: "lane-shooter",
+  app_subtitle: "hongdatchy",
   nav: {
     home: "Trang chủ",
   },
@@ -12,7 +12,7 @@ export const vi = {
     ERROR: "Có lỗi",
   },
   game: {
-    title: "Lane Shooter 3D",
+    title: "3D Lane Shooter",
     subtitle:
       "Tiêu diệt quái vật ở làn trái • Bắn hòm phải để nâng cấp vũ khí",
     start: "Chơi ngay",

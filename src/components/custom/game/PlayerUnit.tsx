@@ -1,17 +1,317 @@
 "use client";
 
-import { forwardRef, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import React, { Component, ReactNode, Suspense, forwardRef, useEffect, useMemo, useRef } from "react";
+import { createPortal, useFrame } from "@react-three/fiber";
+import { Html, useAnimations, useFBX, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { WeaponConfigDTO } from "@/dto/GameDTO";
 import { ARENA_CONFIG, RAGE_CONFIG } from "@/service/game-constants";
+import { gameInput } from "@/service/game-input";
 import { useGameStore } from "@/state-manager/game-store";
+import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { withAssetBase } from "@/lib/utils";
+import { installModelBrowserCache } from "@/service/model-cache";
 import { WeaponModel3D } from "./WeaponModel3D";
+
+installModelBrowserCache();
+
+const PLAYER_MODEL_CONFIG = {
+  // Đổi giữa "fbx" (3 file Mixamo: idle + left + right) hoặc "glb" (1 file .glb)
+  format: "fbx" as "fbx" | "glb",
+  fbxFiles: {
+    idle: "player-idle.fbx",
+    left: "player-left.fbx",
+    right: "player-right.fbx",
+  },
+  glbFile: "player.glb",
+  targetHeight: 1.65,
+  baseY: 0,
+  // Mặc định model .fbx/.glb quay mặt +Z, xoay Math.PI (180 độ) để nhìn về phía quái (-Z).
+  rotationY: Math.PI,
+  // Căn chỉnh vị trí & góc xoay khẩu súng gắn vào xương bàn tay phải (mixamorigRightHand)
+  handAttachment: {
+    scale: 0.36,
+    position: [0.02, 0.09, 0.03] as [number, number, number],
+    rotation: [-Math.PI / 2, 0, Math.PI / 2] as [number, number, number],
+  },
+};
+
+const toModelUrl = (fileName: string) => withAssetBase(encodeURI(`models/${fileName}`));
+
+const FBX_URLS = {
+  idle: toModelUrl(PLAYER_MODEL_CONFIG.fbxFiles.idle),
+  left: toModelUrl(PLAYER_MODEL_CONFIG.fbxFiles.left),
+  right: toModelUrl(PLAYER_MODEL_CONFIG.fbxFiles.right),
+};
+const GLB_URL = toModelUrl(PLAYER_MODEL_CONFIG.glbFile);
+
+if (typeof window !== "undefined") {
+  if (PLAYER_MODEL_CONFIG.format === "fbx") {
+    useFBX.preload(FBX_URLS.idle);
+    useFBX.preload(FBX_URLS.left);
+    useFBX.preload(FBX_URLS.right);
+  } else {
+    useGLTF.preload(GLB_URL);
+  }
+}
+
+function prepareAnimationClip(clip: THREE.AnimationClip, name: string): THREE.AnimationClip {
+  const cloned = clip.clone();
+  cloned.name = name;
+  for (const track of cloned.tracks) {
+    // Khóa dịch chuyển ngang X/Z trên xương gốc phòng trường hợp file Mixamo chưa tick In Place
+    if (/hips\.position$|^root\.position$/i.test(track.name) && track.values.length >= 3) {
+      const vals = Float32Array.from(track.values);
+      const x0 = vals[0];
+      const z0 = vals[2];
+      for (let i = 0; i < vals.length; i += 3) {
+        vals[i] = x0;
+        vals[i + 2] = z0;
+      }
+      track.values = vals;
+    }
+  }
+  return cloned;
+}
 
 interface PlayerUnitProps {
   weapon: WeaponConfigDTO;
   muzzleFlashRef: React.MutableRefObject<number>;
+}
+
+function FallbackRobotMesh({ activeAccent }: { activeAccent: string }) {
+  return (
+    <group>
+      <mesh position={[0, 0.85, 0]} castShadow>
+        <boxGeometry args={[0.92, 0.95, 0.86]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.35} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 1.0, -0.44]}>
+        <boxGeometry args={[0.66, 0.24, 0.08]} />
+        <meshStandardMaterial
+          color={activeAccent}
+          emissive={activeAccent}
+          emissiveIntensity={2}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+interface ModelErrorBoundaryProps {
+  fallback: ReactNode;
+  children: ReactNode;
+}
+
+interface ModelErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ModelErrorBoundary extends Component<ModelErrorBoundaryProps, ModelErrorBoundaryState> {
+  state: ModelErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ModelErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn("Không nạp được model nhân vật, dùng mô hình dự phòng:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+interface RiggedModelRunnerProps {
+  sourceScene: THREE.Object3D;
+  clips: THREE.AnimationClip[];
+  idleClipName: string | null;
+  leftClipName: string | null;
+  rightClipName: string | null;
+  weaponNode: ReactNode;
+}
+
+function RiggedModelRunner({
+  sourceScene,
+  clips,
+  idleClipName,
+  leftClipName,
+  rightClipName,
+  weaponNode,
+}: RiggedModelRunnerProps) {
+  const animRootRef = useRef<THREE.Group>(null);
+  const activeAnimRef = useRef<string | null>(null);
+
+  const { clonedScene, autoScale, offset, handBone } = useMemo(() => {
+    const root = cloneSkinned(sourceScene);
+    root.rotation.set(0, PLAYER_MODEL_CONFIG.rotationY, 0);
+    root.position.set(0, 0, 0);
+    root.scale.setScalar(1);
+
+    let foundHandBone: THREE.Object3D | null = null;
+    root.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+      if (!foundHandBone && /righthand|hand_r|r_hand/i.test(obj.name)) {
+        foundHandBone = obj;
+      }
+    });
+    root.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const refHeight = size.y > 0.001 ? size.y : Math.max(size.x, size.z, 1);
+    const scale = PLAYER_MODEL_CONFIG.targetHeight / refHeight;
+
+    return {
+      clonedScene: root,
+      autoScale: scale,
+      handBone: foundHandBone as THREE.Object3D | null,
+      offset: [
+        -center.x * scale,
+        PLAYER_MODEL_CONFIG.baseY - box.min.y * scale,
+        -center.z * scale,
+      ] as [number, number, number],
+    };
+  }, [sourceScene]);
+
+  const { actions } = useAnimations(clips, animRootRef);
+
+  useEffect(() => {
+    activeAnimRef.current = null;
+    if (idleClipName && actions[idleClipName]) {
+      actions[idleClipName]?.reset().fadeIn(0.15).play();
+      activeAnimRef.current = idleClipName;
+    }
+    return () => {
+      for (const key of Object.keys(actions)) {
+        actions[key]?.stop();
+      }
+    };
+  }, [actions, idleClipName]);
+
+  useFrame(() => {
+    if (!idleClipName) return;
+    const status = useGameStore.getState().gameStatus;
+    const movingLeft = status === "PLAYING" && gameInput.left && !gameInput.right;
+    const movingRight = status === "PLAYING" && gameInput.right && !gameInput.left;
+
+    const targetName = movingLeft
+      ? leftClipName || idleClipName
+      : movingRight
+        ? rightClipName || idleClipName
+        : idleClipName;
+
+    if (!targetName || activeAnimRef.current === targetName) return;
+
+    const prevAction = activeAnimRef.current ? actions[activeAnimRef.current] : null;
+    const nextAction = actions[targetName];
+    if (nextAction) {
+      prevAction?.fadeOut(0.14);
+      nextAction.timeScale = targetName === idleClipName ? 1 : 1.45;
+      nextAction.reset().fadeIn(0.14).play();
+      activeAnimRef.current = targetName;
+    }
+  });
+
+  return (
+    <group ref={animRootRef} position={offset} scale={autoScale}>
+      <primitive object={clonedScene} />
+      {handBone ? (
+        createPortal(
+          // Bù scale ngược 1/autoScale vì xương Mixamo nằm trong hệ quy chiếu đã thu nhỏ theo autoScale
+          <group scale={1 / autoScale}>
+            <group
+              position={PLAYER_MODEL_CONFIG.handAttachment.position}
+              rotation={PLAYER_MODEL_CONFIG.handAttachment.rotation}
+              scale={PLAYER_MODEL_CONFIG.handAttachment.scale}
+            >
+              {weaponNode}
+            </group>
+          </group>,
+          handBone
+        )
+      ) : (
+        <group scale={1 / autoScale}>
+          <group position={[0.25, 1.15, -0.5]} scale={0.75}>
+            {weaponNode}
+          </group>
+        </group>
+      )}
+    </group>
+  );
+}
+
+// Nhánh 1: Nạp 3 file Mixamo .fbx (player-idle.fbx + player-left.fbx + player-right.fbx)
+function PlayerMixamoFbxModel({ weaponNode }: { weaponNode: ReactNode }) {
+  const idleFbx = useFBX(FBX_URLS.idle);
+  const leftFbx = useFBX(FBX_URLS.left);
+  const rightFbx = useFBX(FBX_URLS.right);
+
+  const clips = useMemo(() => {
+    const list: THREE.AnimationClip[] = [];
+    if (idleFbx.animations[0]) {
+      list.push(prepareAnimationClip(idleFbx.animations[0], "idle"));
+    }
+    if (leftFbx.animations[0]) {
+      list.push(prepareAnimationClip(leftFbx.animations[0], "left"));
+    }
+    if (rightFbx.animations[0]) {
+      list.push(prepareAnimationClip(rightFbx.animations[0], "right"));
+    }
+    return list;
+  }, [idleFbx.animations, leftFbx.animations, rightFbx.animations]);
+
+  return (
+    <RiggedModelRunner
+      sourceScene={idleFbx}
+      clips={clips}
+      idleClipName={idleFbx.animations[0] ? "idle" : null}
+      leftClipName={leftFbx.animations[0] ? "left" : null}
+      rightClipName={rightFbx.animations[0] ? "right" : null}
+      weaponNode={weaponNode}
+    />
+  );
+}
+
+// Nhánh 2: Nạp 1 file .glb / .gltf (chứa sẵn Idle + Run/Strafe bên trong)
+function PlayerGlbModel({ weaponNode }: { weaponNode: ReactNode }) {
+  const gltf = useGLTF(GLB_URL);
+
+  const { clips, idleName, leftName, rightName } = useMemo(() => {
+    const prepared = gltf.animations.map((clip) => prepareAnimationClip(clip, clip.name));
+    const names = prepared.map((c) => c.name);
+    const idle = names.find((n) => /idle|stand|breath/i.test(n)) || names[0] || null;
+    const left = names.find((n) => /left|strafe|run|walk|move/i.test(n)) || idle;
+    const right = names.find((n) => /right|strafe|run|walk|move/i.test(n)) || left;
+    return { clips: prepared, idleName: idle, leftName: left, rightName: right };
+  }, [gltf.animations]);
+
+  return (
+    <RiggedModelRunner
+      sourceScene={gltf.scene}
+      clips={clips}
+      idleClipName={idleName}
+      leftClipName={leftName}
+      rightClipName={rightName}
+      weaponNode={weaponNode}
+    />
+  );
+}
+
+function PlayerModelSwitch({ weaponNode }: { weaponNode: ReactNode }) {
+  if (PLAYER_MODEL_CONFIG.format === "fbx") {
+    return <PlayerMixamoFbxModel weaponNode={weaponNode} />;
+  }
+  return <PlayerGlbModel weaponNode={weaponNode} />;
 }
 
 export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
@@ -23,6 +323,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
     const rageTimeLeft = useGameStore((s) => s.rageTimeLeft);
     const icbmAiming = useGameStore((s) => s.icbmAiming);
     const icbmPending = useGameStore((s) => s.icbmPending);
+    const trans = useTransClientSide();
 
     const flashMeshRef = useRef<THREE.Mesh>(null);
     const rageRingRef = useRef<THREE.Mesh>(null);
@@ -68,16 +369,29 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
     const rageBarWidth = 1.65;
     const rageFillWidth = Math.max(0.01, rageBarWidth * rageProgress);
 
+    const weaponNode = (
+      <>
+        <WeaponModel3D weapon={weapon} spinBarrels={rageActive || weapon.id === "machine-gun"} />
+        <mesh ref={flashMeshRef} position={[0, 0.06, -1.15]} visible={false}>
+          <sphereGeometry args={[0.28, 10, 10]} />
+          <meshBasicMaterial color={activeAccent} transparent opacity={0.9} />
+        </mesh>
+      </>
+    );
+
+    const fallbackWithWeapon = (
+      <>
+        <FallbackRobotMesh activeAccent={activeAccent} />
+        <group position={[0.45, 0.78, -0.58]} scale={0.75}>
+          {weaponNode}
+        </group>
+      </>
+    );
+
     return (
       <group ref={ref} position={[ARENA_CONFIG.playerStartX, 0, ARENA_CONFIG.playerZ]}>
-        {/* Đế trượt năng lượng */}
-        <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.72, 0.85, 0.35, 16]} />
-          <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.3} />
-        </mesh>
-
         {/* Vòng sáng dưới chân nhân vật */}
-        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.75, 0.98, 24]} />
           <meshBasicMaterial color={activeAccent} transparent opacity={0.85} />
         </mesh>
@@ -85,7 +399,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
         {/* Vòng hào quang khi Nộ đầy hoặc đang xả Mưa Đạn */}
         <mesh
           ref={rageRingRef}
-          position={[0, 0.06, 0]}
+          position={[0, 0.05, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
           visible={false}
         >
@@ -93,35 +407,15 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
           <meshBasicMaterial color="#fbbf24" transparent opacity={0.9} />
         </mesh>
 
-        {/* Thân nhân vật / Robot chiến đấu */}
-        <mesh position={[0, 0.85, 0]} castShadow>
-          <boxGeometry args={[0.92, 0.95, 0.86]} />
-          <meshStandardMaterial color="#e2e8f0" metalness={0.35} roughness={0.35} />
-        </mesh>
-
-        {/* Kính ngắm hướng về phía trước (-Z) */}
-        <mesh position={[0, 1.0, -0.44]}>
-          <boxGeometry args={[0.66, 0.24, 0.08]} />
-          <meshStandardMaterial
-            color={activeAccent}
-            emissive={activeAccent}
-            emissiveIntensity={2}
-          />
-        </mesh>
-
-        {/* Khẩu súng 3D thực tế đang cầm trên tay / vai phải */}
-        <group position={[0.45, 0.78, -0.58]} scale={0.75}>
-          <WeaponModel3D weapon={weapon} spinBarrels={rageActive || weapon.id === "machine-gun"} />
-
-          {/* Hiệu ứng tia lửa đầu nòng khi bắn */}
-          <mesh ref={flashMeshRef} position={[0, 0.06, -1.15]} visible={false}>
-            <sphereGeometry args={[0.28, 10, 10]} />
-            <meshBasicMaterial color={activeAccent} transparent opacity={0.9} />
-          </mesh>
-        </group>
+        {/* Mô hình nhân vật 3D từ /public/models/ (súng gắn trực tiếp vào xương bàn tay phải) */}
+        <ModelErrorBoundary fallback={fallbackWithWeapon}>
+          <Suspense fallback={fallbackWithWeapon}>
+            <PlayerModelSwitch weaponNode={weaponNode} />
+          </Suspense>
+        </ModelErrorBoundary>
 
         {/* Thanh Nộ 3D đặt ngay trên đầu nhân vật */}
-        <group position={[0, 1.92, 0]}>
+        <group position={[0, 1.95, 0]}>
           <mesh>
             <boxGeometry args={[rageBarWidth + 0.1, 0.24, 0.08]} />
             <meshBasicMaterial color="#0f172a" />
@@ -147,23 +441,25 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
             <div className="select-none whitespace-nowrap text-center">
               {icbmAiming ? (
                 <span className="animate-pulse rounded-full border border-rose-300 bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white shadow-lg">
-                  CLICK CHỌN ĐIỂM PHÓNG!
+                  {trans.hud.rageAimingFull}
                 </span>
               ) : icbmPending ? (
                 <span className="rounded-full border border-amber-300 bg-orange-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
-                  TÊN LỬA ĐANG BAY!
+                  {trans.hud.rageMissileFlyingUpper}
                 </span>
               ) : rageActive ? (
                 <span className="rounded-full border border-amber-300/80 bg-amber-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
-                  MƯA ĐẠN {rageTimeLeft.toFixed(1)}s
+                  {formatText(trans.hud.rageBulletRainUpper, {
+                    time: rageTimeLeft.toFixed(1),
+                  })}
                 </span>
               ) : rageReady ? (
                 <span className="animate-pulse rounded-full border border-yellow-300 bg-amber-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg">
-                  {weapon.id === "icbm" ? "TÊN LỬA SẴN SÀNG [R]" : "NỘ ĐẦY • BẤM [R]"}
+                  {weapon.id === "icbm" ? trans.hud.rageReadyIcbm : trans.hud.rageReadyHint}
                 </span>
               ) : (
                 <span className="rounded bg-slate-950/85 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
-                  NỘ {ragePercent}%
+                  {formatText(trans.hud.ragePercentUpper, { pct: ragePercent })}
                 </span>
               )}
             </div>
@@ -173,3 +469,11 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
     );
   }
 );
+
+if (PLAYER_MODEL_CONFIG.format === "fbx") {
+  useFBX.preload(FBX_URLS.idle);
+  useFBX.preload(FBX_URLS.left);
+  useFBX.preload(FBX_URLS.right);
+} else {
+  useGLTF.preload(GLB_URL);
+}

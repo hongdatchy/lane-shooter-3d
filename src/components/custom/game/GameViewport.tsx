@@ -5,17 +5,23 @@ import { Canvas } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { GameRuntimeRef } from "@/dto/GameDTO";
 import { ARENA_CONFIG } from "@/service/game-constants";
+import { useAppStore } from "@/state-manager/app-store";
 import { GameCamera } from "./GameCamera";
 import { ArenaStage } from "./ArenaStage";
 import { ArenaWorld } from "./ArenaWorld";
 
 export function GameViewport() {
+  const theme = useAppStore((s) => s.theme);
+  const isLight = theme === "light";
+
   const runtimeRef = useRef<GameRuntimeRef>({
     playerX: ARENA_CONFIG.playerStartX,
     playerVelocityX: 0,
     cratePulse: 0,
     screenShake: 0,
   });
+
+  const bgColor = isLight ? "#dbeafe" : "#070b14";
 
   return (
     <Canvas
@@ -25,15 +31,15 @@ export function GameViewport() {
       gl={{ antialias: true }}
       className="h-full w-full"
     >
-      <color attach="background" args={["#070b14"]} />
-      <fog attach="fog" args={["#070b14", 34, 70]} />
+      <color attach="background" args={[bgColor]} />
+      <fog attach="fog" args={[bgColor, isLight ? 40 : 34, isLight ? 82 : 70]} />
 
       {/* Hệ thống ánh sáng sân khấu */}
-      <ambientLight intensity={0.45} />
-      <hemisphereLight args={["#bae6fd", "#1e1b4b", 0.6]} />
+      <ambientLight intensity={isLight ? 0.85 : 0.45} />
+      <hemisphereLight args={[isLight ? "#ffffff" : "#bae6fd", isLight ? "#cbd5e1" : "#1e1b4b", isLight ? 0.85 : 0.6]} />
       <directionalLight
         position={[10, 24, 12]}
-        intensity={1.7}
+        intensity={isLight ? 1.9 : 1.7}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}

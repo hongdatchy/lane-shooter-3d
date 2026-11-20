@@ -7,6 +7,7 @@ import * as THREE from "three";
 import {
   BulletEntity,
   EnemyEntity,
+  EnemyKind,
   GameRuntimeRef,
   ParticleEntity,
 } from "@/dto/GameDTO";
@@ -17,12 +18,20 @@ import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
 import { PlayerUnit } from "./PlayerUnit";
 import { WeaponCrate } from "./WeaponCrate";
+import { EnemyModelUnit } from "./EnemyModelUnit";
+import { useTransClientSide } from "@/lang/useTransClientSide";
 
 interface ArenaWorldProps {
   runtimeRef: React.MutableRefObject<GameRuntimeRef>;
 }
 
 const MAX_ENEMIES = 72;
+const NORMAL_POOL_START = 0;
+const NORMAL_POOL_END = 50;
+const ELITE_POOL_START = 50;
+const ELITE_POOL_END = 70;
+const BOSS_POOL_START = 70;
+const BOSS_POOL_END = MAX_ENEMIES;
 const MAX_BULLETS = 600;
 const MAX_PARTICLES = 300;
 
@@ -34,6 +43,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const sessionId = useGameStore((s) => s.sessionId);
   const icbmAiming = useGameStore((s) => s.icbmAiming);
   const icbmPending = useGameStore((s) => s.icbmPending);
+  const trans = useTransClientSide();
 
   const activeWeapon = weaponService.getWeaponByIndex(weaponIndex);
 
@@ -243,11 +253,10 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     const pool = enemiesPoolRef.current;
     const stageCfg = weaponService.getStageConfig(stage);
 
-    for (let i = 0; i < pool.length; i++) {
-      const e = pool[i];
-      if (e.active) continue;
-
-      if (stageCfg.isBossStage) {
+    if (stageCfg.isBossStage) {
+      for (let i = BOSS_POOL_START; i < BOSS_POOL_END; i++) {
+        const e = pool[i];
+        if (e.active) continue;
         e.active = true;
         e.id = enemyIdSeqRef.current++;
         e.kind = "BOSS";
@@ -265,8 +274,17 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         runtimeRef.current.screenShake = 0.55;
         return;
       }
+      return;
+    }
 
-      const isElite = Math.random() < stageCfg.eliteChance;
+    const isElite = Math.random() < stageCfg.eliteChance;
+    const rangeStart = isElite ? ELITE_POOL_START : NORMAL_POOL_START;
+    const rangeEnd = isElite ? ELITE_POOL_END : NORMAL_POOL_END;
+
+    for (let i = rangeStart; i < rangeEnd; i++) {
+      const e = pool[i];
+      if (e.active) continue;
+
       const baseScale = isElite ? stageCfg.eliteScale : stageCfg.normalScale;
       // Quái to ngẫu nhiên hơn nữa (0.9x -> 1.25x): con nào càng to thì máu càng trâu theo lũy thừa kích thước
       const sizeFactor = isElite
@@ -984,110 +1002,121 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       {/* Hòm Item / Vũ khí cố định bên làn phải (Kiểu B) */}
       <WeaponCrate runtimeRef={runtimeRef} />
 
-      {/* Pool Quái (Làn trái) */}
-      {enemyIndices.map((idx) => (
-        <group
-          key={idx}
-          ref={(el) => {
-            enemySlotRefs.current[idx] = el;
-          }}
-          visible={false}
-        >
-          {/* Thân quái */}
-          <mesh
-            ref={(el) => {
-              enemyBodyRefs.current[idx] = el;
-            }}
-            position={[0, 0.58, 0]}
-            castShadow
-          >
-            <boxGeometry args={[0.92, 1.05, 0.92]} />
-            <meshStandardMaterial color="#e11d48" roughness={0.45} metalness={0.25} />
-          </mesh>
+      {/* Pool Quái (Làn trái: 0..49 Thường, 50..69 Elite, 70..71 Boss) */}
+      {enemyIndices.map((idx) => {
+        const slotKind: EnemyKind =
+          idx >= BOSS_POOL_START ? "BOSS" : idx >= ELITE_POOL_START ? "ELITE" : "NORMAL";
 
-          {/* Đôi mắt phát sáng hướng về phía người chơi (+Z) */}
-          <mesh position={[-0.2, 0.72, 0.47]}>
-            <boxGeometry args={[0.16, 0.14, 0.04]} />
-            <meshBasicMaterial color="#fef08a" />
-          </mesh>
-          <mesh position={[0.2, 0.72, 0.47]}>
-            <boxGeometry args={[0.16, 0.14, 0.04]} />
-            <meshBasicMaterial color="#fef08a" />
-          </mesh>
-
-          {/* Miệng & hàm răng sắc nhọn dành riêng cho Boss */}
-          <group
-            ref={(el) => {
-              enemyUpperMouthRefs.current[idx] = el;
-            }}
-            position={[0, 0.42, 0.47]}
-            visible={false}
-          >
-            <mesh position={[0, -0.07, -0.01]}>
-              <boxGeometry args={[0.56, 0.24, 0.04]} />
-              <meshBasicMaterial color="#1c0608" />
-            </mesh>
-            {[-0.18, 0, 0.18].map((fx) => (
-              <mesh key={fx} position={[fx, -0.02, 0.03]} rotation={[Math.PI, 0, 0]}>
-                <coneGeometry args={[0.065, 0.16, 6]} />
-                <meshStandardMaterial color="#fef2f2" roughness={0.25} />
-              </mesh>
-            ))}
-          </group>
-
-          <group
-            ref={(el) => {
-              enemyLowerJawRefs.current[idx] = el;
-            }}
-            position={[0, 0.2, 0.34]}
-            visible={false}
-          >
-            <mesh position={[0, -0.04, 0.14]}>
-              <boxGeometry args={[0.58, 0.1, 0.16]} />
-              <meshStandardMaterial color="#7f1d1d" roughness={0.45} metalness={0.2} />
-            </mesh>
-            {[-0.14, 0, 0.14].map((fx) => (
-              <mesh key={fx} position={[fx, 0.06, 0.18]}>
-                <coneGeometry args={[0.055, 0.14, 6]} />
-                <meshStandardMaterial color="#fef2f2" roughness={0.25} />
-              </mesh>
-            ))}
-          </group>
-
-          {/* Sừng dành cho quái Elite */}
-          <mesh
-            ref={(el) => {
-              enemyCrownRefs.current[idx] = el;
-            }}
-            position={[0, 1.25, 0]}
-            visible={false}
-          >
-            <octahedronGeometry args={[0.26, 0]} />
-            <meshStandardMaterial
-              color="#facc15"
-              emissive="#eab308"
-              emissiveIntensity={1.2}
-            />
-          </mesh>
-
-          {/* Thanh máu 3D trên đầu quái */}
-          <group position={[0, 1.55, 0]}>
-            <mesh>
-              <boxGeometry args={[1.14, 0.14, 0.04]} />
-              <meshBasicMaterial color="#0f172a" />
-            </mesh>
+        const fallbackMesh = (
+          <>
+            {/* Thân quái */}
             <mesh
               ref={(el) => {
-                enemyHpFillRefs.current[idx] = el;
+                enemyBodyRefs.current[idx] = el;
               }}
-              position={[0, 0, 0.03]}
+              position={[0, 0.58, 0]}
+              castShadow
             >
-              <boxGeometry args={[1.1, 0.09, 0.03]} />
-              <meshBasicMaterial color="#4ade80" />
+              <boxGeometry args={[0.92, 1.05, 0.92]} />
+              <meshStandardMaterial color="#e11d48" roughness={0.45} metalness={0.25} />
             </mesh>
+
+            {/* Đôi mắt phát sáng hướng về phía người chơi (+Z) */}
+            <mesh position={[-0.2, 0.72, 0.47]}>
+              <boxGeometry args={[0.16, 0.14, 0.04]} />
+              <meshBasicMaterial color="#fef08a" />
+            </mesh>
+            <mesh position={[0.2, 0.72, 0.47]}>
+              <boxGeometry args={[0.16, 0.14, 0.04]} />
+              <meshBasicMaterial color="#fef08a" />
+            </mesh>
+
+            {/* Miệng & hàm răng sắc nhọn dành riêng cho Boss */}
+            <group
+              ref={(el) => {
+                enemyUpperMouthRefs.current[idx] = el;
+              }}
+              position={[0, 0.42, 0.47]}
+              visible={false}
+            >
+              <mesh position={[0, -0.07, -0.01]}>
+                <boxGeometry args={[0.56, 0.24, 0.04]} />
+                <meshBasicMaterial color="#1c0608" />
+              </mesh>
+              {[-0.18, 0, 0.18].map((fx) => (
+                <mesh key={fx} position={[fx, -0.02, 0.03]} rotation={[Math.PI, 0, 0]}>
+                  <coneGeometry args={[0.065, 0.16, 6]} />
+                  <meshStandardMaterial color="#fef2f2" roughness={0.25} />
+                </mesh>
+              ))}
+            </group>
+
+            <group
+              ref={(el) => {
+                enemyLowerJawRefs.current[idx] = el;
+              }}
+              position={[0, 0.2, 0.34]}
+              visible={false}
+            >
+              <mesh position={[0, -0.04, 0.14]}>
+                <boxGeometry args={[0.58, 0.1, 0.16]} />
+                <meshStandardMaterial color="#7f1d1d" roughness={0.45} metalness={0.2} />
+              </mesh>
+              {[-0.14, 0, 0.14].map((fx) => (
+                <mesh key={fx} position={[fx, 0.06, 0.18]}>
+                  <coneGeometry args={[0.055, 0.14, 6]} />
+                  <meshStandardMaterial color="#fef2f2" roughness={0.25} />
+                </mesh>
+              ))}
+            </group>
+
+            {/* Sừng dành cho quái Elite */}
+            <mesh
+              ref={(el) => {
+                enemyCrownRefs.current[idx] = el;
+              }}
+              position={[0, 1.25, 0]}
+              visible={false}
+            >
+              <octahedronGeometry args={[0.26, 0]} />
+              <meshStandardMaterial
+                color="#facc15"
+                emissive="#eab308"
+                emissiveIntensity={1.2}
+              />
+            </mesh>
+          </>
+        );
+
+        return (
+          <group
+            key={idx}
+            ref={(el) => {
+              enemySlotRefs.current[idx] = el;
+            }}
+            visible={false}
+          >
+            <EnemyModelUnit kind={slotKind} fallback={fallbackMesh} />
+
+            {/* Thanh máu 3D trên đầu quái */}
+            <group position={[0, 1.55, 0]}>
+              <mesh>
+                <boxGeometry args={[1.14, 0.14, 0.04]} />
+                <meshBasicMaterial color="#0f172a" />
+              </mesh>
+              <mesh
+                ref={(el) => {
+                  enemyHpFillRefs.current[idx] = el;
+                }}
+                position={[0, 0, 0.03]}
+              >
+                <boxGeometry args={[1.1, 0.09, 0.03]} />
+                <meshBasicMaterial color="#4ade80" />
+              </mesh>
+            </group>
           </group>
-        </group>
-      ))}
+        );
+      })}
 
       {/* InstancedMesh cho toàn bộ Đạn (1 draw call) */}
       <instancedMesh
@@ -1191,7 +1220,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               style={{ pointerEvents: "none" }}
             >
               <div className="select-none whitespace-nowrap rounded-full border border-rose-400 bg-rose-950/95 px-3 py-1 text-xs font-black text-amber-300 shadow-xl">
-                TÊN LỬA RƠI SAU <span ref={icbmCountdownElRef}>{icbmPending.delaySeconds.toFixed(1)}s</span>
+                {trans.crate.icbmFalling}{" "}
+                <span ref={icbmCountdownElRef}>{icbmPending.delaySeconds.toFixed(1)}s</span>
               </div>
             </Html>
           </group>

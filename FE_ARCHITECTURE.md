@@ -1,6 +1,6 @@
 # Kiến trúc dự án Frontend (3d_demo)
 
-Tài liệu này quy chuẩn cấu trúc thư mục và nguyên tắc phát triển giao diện (FE) của dự án **3D Demo** (`3d_demo`), giữ nguyên pattern phân tầng từ dự án tham chiếu và mở rộng thêm mảng 3D (`three`, `@react-three/fiber`, `@react-three/drei`, `framer-motion`).
+Tài liệu này quy chuẩn cấu trúc thư mục và nguyên tắc phát triển giao diện (FE) của dự án **3D Lane Shooter** (`3d_demo`), giữ nguyên pattern phân tầng từ dự án tham chiếu và mở rộng thêm mảng 3D (`three`, `@react-three/fiber`, `@react-three/drei`, `framer-motion`).
 
 ## Cấu trúc thư mục (`src/`)
 

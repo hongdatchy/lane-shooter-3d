@@ -6,6 +6,10 @@ import { soundService } from "@/service/sound-service";
 import { playerStorageService } from "@/service/player-storage-service";
 import { leaderboardService, LeaderboardSource } from "@/service/leaderboard-service";
 import { isFirebaseReady } from "@/lib/firebase";
+import { useAppStore } from "@/state-manager/app-store";
+import { formatText, getTranslation } from "@/lang/useTransClientSide";
+
+const getCurrentTrans = () => getTranslation(useAppStore.getState().locale);
 
 interface GameState {
   gameStatus: GameStatus;
@@ -145,7 +149,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   icbmAiming: false,
   icbmPending: null,
 
-  cameraMode: "TOP_DOWN",
+  cameraMode: "THIRD_PERSON",
   autoFire: true,
   isMuted: false,
   sessionId: 0,
@@ -218,7 +222,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         crateBatch: 0,
         crateHits: 0,
         crateTargetHits: weaponService.getCrateTargetForBatch(0),
-        rewardBanner: "Màn 1 — Khởi động!",
+        rewardBanner: getCurrentTrans().banners.stage1Start,
         rage: 0,
         rageReady: false,
         rageActive: false,
@@ -303,14 +307,15 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextRage = Math.min(RAGE_CONFIG.maxRage, state.rage + amount);
     if (nextRage >= RAGE_CONFIG.maxRage) {
       const weapon = weaponService.getWeaponByIndex(state.weaponIndex);
+      const trans = getCurrentTrans();
       soundService.play("rageReady");
       set({
         rage: RAGE_CONFIG.maxRage,
         rageReady: true,
         rewardBanner:
           weapon.id === "icbm"
-            ? "Nộ đầy! Bấm [R] rồi chỉ chuột phóng Tên Lửa Liên Lục Địa!"
-            : "Thanh Nộ đã đầy! Bấm [R] hoặc nút Nộ để xả Mưa Đạn!",
+            ? trans.banners.rageReadyIcbm
+            : trans.banners.rageReadyNormal,
       });
       return;
     }
@@ -324,17 +329,18 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     }
     if (!state.rageReady) {
       const pct = Math.round((state.rage / RAGE_CONFIG.maxRage) * 100);
-      set({ rewardBanner: `Chưa đủ 100% Nộ (${pct}%)!` });
+      set({ rewardBanner: formatText(getCurrentTrans().banners.rageNotReady, { pct }) });
       return;
     }
     soundService.unlock();
     const weapon = weaponService.getWeaponByIndex(state.weaponIndex);
+    const trans = getCurrentTrans();
     if (weapon.id === "icbm") {
       soundService.play("rageReady");
       set({
         rageReady: false,
         icbmAiming: true,
-        rewardBanner: "CHỈ CHUỘT VÀO SÂN VÀ CLICK ĐỂ PHÓNG TÊN LỬA LIÊN LỤC ĐỊA!",
+        rewardBanner: trans.banners.icbmAiming,
       });
       return;
     }
@@ -345,7 +351,11 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       rageReady: false,
       rageActive: true,
       rageTimeLeft: RAGE_CONFIG.durationSeconds,
-      rewardBanner: `MƯA ĐẠN NỘ! Bắn nhanh x${RAGE_CONFIG.fireRateMultiplier} • Số đạn x${RAGE_CONFIG.bulletCountMultiplier} (${RAGE_CONFIG.durationSeconds}s)!`,
+      rewardBanner: formatText(trans.banners.rageActivated, {
+        rate: RAGE_CONFIG.fireRateMultiplier,
+        count: RAGE_CONFIG.bulletCountMultiplier,
+        sec: RAGE_CONFIG.durationSeconds,
+      }),
     });
   },
 
@@ -364,7 +374,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         targetZ,
         delaySeconds: ICBM_CONFIG.impactDelaySeconds,
       },
-      rewardBanner: `ĐÃ PHÓNG TÊN LỬA! Va chạm sau ${ICBM_CONFIG.impactDelaySeconds}s...`,
+      rewardBanner: formatText(getCurrentTrans().banners.icbmLaunched, {
+        sec: ICBM_CONFIG.impactDelaySeconds,
+      }),
     });
   },
 
@@ -441,7 +453,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         rageTimeLeft: 0,
         icbmAiming: false,
         icbmPending: null,
-        rewardBanner: `Chiến thắng! Đã hạ Boss Khổng Lồ và vượt qua cả ${state.maxWaves} màn!`,
+        rewardBanner: formatText(getCurrentTrans().banners.victory, {
+          max: state.maxWaves,
+        }),
       });
       return;
     }
@@ -449,16 +463,22 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     // Qua màn tiếp theo (Kiểm tra xem có vũ khí mới được mở khóa ở màn mới không)
     const nextWave = state.wave + 1;
     const nextStageCfg = weaponService.getStageConfig(nextWave);
+    const trans = getCurrentTrans();
     soundService.play(nextStageCfg.isBossStage ? "bossWarning" : "stageClear");
     const nextWeaponNow = weaponService.getNextWeapon(state.weaponIndex, nextWave);
     const hadWeaponBefore = weaponService.getNextWeapon(state.weaponIndex, state.wave);
     const unlockNotice =
       !hadWeaponBefore && nextWeaponNow
-        ? ` • ${nextWeaponNow.name} đã xuất hiện ở làn phải!`
+        ? formatText(trans.banners.weaponAppeared, {
+            name: trans.weapons[nextWeaponNow.id],
+          })
         : "";
     const bannerText = nextStageCfg.isBossStage
-      ? `Màn ${nextWave}/${state.maxWaves} — BOSS KHỔNG LỒ!${unlockNotice}`
-      : `Qua Màn ${nextWave} — Quái nhanh, to & trâu hơn!${unlockNotice}`;
+      ? `${formatText(trans.banners.bossStage, {
+          wave: nextWave,
+          max: state.maxWaves,
+        })}${unlockNotice}`
+      : `${formatText(trans.banners.stageClear, { wave: nextWave })}${unlockNotice}`;
 
     set({
       kills: nextKills,
@@ -493,7 +513,10 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextBatch = state.crateBatch + 1;
     const nextTarget = weaponService.getCrateTargetForBatch(nextBatch);
     const nextWeaponIndex = state.weaponIndex + 1;
-    const rewardLabel = `Mở khóa: ${nextWeapon.name}!`;
+    const trans = getCurrentTrans();
+    const rewardLabel = formatText(trans.banners.weaponUnlocked, {
+      name: trans.weapons[nextWeapon.id],
+    });
     const nextScore = state.score + 150;
 
     soundService.play("upgradeWeapon");

@@ -8,6 +8,7 @@ import { useGameStore } from "@/state-manager/game-store";
 import { weaponService } from "@/service/weapon-service";
 import { ARENA_CONFIG } from "@/service/game-constants";
 import { GameRuntimeRef } from "@/dto/GameDTO";
+import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 import { WeaponModel3D } from "./WeaponModel3D";
 
 interface WeaponCrateProps {
@@ -21,6 +22,7 @@ export function WeaponCrate({ runtimeRef }: WeaponCrateProps) {
   const weaponIndex = useGameStore((s) => s.weaponIndex);
   const wave = useGameStore((s) => s.wave);
   const maxWaves = useGameStore((s) => s.maxWaves);
+  const trans = useTransClientSide();
 
   const gunPivotRef = useRef<THREE.Group>(null);
   const auraRingRef = useRef<THREE.Mesh>(null);
@@ -132,37 +134,42 @@ export function WeaponCrate({ runtimeRef }: WeaponCrateProps) {
             {nextWeapon ? (
               <>
                 <div className="text-base sm:text-lg font-black uppercase tracking-wide text-sky-300 leading-tight">
-                  {nextWeapon.name}
+                  {trans.weapons[nextWeapon.id]}
                 </div>
                 <div className="mt-0.5 text-sm sm:text-base font-black text-amber-300">
-                  {crateHits} / {crateTargetHits} phát
+                  {formatText(trans.hud.shotsProgress, {
+                    hits: crateHits,
+                    target: crateTargetHits,
+                  })}
                 </div>
               </>
             ) : visibleLockedNext ? (
               <>
                 <div className="text-sm sm:text-base font-black uppercase tracking-wide text-amber-300 leading-tight">
-                  {visibleLockedNext.weapon.name}
+                  {trans.weapons[visibleLockedNext.weapon.id]}
                 </div>
                 <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                  Mở ở Màn {visibleLockedNext.minStage}
+                  {formatText(trans.hud.unlockAtStage, {
+                    stage: visibleLockedNext.minStage,
+                  })}
                 </div>
               </>
             ) : isAtMaxWeapon ? (
               <>
                 <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
-                  Đã đạt tối đa
+                  {trans.crate.maxTitle}
                 </div>
                 <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                  Sẵn sàng phóng Tên Lửa!
+                  {trans.crate.readyIcbm}
                 </div>
               </>
             ) : (
               <>
                 <div className="text-sm sm:text-base font-black uppercase tracking-wide text-emerald-300 leading-tight">
-                  Đã đạt tối đa
+                  {trans.crate.maxTitle}
                 </div>
                 <div className="mt-0.5 text-xs sm:text-sm font-bold text-slate-300">
-                  Sẵn sàng chiến đấu!
+                  {trans.crate.readyCombat}
                 </div>
               </>
             )}

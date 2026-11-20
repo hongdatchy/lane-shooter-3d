@@ -11,7 +11,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "3D Demo - Base Project",
+  title: "3D Lane Shooter",
   description: "Base project Next.js + TypeScript + Tailwind + Zustand cho ứng dụng và game 3D",
 };
 
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className="min-h-screen flex flex-col bg-slate-50/50 font-sans antialiased text-slate-900">
+      <body className="min-h-screen flex flex-col bg-slate-50/50 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100 transition-colors">
         <AppProvider>
           <Header />
           <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
