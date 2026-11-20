@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const DEFAULT_R2_ASSET_URL =
-  "https://pub-1f6e2b4582bc477f8b6205fdb1d711e5.r2.dev";
+  "https://lane-shooter-assets.hongdatchy.workers.dev";
 
 // Tạo đường dẫn tài nguyên (models, sounds...) ưu tiên Cloudflare R2 CDN
 export function withAssetBase(path: string): string {
