@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { DEFAULT_R2_ASSET_URL } from "@/lib/utils";
 
-export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v1";
+export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v2";
 
 // Bật bộ nhớ đệm RAM nội bộ của Three.js trong suốt phiên chơi
 THREE.Cache.enabled = true;
