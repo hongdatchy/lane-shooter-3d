@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { DEFAULT_R2_ASSET_URL } from "@/lib/utils";
+import { DEFAULT_R2_ASSET_URL, isLocalAssetMode } from "@/lib/utils";
 
 export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v2";
 
@@ -14,6 +14,17 @@ interface CachedBufferPayload {
 }
 
 const inFlightDownloads = new Map<string, Promise<CachedBufferPayload>>();
+// Cache trong RAM theo từng phiên tab (F5 sẽ tự reset để đọc file local mới nhất)
+const sessionMemoryCache = new Map<string, CachedBufferPayload>();
+
+function toCanonicalUrl(url: string): string {
+  if (typeof window === "undefined") return url;
+  try {
+    return new URL(url, window.location.href).href;
+  } catch {
+    return url;
+  }
+}
 
 export function isModelAssetUrl(url: string): boolean {
   if (!url) return false;
@@ -51,39 +62,6 @@ export function isHtmlBuffer(buffer: ArrayBuffer): boolean {
   return view[i] === 60; // Ký tự '<' (0x3C)
 }
 
-export function getLocalFallbackUrls(url: string): string[] {
-  try {
-    const cleanUrl = url.split("?")[0];
-    const r2Base = (
-      process.env.NEXT_PUBLIC_R2_ASSET_URL ?? DEFAULT_R2_ASSET_URL
-    )
-      .trim()
-      .replace(/\/+$/, "");
-
-    let rel = cleanUrl;
-    if (r2Base && cleanUrl.toLowerCase().startsWith(r2Base.toLowerCase())) {
-      rel = cleanUrl.slice(r2Base.length).replace(/^\/+/, "");
-    } else {
-      const parsed = new URL(
-        url,
-        typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
-      );
-      rel = parsed.pathname.replace(/^\/+/, "");
-    }
-
-    const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").trim().replace(/\/+$/, "");
-    const list: string[] = [];
-    if (basePath) {
-      list.push(`${basePath}/${rel}`);
-    }
-    list.push(`/${rel}`);
-    list.push(`./${rel}`);
-    return list;
-  } catch {
-    return [];
-  }
-}
-
 export function buildResponseFromBuffer(payload: CachedBufferPayload): Response {
   return new Response(payload.buffer.slice(0), {
     status: 200,
@@ -100,12 +78,16 @@ export function buildResponseFromBuffer(payload: CachedBufferPayload): Response 
  * Kiểm tra xem một URL model đã có sẵn trong CacheStorage của trình duyệt chưa
  */
 export async function isModelCached(url: string): Promise<boolean> {
+  if (isLocalAssetMode()) {
+    return false;
+  }
   if (typeof window === "undefined" || !("caches" in window)) {
     return false;
   }
   try {
     const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
-    const match = await cache.match(url);
+    const canonicalUrl = toCanonicalUrl(url);
+    const match = (await cache.match(canonicalUrl)) ?? (await cache.match(url));
     if (!match || !match.ok) return false;
     const buf = await match.clone().arrayBuffer();
     return !isHtmlBuffer(buf);
@@ -118,8 +100,7 @@ export async function isModelCached(url: string): Promise<boolean> {
  * Kích hoạt bộ nhớ đệm 2 tầng cho toàn bộ file 3D (.glb, .fbx):
  * 1. THREE.Cache (RAM): dùng lại ngay trong phiên chơi mà không parse/tải lại.
  * 2. Browser CacheStorage (Ổ cứng trình duyệt): lưu bền vững qua các lần F5 / đóng mở lại trình duyệt.
- * Có cơ chế tự động thử fallback sang đường dẫn file local nếu R2 bị lỗi CORS hoặc mất mạng,
- * và TUYỆT ĐỐI chặn các trang HTML lỗi 403/404 lọt vào Three.js.
+ * TUYỆT ĐỐI không fallback ngầm và chặn các trang HTML lỗi 403/404 lọt vào Three.js.
  */
 export function installModelBrowserCache(): void {
   if (typeof window === "undefined" || isFetchPatched) {
@@ -150,19 +131,32 @@ export function installModelBrowserCache(): void {
       return nativeFetch(input, init);
     }
 
-    const canUseCacheStorage = "caches" in window;
+    const canonicalUrl = toCanonicalUrl(url);
+    const cachedInRam = sessionMemoryCache.get(canonicalUrl);
+    if (cachedInRam) {
+      return buildResponseFromBuffer(cachedInRam);
+    }
 
-    // 1. Kiểm tra trong ổ cứng trình duyệt (CacheStorage) trước
+    const useLocalMode = isLocalAssetMode();
+    const canUseCacheStorage = !useLocalMode && "caches" in window;
+
+    // 1. Kiểm tra trong ổ cứng trình duyệt (CacheStorage) trước (chỉ áp dụng cho CDN production; local dev luôn đọc file mới từ public/)
     if (canUseCacheStorage) {
       try {
         const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
-        const cachedRes = await cache.match(url);
+        const cachedRes = (await cache.match(canonicalUrl)) ?? (await cache.match(url));
         if (cachedRes && cachedRes.ok) {
           const testBuffer = await cachedRes.clone().arrayBuffer();
           if (!isHtmlBuffer(testBuffer)) {
-            return cachedRes;
+            const payload: CachedBufferPayload = {
+              buffer: testBuffer,
+              contentType: cachedRes.headers.get("Content-Type") || "application/octet-stream",
+            };
+            sessionMemoryCache.set(canonicalUrl, payload);
+            return buildResponseFromBuffer(payload);
           }
           // Nếu lỡ cache phải trang HTML lỗi trước đó thì xóa bỏ
+          await cache.delete(canonicalUrl);
           await cache.delete(url);
         }
       } catch {
@@ -171,90 +165,71 @@ export function installModelBrowserCache(): void {
     }
 
     // 2. Gom các request trùng URL đang tải cùng lúc thành 1 lượt tải duy nhất
-    let pending = inFlightDownloads.get(url);
+    let pending = inFlightDownloads.get(canonicalUrl);
     if (!pending) {
       pending = (async (): Promise<CachedBufferPayload> => {
-        let netRes: Response | null = null;
-        let lastError: unknown = null;
+        const isCrossOrigin = /^https?:\/\//i.test(canonicalUrl) &&
+          typeof window !== "undefined" &&
+          !canonicalUrl.startsWith(window.location.origin);
+        const netRes = await nativeFetch(canonicalUrl, {
+          ...init,
+          method: "GET",
+          // Bỏ qua HTTP Disk Cache của Chromium để tránh lỗi net::ERR_CACHE_WRITE_FAILURE với file model lớn (115MB) / local dev
+          cache: "no-store",
+          mode: isCrossOrigin ? "cors" : "same-origin",
+          credentials: isCrossOrigin ? "omit" : "same-origin",
+          signal: init?.signal ?? (input instanceof Request ? input.signal : undefined),
+        });
 
-        // Ưu tiên tải từ CDN / Cloudflare R2
-        try {
-          const res = await nativeFetch(url, {
-            ...init,
-            method: "GET",
-            mode: "cors",
-            credentials: "omit",
-          });
-          const cType = res.headers.get("Content-Type") || "";
-          if (res.ok && !cType.includes("text/html")) {
-            netRes = res;
-          } else {
-            lastError = new Error(`R2 trả về HTTP ${res.status}`);
-          }
-        } catch (err) {
-          lastError = err;
+        const cType = netRes.headers.get("Content-Type") || "";
+        if (!netRes.ok || cType.includes("text/html")) {
+          const sourceLabel = useLocalMode ? "local (public/)" : "R2";
+          throw new Error(
+            `Không tải được model 3D từ ${sourceLabel} (HTTP ${netRes.status}): ${canonicalUrl}`
+          );
         }
 
-        // Nếu R2 bị lỗi CORS hoặc không tải được -> thử fallback sang các đường dẫn local tương ứng
-        if (!netRes) {
-          const fallbacks = getLocalFallbackUrls(url);
-          for (const fbUrl of fallbacks) {
-            try {
-              const fbRes = await nativeFetch(fbUrl, init);
-              const fbType = fbRes.headers.get("Content-Type") || "";
-              if (fbRes.ok && !fbType.includes("text/html")) {
-                netRes = fbRes;
-                break;
-              }
-            } catch {
-              // Tiếp tục thử fallback tiếp theo
-            }
-          }
-        }
-
-        if (!netRes || !netRes.ok) {
-          throw lastError || new Error(`Không tải được model từ R2 hoặc local fallback: ${url}`);
-        }
-
-        const contentType =
-          netRes.headers.get("Content-Type") || "application/octet-stream";
+        const contentType = cType || "application/octet-stream";
         const buffer = await netRes.arrayBuffer();
 
         // Kiểm tra xem dữ liệu có phải là file nhị phân hợp lệ hay trang HTML lỗi
         if (isHtmlBuffer(buffer)) {
           throw new Error(
-            `Dữ liệu nhận về từ máy chủ là trang HTML lỗi (403/404), không phải file model 3D: ${url}`
+            `Dữ liệu nhận về từ máy chủ là trang HTML lỗi (403/404), không phải file model 3D: ${canonicalUrl}`
           );
         }
 
-        // Lưu bền vững vào CacheStorage của trình duyệt để các lần mở game sau không cần tải lại
+        const payload: CachedBufferPayload = { buffer, contentType };
+        sessionMemoryCache.set(canonicalUrl, payload);
+
+        // Lưu bền vững vào CacheStorage của trình duyệt cho R2 CDN ở production
         if (canUseCacheStorage && buffer.byteLength > 0) {
           try {
             const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
             await cache.put(
-              url,
-              buildResponseFromBuffer({ buffer, contentType })
+              canonicalUrl,
+              buildResponseFromBuffer(payload)
             );
           } catch {
             // Bỏ qua nếu đầy bộ nhớ cache trình duyệt
           }
         }
 
-        return { buffer, contentType };
+        return payload;
       })();
 
-      inFlightDownloads.set(url, pending);
+      inFlightDownloads.set(canonicalUrl, pending);
     }
 
     try {
       const payload = await pending;
       return buildResponseFromBuffer(payload);
     } catch (err) {
-      // Báo lỗi rõ ràng cho Three.js ErrorBoundary xử lý (trả về fallback robot),
-      // TUYỆT ĐỐI không gọi nativeFetch trả về trang HTML 403 gây crash parser.
+      // Báo lỗi rõ ràng cho Three.js ErrorBoundary xử lý,
+      // TUYỆT ĐỐI không fallback ngầm.
       throw err;
     } finally {
-      inFlightDownloads.delete(url);
+      inFlightDownloads.delete(canonicalUrl);
     }
   };
 }

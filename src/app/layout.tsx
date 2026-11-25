@@ -1,19 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
-import Header from "@/layout/header";
-import Footer from "@/layout/footer";
 import { AppProvider } from "@/context/app-context";
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#0A0D14",
   width: "device-width",
   initialScale: 1,
 };
 
 export const metadata: Metadata = {
-  title: "3D Lane Shooter",
-  description: "Base project Next.js + TypeScript + Tailwind + Zustand cho ứng dụng và game 3D",
+  title: "LANE SHOOTER 3D",
+  description: "Arcade lane shooter — survive the onslaught, upgrade your arsenal.",
 };
+
+const isCrazyGamesBuild = process.env.NEXT_PUBLIC_PLATFORM === "crazygames";
 
 export default function RootLayout({
   children,
@@ -21,13 +22,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className="min-h-screen flex flex-col bg-slate-50/50 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100 transition-colors">
-        <AppProvider>
-          <Header />
-          <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
-          <Footer />
-        </AppProvider>
+    <html lang="en" className="dark">
+      <body className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-[#0A0D14] text-[#E1E2EC] antialiased">
+        {isCrazyGamesBuild && (
+          <Script
+            id="crazygames-sdk-script"
+            src="https://sdk.crazygames.com/crazygames-sdk-v3.js"
+            strategy="beforeInteractive"
+          />
+        )}
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );

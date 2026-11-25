@@ -15,7 +15,6 @@ import {
   Minimize2,
   Moon,
   Pause,
-  Pencil,
   Play,
   RotateCcw,
   Sparkles,
@@ -27,13 +26,10 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { CameraMode } from "@/dto/GameDTO";
 import { useGameStore } from "@/state-manager/game-store";
 import { useAppStore } from "@/state-manager/app-store";
 import { weaponService } from "@/service/weapon-service";
-import { leaderboardService } from "@/service/leaderboard-service";
 import { RAGE_CONFIG } from "@/service/game-constants";
 import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
@@ -50,11 +46,11 @@ const CAMERA_ORDER: CameraMode[] = ["TOP_DOWN", "THIRD_PERSON", "FREE_ORBIT"];
 export function GameHUD({ containerRef }: GameHUDProps) {
   const {
     gameStatus,
-    playerId,
+    player,
     playerName,
-    leaderboard,
-    leaderboardSource,
-    profileLoaded,
+    platformCapabilities,
+    authLoading,
+    scoreSyncError,
     score,
     highScore,
     hp,
@@ -64,7 +60,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     stageKills,
     stageTargetKills,
     kills,
-    weaponIndex,
+    combatLoadoutIds,
+    activeLoadoutSlot,
+    saveData,
     overdriveLevel,
     crateHits,
     crateTargetHits,
@@ -79,21 +77,19 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     autoFire,
     isMuted,
     assetsReady,
-    assetsLoading,
     assetsLoadedCount,
     assetsTotal,
     assetsPercent,
     assetsError,
     assetsWaitingToStart,
-    setAssetsReady,
     setAssetsWaitingToStart,
-    hydrateProfile,
-    setPlayerName,
-    setLeaderboardData,
+    loginWithPlatform,
     startGame,
     returnToMenu,
     togglePause,
     activateRage,
+    switchCombatWeaponSlot,
+    cycleCombatWeapon,
     setCameraMode,
     cycleCameraMode,
     toggleAutoFire,
@@ -101,9 +97,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     clearRewardBanner,
   } = useGameStore();
 
-  const [nameDraft, setNameDraft] = useState("");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameError, setNameError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
@@ -113,30 +106,19 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     label: trans.camera[mode],
   }));
 
-  const weapon = weaponService.getWeaponByIndex(weaponIndex);
-  const nextWeapon = weaponService.getNextWeapon(weaponIndex, wave);
-  const lockedNext = weaponService.getLockedNextWeapon(weaponIndex, wave);
-  // Các vũ khí mở ở màn cuối (Màn 6) sẽ chỉ hiện khi bước vào Màn 6
-  const visibleLockedNext = lockedNext && lockedNext.minStage < maxWaves ? lockedNext : null;
+  const loadoutWeapons = combatLoadoutIds.map((id) =>
+    weaponService.resolveCombatWeapon(id, saveData.weaponLevels[id] ?? 1)
+  );
+  const weapon =
+    loadoutWeapons[activeLoadoutSlot] ??
+    loadoutWeapons[0] ??
+    weaponService.resolveCombatWeapon("pistol", 1);
   const baseRate = weaponService.getEffectiveFireRate(weapon, overdriveLevel);
   const effectiveRate = (
     rageActive ? baseRate * RAGE_CONFIG.fireRateMultiplier : baseRate
   ).toFixed(1);
   const effectiveDamage = weaponService.getEffectiveDamage(weapon, overdriveLevel);
   const ragePercent = Math.round(Math.min(100, Math.max(0, (rage / RAGE_CONFIG.maxRage) * 100)));
-  const needsNameInput = !playerName || isEditingName;
-
-  useEffect(() => {
-    hydrateProfile();
-    const unsubscribe = leaderboardService.subscribeLeaderboard((entries, source) => {
-      setLeaderboardData(entries, source);
-    });
-    return () => unsubscribe();
-  }, [hydrateProfile, setLeaderboardData]);
-
-  useEffect(() => {
-    setNameDraft(playerName);
-  }, [playerName]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -176,26 +158,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     } else {
       enterFullscreen();
     }
-  };
-
-  const handlePlayNow = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const chosenName = needsNameInput ? nameDraft.trim() : playerName.trim();
-    if (!chosenName) {
-      setNameError(trans.menu.emptyNameError);
-      return;
-    }
-    setNameError("");
-    if (needsNameInput) {
-      setPlayerName(chosenName);
-      setIsEditingName(false);
-    }
-    if (!assetsReady) {
-      setAssetsWaitingToStart(true);
-      return;
-    }
-    enterFullscreen();
-    startGame();
   };
 
   const handleRestart = () => {
@@ -259,6 +221,18 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       }
       if (!e.repeat && (e.code === "KeyV" || key === "v")) {
         useGameStore.getState().cycleCameraMode();
+      }
+      if (!e.repeat && (e.code === "Digit1" || key === "1")) {
+        useGameStore.getState().switchCombatWeaponSlot(0);
+      }
+      if (!e.repeat && (e.code === "Digit2" || key === "2")) {
+        useGameStore.getState().switchCombatWeaponSlot(1);
+      }
+      if (!e.repeat && (e.code === "Digit3" || key === "3")) {
+        useGameStore.getState().switchCombatWeaponSlot(2);
+      }
+      if (!e.repeat && (e.code === "KeyQ" || key === "q")) {
+        useGameStore.getState().cycleCombatWeapon();
       }
       if (
         !e.repeat &&
@@ -574,297 +548,18 @@ export function GameHUD({ containerRef }: GameHUDProps) {
         )}
       </AnimatePresence>
 
-      {/* Màn hình Start (Nhập tên + Chơi ngay + Bảng xếp hạng) / Pause / Game Over / Victory */}
+      {/* Modal Pause / Game Over / Victory */}
       <AnimatePresence>
-        {gameStatus !== "PLAYING" && (
+        {(gameStatus === "PAUSED" ||
+          gameStatus === "GAME_OVER" ||
+          gameStatus === "VICTORY") && (
           <motion.div
             key={gameStatus}
             initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.94 }}
-            className={`pointer-events-auto mx-auto my-auto max-h-full w-full overflow-y-auto rounded-2xl border border-slate-700/90 bg-slate-950/95 p-5 sm:p-6 text-white shadow-2xl backdrop-blur-lg ${
-              isInMenu ? "max-w-3xl text-left" : "max-w-md text-center"
-            }`}
+            className="pointer-events-auto mx-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-slate-700/90 bg-slate-950/95 p-5 sm:p-6 text-center text-white shadow-2xl backdrop-blur-lg"
           >
-            {gameStatus === "MENU" && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-[1.05fr_1fr] md:items-stretch">
-                {/* Cột trái: Thông tin game + Nhập tên / Tên đã lưu + Nút Chơi ngay */}
-                <div className="flex flex-col justify-between gap-4">
-                  <div>
-                    <Badge variant="info" className="mb-2.5 bg-sky-500/20 text-sky-300">
-                      {trans.menu.badge}
-                    </Badge>
-                    <h2 className="text-2xl font-black tracking-tight">{trans.menu.title}</h2>
-                    <p className="mt-1.5 text-xs sm:text-sm text-slate-300">
-                      {trans.menu.subtitle}
-                    </p>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-300">
-                      <div>
-                        <p className="font-bold text-rose-400">
-                          {trans.menu.cardChallengeTitle}
-                        </p>
-                        <p className="mt-0.5">{trans.menu.cardChallengeDesc}</p>
-                      </div>
-                      <div>
-                        <p className="font-bold text-sky-400">
-                          {trans.menu.cardWeaponsTitle}
-                        </p>
-                        <p className="mt-0.5">{trans.menu.cardWeaponsDesc}</p>
-                      </div>
-                      <div className="col-span-2 border-t border-slate-800 pt-2">
-                        <p className="font-bold text-amber-300">{trans.menu.cardRageTitle}</p>
-                        <p className="mt-0.5">
-                          {formatText(trans.menu.cardRageDesc, {
-                            count: RAGE_CONFIG.bulletCountMultiplier,
-                            rate: RAGE_CONFIG.fireRateMultiplier,
-                            sec: RAGE_CONFIG.durationSeconds,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Khu vực nhập tên / tên đã lưu + Chơi ngay ngay phía dưới */}
-                  <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
-                    {!profileLoaded ? (
-                      <div className="py-5 text-center text-xs text-slate-400">
-                        {trans.menu.loadingProfile}
-                      </div>
-                    ) : needsNameInput ? (
-                      <form onSubmit={handlePlayNow} className="space-y-3">
-                        <div>
-                          <div className="mb-1.5 flex items-center justify-between">
-                            <label
-                              htmlFor="player-name-input"
-                              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-300"
-                            >
-                              <User className="h-3.5 w-3.5" />
-                              {trans.menu.enterNameLabel}
-                            </label>
-                            {isEditingName && playerName && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsEditingName(false);
-                                  setNameDraft(playerName);
-                                  setNameError("");
-                                }}
-                                className="text-xs font-semibold text-slate-400 hover:text-white"
-                              >
-                                {trans.menu.cancel}
-                              </button>
-                            )}
-                          </div>
-                          <Input
-                            id="player-name-input"
-                            value={nameDraft}
-                            maxLength={24}
-                            autoFocus
-                            onChange={(e) => {
-                              setNameDraft(e.target.value);
-                              if (nameError) setNameError("");
-                            }}
-                            placeholder={trans.menu.enterNamePlaceholder}
-                            className="border-slate-700 bg-slate-950/90 text-white placeholder:text-slate-500 focus-visible:ring-sky-500"
-                          />
-                          {nameError && (
-                            <p className="mt-1.5 text-xs font-medium text-rose-400">
-                              {nameError}
-                            </p>
-                          )}
-                        </div>
-
-                        <Button
-                          type="submit"
-                          size="lg"
-                          className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
-                        >
-                          {!assetsReady ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin text-sky-200" />
-                              <span>{trans.menu.playNow}</span>
-                              <span className="text-xs font-semibold text-sky-200/90">
-                                ({assetsPercent}%)
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="h-4 w-4 fill-current" />
-                              <span>{trans.menu.playNow}</span>
-                            </>
-                          )}
-                        </Button>
-                      </form>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-700/80 bg-slate-950/80 px-3 py-2.5">
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-medium text-slate-400">
-                              {trans.menu.playerLabel}
-                            </span>
-                            <div className="flex items-center gap-1.5 truncate text-base font-black text-sky-300">
-                              <User className="h-4 w-4 shrink-0 text-sky-400" />
-                              <span className="truncate">{playerName}</span>
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setNameDraft(playerName);
-                              setIsEditingName(true);
-                              setNameError("");
-                            }}
-                            className="h-8 shrink-0 gap-1 border-slate-700 bg-slate-900 text-xs text-slate-200 hover:bg-slate-800 hover:text-white"
-                          >
-                            <Pencil className="h-3 w-3" />
-                            {trans.menu.changeName}
-                          </Button>
-                        </div>
-
-                        <Button
-                          type="button"
-                          size="lg"
-                          onClick={() => handlePlayNow()}
-                          className="w-full gap-2 bg-gradient-to-r from-blue-600 to-sky-500 font-black text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-sky-400"
-                        >
-                          {!assetsReady ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin text-sky-200" />
-                              <span>{trans.menu.playNow}</span>
-                              <span className="text-xs font-semibold text-sky-200/90">
-                                ({assetsPercent}%)
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="h-4 w-4 fill-current" />
-                              <span>{trans.menu.playNow}</span>
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Cột phải: Bảng xếp hạng (Firebase Firestore + fallback localStorage) */}
-                <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/75 p-4">
-                  <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-amber-400" />
-                      <h3 className="text-sm font-black uppercase tracking-wide text-amber-300">
-                        {trans.menu.leaderboardTitle}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          leaderboardSource === "firebase"
-                            ? "bg-emerald-500/20 text-emerald-300"
-                            : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        {leaderboardSource === "firebase" ? "Online" : "Local"}
-                      </span>
-                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
-                        {formatText(trans.menu.playersCount, {
-                          count: leaderboard.length,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!profileLoaded ? (
-                    <div className="flex flex-1 items-center justify-center py-8 text-xs text-slate-400">
-                      {trans.menu.loadingBoard}
-                    </div>
-                  ) : leaderboard.length === 0 ? (
-                    <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-                      <Trophy className="mb-2 h-8 w-8 text-slate-700" />
-                      <p className="text-xs font-semibold text-slate-400">
-                        {trans.menu.emptyBoardTitle}
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        {trans.menu.emptyBoardDesc}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="max-h-[300px] space-y-1.5 overflow-y-auto pr-1">
-                      {leaderboard.map((entry, idx) => {
-                        const isCurrentPlayer = playerId
-                          ? entry.id === playerId
-                          : Boolean(playerName) &&
-                            entry.playerName.trim().toLowerCase() ===
-                              playerName.trim().toLowerCase();
-                        const rankBadgeClass =
-                          idx === 0
-                            ? "bg-amber-400 text-slate-950"
-                            : idx === 1
-                              ? "bg-slate-300 text-slate-950"
-                              : idx === 2
-                                ? "bg-orange-400 text-slate-950"
-                                : "bg-slate-800 text-slate-300";
-
-                        return (
-                          <div
-                            key={entry.id}
-                            className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors ${
-                              isCurrentPlayer
-                                ? "border-sky-500/70 bg-sky-950/50"
-                                : "border-slate-800/90 bg-slate-950/60"
-                            }`}
-                          >
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              <span
-                                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-black ${rankBadgeClass}`}
-                              >
-                                {idx + 1}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="truncate font-bold text-white">
-                                    {entry.playerName}
-                                  </span>
-                                  {isCurrentPlayer && (
-                                    <span className="rounded bg-sky-500/25 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
-                                      {trans.menu.youBadge}
-                                    </span>
-                                  )}
-                                  {entry.victory && (
-                                    <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
-                                      {trans.menu.clearBadge}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-slate-400">
-                                  {formatText(trans.menu.boardMeta, {
-                                    wave: entry.wave,
-                                    kills: entry.kills,
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="shrink-0 text-right">
-                              <span className="font-black text-amber-300">
-                                {entry.score.toLocaleString()}
-                              </span>
-                              <span className="block text-[10px] text-slate-500">
-                                {trans.menu.pointsUnit}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {gameStatus === "PAUSED" && (
               <>
                 <h2 className="text-xl font-black">
@@ -923,11 +618,34 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     : trans.modals.gameOverTitle}
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">
-                  {playerName ? `${playerName} • ` : ""}
+                  {playerName ? `${playerName} • ` : `${trans.modals.guestLabel} • `}
                   {gameStatus === "VICTORY"
                     ? trans.modals.victoryDesc
                     : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
                 </p>
+                {!player && (
+                  <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/40 px-3 py-2 text-xs text-amber-200 flex items-center justify-between gap-2">
+                    <span className="text-left">
+                      {trans.modals.guestNoRankNotice}
+                    </span>
+                    {platformCapabilities?.supportsLoginPrompt && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={authLoading}
+                        onClick={() => void loginWithPlatform()}
+                        className="shrink-0 bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300"
+                      >
+                        {authLoading ? "..." : trans.modals.loginBtn}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {scoreSyncError && (
+                  <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-xs text-rose-300 text-left">
+                    {formatText(trans.modals.scoreSyncFailed, { err: scoreSyncError })}
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
                   <div>
                     <span className="block text-slate-400">{trans.modals.score}</span>
@@ -971,71 +689,93 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       {/* Thanh thông tin vũ khí & nút điều khiển bên dưới (chỉ hiện khi đã vào game) */}
       {!isInMenu && (
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3">
-          {/* Thông số súng hiện tại & Tiến độ hòm bên phải */}
-          <div className="pointer-events-auto flex w-full sm:w-auto items-center justify-between gap-2.5 sm:gap-3 rounded-xl border border-slate-700/80 bg-slate-950/80 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs text-white shadow-lg backdrop-blur-md">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 sm:gap-1.5 font-bold text-sky-300">
-                <Zap className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{trans.weapons[weapon.id]}</span>
-                {weapon.splashRadius > 0 && (
-                  <span className="shrink-0 rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
-                    {trans.hud.splash}
-                  </span>
-                )}
-                {overdriveLevel > 0 && (
-                  <span className="shrink-0 rounded bg-purple-500/30 px-1.5 py-0.5 text-[10px] text-purple-200">
-                    Lv.+{overdriveLevel}
-                  </span>
-                )}
-              </div>
-              <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
-                {trans.hud.damage}{" "}
-                <strong className="text-amber-300">{effectiveDamage}</strong> •{" "}
-                {trans.hud.fireRate}{" "}
-                <strong className="text-emerald-300">{effectiveRate}</strong>
-                {trans.hud.perSec}
-                {rageActive && (
-                  <span className="ml-1.5 font-bold text-amber-300">
-                    • x{RAGE_CONFIG.bulletCountMultiplier} {trans.hud.bulletsMultiplier}
-                  </span>
-                )}
-              </div>
+          {/* Thanh chọn 3 súng mang theo + Thông số súng hiện tại & Tiến độ Overdrive làn phải */}
+          <div className="pointer-events-auto flex w-full sm:w-auto flex-col gap-1.5 rounded-xl border border-slate-700/80 bg-slate-950/85 px-2.5 py-2 sm:px-3.5 text-[11px] sm:text-xs text-white shadow-lg backdrop-blur-md">
+            {/* 3 nút đổi súng trực tiếp */}
+            <div className="flex items-center gap-1.5">
+              {loadoutWeapons.map((slotWeapon, idx) => {
+                const isActive = idx === activeLoadoutSlot;
+                const slotLv = saveData.weaponLevels[slotWeapon.id] ?? 1;
+                return (
+                  <button
+                    key={`${slotWeapon.id}-${idx}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.currentTarget.blur();
+                      switchCombatWeaponSlot(idx);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer touch-none ${
+                      isActive
+                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.28)]"
+                        : "border-slate-700/80 bg-slate-900/80 text-slate-400 hover:border-slate-500 hover:text-white"
+                    }`}
+                  >
+                    <kbd
+                      className={`rounded px-1 text-[9px] font-black ${
+                        isActive
+                          ? "bg-cyan-400 text-slate-950"
+                          : "bg-slate-800 text-slate-300"
+                      }`}
+                    >
+                      {idx + 1}
+                    </kbd>
+                    <span className="max-w-[92px] truncate">{slotWeapon.name}</span>
+                    <span className="text-[9px] opacity-75">L{slotLv}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="shrink-0 border-l border-slate-700 pl-2.5 sm:pl-3 text-right sm:text-left">
-              <div className="text-[10px] sm:text-[11px] text-slate-400">
-                <span className="hidden sm:inline">
-                  {nextWeapon
-                    ? formatText(trans.hud.crateRightTo, {
-                        name: trans.weapons[nextWeapon.id],
-                      })
-                    : visibleLockedNext
-                      ? formatText(trans.hud.crateRightLocked, {
-                          name: trans.weapons[visibleLockedNext.weapon.id],
-                        })
-                      : trans.hud.weaponStatus}
-                </span>
-                <span className="sm:hidden">
-                  {nextWeapon
-                    ? formatText(trans.hud.crateShortTo, {
-                        name: trans.weapons[nextWeapon.id],
-                      })
-                    : visibleLockedNext
-                      ? trans.weapons[visibleLockedNext.weapon.id]
-                      : trans.hud.weaponStatusShort}
-                </span>
+            <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 font-bold text-sky-300">
+                  <Zap className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{weapon.name}</span>
+                  {weapon.splashRadius > 0 && (
+                    <span className="shrink-0 rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
+                      {trans.hud.splash}
+                    </span>
+                  )}
+                  {overdriveLevel > 0 && (
+                    <span className="shrink-0 rounded bg-purple-500/30 px-1.5 py-0.5 text-[10px] text-purple-200">
+                      Lv.+{overdriveLevel}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
+                  {trans.hud.damage}{" "}
+                  <strong className="text-amber-300">{effectiveDamage}</strong> •{" "}
+                  {trans.hud.fireRate}{" "}
+                  <strong className="text-emerald-300">{effectiveRate}</strong>
+                  {trans.hud.perSec}
+                  {rageActive && (
+                    <span className="ml-1.5 font-bold text-amber-300">
+                      • x{RAGE_CONFIG.bulletCountMultiplier} {trans.hud.bulletsMultiplier}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="font-black text-amber-300">
-                {nextWeapon
-                  ? formatText(trans.hud.shotsProgress, {
-                      hits: crateHits,
-                      target: crateTargetHits,
-                    })
-                  : visibleLockedNext
-                    ? formatText(trans.hud.unlockAtStage, {
-                        stage: visibleLockedNext.minStage,
-                      })
-                    : trans.hud.maxReached}
+
+              <div className="shrink-0 border-l border-slate-700 pl-2.5 sm:pl-3 text-right sm:text-left">
+                <div className="text-[10px] sm:text-[11px] text-slate-400">
+                  <span className="hidden sm:inline">
+                    {formatText(trans.hud.overdriveBuffLabel, {
+                      lv: overdriveLevel + 1,
+                    })}
+                  </span>
+                  <span className="sm:hidden">
+                    {formatText(trans.hud.overdriveBuffShort, {
+                      lv: overdriveLevel + 1,
+                    })}
+                  </span>
+                </div>
+                <div className="font-black text-amber-300">
+                  {formatText(trans.hud.shotsProgress, {
+                    hits: crateHits,
+                    target: crateTargetHits,
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -1132,6 +872,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             <span className="hidden lg:inline-block lg:order-2 rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
               <strong className="text-white">A / D</strong> {trans.hud.keyOr}{" "}
               <strong className="text-white">← / →</strong> {trans.hud.keyMove} •{" "}
+              <strong className="text-cyan-300">1-3 / Q</strong> {trans.hud.keySwitchWeapon} •{" "}
               <strong className="text-amber-300">R</strong> {trans.hud.keyRage} •{" "}
               <strong className="text-white">V</strong> {trans.hud.keyCamera} •{" "}
               {cameraMode === "FREE_ORBIT"
@@ -1211,7 +952,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
 
               {assetsError && (
                 <div className="mt-4 w-full rounded-lg border border-rose-500/40 bg-rose-950/40 p-3 text-xs text-rose-300">
-                  <p className="font-semibold">{trans.menu.loadingAssetsError}</p>
+                  <p className="font-semibold">{assetsError}</p>
                   <div className="mt-2.5 flex flex-wrap justify-center gap-2">
                     <Button
                       type="button"
@@ -1222,19 +963,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     >
                       <RotateCcw className="mr-1 h-3.5 w-3.5" />
                       {trans.menu.loadingAssetsRetry}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        setAssetsReady(true);
-                        setAssetsWaitingToStart(false);
-                        enterFullscreen();
-                        startGame();
-                      }}
-                      className="bg-amber-600 text-xs text-white hover:bg-amber-500"
-                    >
-                      {trans.menu.loadingAssetsPlayAnyway}
                     </Button>
                   </div>
                 </div>

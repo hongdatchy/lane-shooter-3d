@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "build:crazygames": "next build && node scripts/prepare-crazygames.js",
+    "dev": "node scripts/run-with-platform.js crazygames dev",
+    "dev:crazygames": "node scripts/run-with-platform.js crazygames dev",
+    "dev:web": "node scripts/run-with-platform.js web dev",
+    "build": "node scripts/run-with-platform.js web build",
+    "build:web": "node scripts/run-with-platform.js web build",
+    "build:crazygames": "node scripts/run-with-platform.js crazygames build && node scripts/prepare-crazygames.js",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"

@@ -29,5 +29,23 @@ if (isFirebaseReady()) {
   db = getFirestore(app);
 }
 
+export function getFirebaseAppOrThrow(): FirebaseApp {
+  if (!isFirebaseReady() || !app) {
+    throw new Error(
+      "Firebase is not configured. Please check NEXT_PUBLIC_FIREBASE_* environment variables."
+    );
+  }
+  return app;
+}
+
+export function getFirebaseDbOrThrow(): Firestore {
+  if (!isFirebaseReady() || !db) {
+    throw new Error(
+      "Firebase Firestore is not configured. Please check NEXT_PUBLIC_FIREBASE_* environment variables."
+    );
+  }
+  return db;
+}
+
 export { app, db };
 export default app;

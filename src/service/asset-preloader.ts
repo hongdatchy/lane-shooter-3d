@@ -1,5 +1,5 @@
 import { useFBX, useGLTF } from "@react-three/drei";
-import { withAssetBase } from "@/lib/utils";
+import { isLocalAssetMode, withAssetBase } from "@/lib/utils";
 import { isModelCached } from "@/service/model-cache";
 import { useGameStore } from "@/state-manager/game-store";
 
@@ -49,7 +49,7 @@ export async function startBackgroundPreload(): Promise<boolean> {
   store.setAssetProgress(0, total);
 
   let loadedCount = 0;
-  let hasFailed = false;
+  let firstErrorMessage: string | null = null;
 
   for (const filePath of PRELOAD_MODEL_FILES) {
     const url = withAssetBase(filePath);
@@ -60,30 +60,31 @@ export async function startBackgroundPreload(): Promise<boolean> {
       const alreadyCached = await isModelCached(url);
 
       if (!alreadyCached) {
-        // Tải file về (model-cache sẽ tự động lưu vào CacheStorage và có sẵn cơ chế fallback)
+        // Tải từ `public/models/` ở local dev hoặc từ R2 CDN ở production (không fallback ngầm)
         const res = await window.fetch(url);
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status} tải ${url}`);
+          throw new Error(
+            `HTTP ${res.status} tải ${url} (${isLocalAssetMode() ? "local" : "R2"})`
+          );
         }
         await res.arrayBuffer();
       }
 
       // 2. Parse sẵn vào bộ nhớ RAM của Three.js
-      try {
-        if (isFbx) {
-          useFBX.preload(url);
-        } else {
-          useGLTF.preload(url);
-        }
-      } catch {
-        // Nếu môi trường chưa mount Canvas R3F thì bỏ qua bước parse trước
+      if (isFbx) {
+        useFBX.preload(url);
+      } else {
+        useGLTF.preload(url);
       }
 
       loadedCount++;
       useGameStore.getState().setAssetProgress(loadedCount, total);
     } catch (err) {
-      console.warn(`[AssetPreloader] Lỗi khi tải tài nguyên ${filePath}:`, err);
-      hasFailed = true;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[AssetPreloader] Lỗi khi tải tài nguyên ${filePath}:`, err);
+      if (!firstErrorMessage) {
+        firstErrorMessage = `${filePath}: ${msg}`;
+      }
     }
   }
 
@@ -95,10 +96,8 @@ export async function startBackgroundPreload(): Promise<boolean> {
     return true;
   }
 
-  if (hasFailed) {
-    useGameStore
-      .getState()
-      .setAssetsError("Không thể tải đủ tất cả model 3D (vui lòng kiểm tra CORS trên R2 hoặc mạng).");
+  if (firstErrorMessage) {
+    useGameStore.getState().setAssetsError(firstErrorMessage);
   }
 
   return false;

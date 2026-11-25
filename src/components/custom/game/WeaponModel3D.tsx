@@ -27,7 +27,7 @@ export function WeaponModel3D({ weapon, spinBarrels = false }: WeaponModel3DProp
     }
   });
 
-  if (weapon.id === "pistol") {
+  if (weapon.modelKind === "pistol") {
     return (
       <group>
         {/* Tay cầm súng lục hơi nghiêng */}
@@ -73,7 +73,7 @@ export function WeaponModel3D({ weapon, spinBarrels = false }: WeaponModel3DProp
     );
   }
 
-  if (weapon.id === "ak-rifle") {
+  if (weapon.modelKind === "ak-rifle") {
     return (
       <group>
         {/* Báng gỗ đặc trưng của AKA */}
@@ -141,7 +141,7 @@ export function WeaponModel3D({ weapon, spinBarrels = false }: WeaponModel3DProp
     );
   }
 
-  if (weapon.id === "machine-gun") {
+  if (weapon.modelKind === "machine-gun") {
     return (
       <group>
         {/* Cụm động cơ xoay phía sau */}
@@ -211,7 +211,7 @@ export function WeaponModel3D({ weapon, spinBarrels = false }: WeaponModel3DProp
     );
   }
 
-  if (weapon.id === "cannon") {
+  if (weapon.modelKind === "cannon") {
     return (
       <group>
         {/* Giá đỡ pháo hạng nặng */}

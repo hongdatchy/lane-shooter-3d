@@ -1,87 +1,81 @@
-import { StageConfigDTO, WeaponConfigDTO } from "@/dto/GameDTO";
+import { StageConfigDTO, WeaponConfigDTO, WeaponModelKindDTO } from "@/dto/GameDTO";
+import {
+  getArmoryWeaponById,
+  getWeaponStatsAtLevel,
+} from "@/service/armory-catalog";
 
+interface BallisticProfile {
+  bulletSpeed: number;
+  spreadDeg: number;
+  bulletSize: [number, number, number];
+}
+
+const MODEL_BALLISTIC_DEFAULTS: Record<WeaponModelKindDTO, BallisticProfile> = {
+  pistol: { bulletSpeed: 32, spreadDeg: 1.0, bulletSize: [0.16, 0.16, 0.65] },
+  "ak-rifle": { bulletSpeed: 38, spreadDeg: 2.8, bulletSize: [0.2, 0.2, 0.85] },
+  "machine-gun": { bulletSpeed: 42, spreadDeg: 4.5, bulletSize: [0.18, 0.18, 0.92] },
+  cannon: { bulletSpeed: 34, spreadDeg: 1.0, bulletSize: [0.52, 0.52, 1.3] },
+  icbm: { bulletSpeed: 34, spreadDeg: 0.8, bulletSize: [0.62, 0.62, 1.4] },
+};
+
+const WEAPON_BALLISTIC_OVERRIDES: Record<string, Partial<BallisticProfile>> = {
+  shotgun: { bulletSpeed: 32, spreadDeg: 16, bulletSize: [0.15, 0.15, 0.45] },
+  scatter: { bulletSpeed: 36, spreadDeg: 14, bulletSize: [0.18, 0.18, 0.6] },
+  plasma_rifle: { bulletSpeed: 42, spreadDeg: 10, bulletSize: [0.2, 0.2, 0.9] },
+  rail_gun: { bulletSpeed: 64, spreadDeg: 0.3, bulletSize: [0.22, 0.22, 1.8] },
+  laser_cannon: { bulletSpeed: 56, spreadDeg: 0.5, bulletSize: [0.24, 0.24, 1.6] },
+  nuke_launcher: { bulletSpeed: 28, spreadDeg: 0.8, bulletSize: [0.68, 0.68, 1.45] },
+};
+
+// Danh sách vũ khí cơ bản tham chiếu cho model 3D & HUD
 export const WEAPON_CATALOG: WeaponConfigDTO[] = [
-  {
-    tier: 1,
-    id: "pistol",
-    name: "Súng Lục Đơn Phát",
-    description: "Bắn từng viên cơ bản, tốc độ vừa phải",
-    fireRate: 3.6,
-    bulletCount: 1,
-    spreadDeg: 1,
-    damage: 1.5,
-    bulletSpeed: 32,
-    bulletSize: [0.16, 0.16, 0.65],
-    splashRadius: 0,
-    bulletColor: "#38bdf8",
-    accentColor: "#0284c7",
-    minStage: 1,
-  },
-  {
-    tier: 2,
-    id: "ak-rifle",
-    name: "Súng Trường AKA",
-    description: "Bắn liên thanh nhanh và sát thương khá",
-    fireRate: 7.0,
-    bulletCount: 1,
-    spreadDeg: 2.8,
-    damage: 3.5,
-    bulletSpeed: 38,
-    bulletSize: [0.2, 0.2, 0.85],
-    splashRadius: 0,
-    bulletColor: "#fbbf24",
-    accentColor: "#d97706",
-    minStage: 1,
-  },
-  {
-    tier: 3,
-    id: "machine-gun",
-    name: "Súng Máy Hạng Nặng",
-    description: "Xả đạn cực nhanh áp đảo số lượng quái",
-    fireRate: 14.0,
-    bulletCount: 1,
-    spreadDeg: 4.5,
-    damage: 5.5,
-    bulletSpeed: 42,
-    bulletSize: [0.18, 0.18, 0.92],
-    splashRadius: 0,
-    bulletColor: "#34d399",
-    accentColor: "#059669",
-    minStage: 1,
-  },
-  {
-    tier: 4,
-    id: "cannon",
-    name: "Súng Đại Bác",
-    description: "Bắn chậm hơn súng máy nhưng đạn khổng lồ, dame cực khủng & nổ lan",
-    fireRate: 3,
-    bulletCount: 1,
-    spreadDeg: 0.8,
-    damage: 55,
-    bulletSpeed: 34,
-    bulletSize: [0.62, 0.62, 1.4],
-    splashRadius: 3.2,
-    bulletColor: "#fb7185",
-    accentColor: "#e11d48",
-    minStage: 1,
-  },
-  {
-    tier: 5,
-    id: "icbm",
-    name: "Tên Lửa Liên Lục Địa",
-    description: "Vũ khí tối thượng màn cuối: bắn như Đại Bác, Nộ phóng tên lửa 100.000 Dame",
-    fireRate: 3,
-    bulletCount: 1,
-    spreadDeg: 0.8,
-    damage: 55,
-    bulletSpeed: 34,
-    bulletSize: [0.62, 0.62, 1.4],
-    splashRadius: 3.2,
-    bulletColor: "#fb923c",
-    accentColor: "#ea580c",
-    minStage: 6,
-  },
+  resolveCombatWeaponById("pistol", 1),
+  resolveCombatWeaponById("ak47", 1),
+  resolveCombatWeaponById("minigun", 1),
+  resolveCombatWeaponById("cannon", 1),
+  resolveCombatWeaponById("icbm", 1),
 ];
+
+export function resolveCombatWeaponById(weaponId: string, level = 1): WeaponConfigDTO {
+  const spec = getArmoryWeaponById(weaponId);
+  const clampedLevel = Math.max(1, Math.min(10, Math.floor(level)));
+  const scaled = getWeaponStatsAtLevel(spec, clampedLevel);
+  const baseProfile = MODEL_BALLISTIC_DEFAULTS[spec.modelKind];
+  const customProfile = WEAPON_BALLISTIC_OVERRIDES[spec.id];
+
+  // ICBM & Laser Cannon sử dụng nhịp bắn cơ bản ổn định trên lane; Nộ giữ đúng kỹ năng đặc trưng
+  const combatFireRate =
+    spec.id === "laser_cannon"
+      ? Number((14 + (clampedLevel - 1) * 0.45).toFixed(1))
+      : spec.id === "icbm"
+        ? 3.0
+        : scaled.fireRate;
+
+  const combatDamage =
+    spec.id === "laser_cannon"
+      ? Number((12 * (1 + (clampedLevel - 1) * 0.1)).toFixed(1))
+      : spec.id === "icbm"
+        ? Number((55 * (1 + (clampedLevel - 1) * 0.1)).toFixed(1))
+        : scaled.damage;
+
+  const combatSplash = spec.id === "icbm" ? 3.2 : spec.splashRadius;
+
+  return {
+    id: spec.id,
+    modelKind: spec.modelKind,
+    name: spec.name,
+    description: spec.rageSkillDescVi,
+    fireRate: combatFireRate,
+    bulletCount: spec.projectilesPerShot,
+    spreadDeg: customProfile?.spreadDeg ?? baseProfile.spreadDeg,
+    damage: combatDamage,
+    bulletSpeed: customProfile?.bulletSpeed ?? baseProfile.bulletSpeed,
+    bulletSize: customProfile?.bulletSize ?? baseProfile.bulletSize,
+    splashRadius: combatSplash,
+    bulletColor: spec.tracerHex,
+    accentColor: spec.tracerHex,
+  };
+}
 
 // Cấu hình 5 màn chơi: Quái càng về sau và càng to thì máu càng trâu gấp bội để bắt buộc phải nâng cấp súng
 export const STAGE_CATALOG: StageConfigDTO[] = [
@@ -172,59 +166,12 @@ export const STAGE_CATALOG: StageConfigDTO[] = [
   },
 ];
 
-// Số phát bắn cần để mở hòm vũ khí theo từng đợt (không cho ăn item mãi nữa, max là Tên Lửa Liên Lục Địa ở màn cuối)
-// Đợt 0 (Súng Lục -> AKA): 10 phát
-// Đợt 1 (AKA -> Súng Máy): 22 phát
-// Đợt 2 (Súng Máy -> Đại Bác): 45 phát
-// Đợt 3 (Đại Bác -> Tên Lửa Liên Lục Địa, chỉ mở ở màn cuối): 18 phát
-const CRATE_TARGETS = [10, 22, 45, 18];
+// Số phát bắn cần để kích hoạt Overdrive Buff trên bệ làn phải (chỉ tăng DMG & ROF, không đổi súng)
+const OVERDRIVE_TARGETS = [10, 16, 24, 34, 46];
 
 export const weaponService = {
-  getWeaponByIndex(index: number): WeaponConfigDTO {
-    const safeIdx = Math.max(0, Math.min(index, WEAPON_CATALOG.length - 1));
-    return WEAPON_CATALOG[safeIdx];
-  },
-
-  isMaxWeapon(index: number): boolean {
-    return index >= WEAPON_CATALOG.length - 1;
-  },
-
-  getWeaponMinStage(weapon: WeaponConfigDTO): number {
-    if (typeof weapon.minStage === "number") {
-      return Math.max(1, Math.floor(weapon.minStage));
-    }
-    if (weapon.finalStageOnly) {
-      return STAGE_CATALOG.length;
-    }
-    return 1;
-  },
-
-  isLockedUntilFinalStage(index: number, currentStage: number): boolean {
-    const next = WEAPON_CATALOG[index + 1];
-    if (!next) return false;
-    return currentStage < this.getWeaponMinStage(next);
-  },
-
-  getLockedNextWeapon(
-    index: number,
-    currentStage: number
-  ): { weapon: WeaponConfigDTO; minStage: number } | null {
-    const next = WEAPON_CATALOG[index + 1];
-    if (!next) return null;
-    const minStage = this.getWeaponMinStage(next);
-    if (currentStage < minStage) {
-      return { weapon: next, minStage };
-    }
-    return null;
-  },
-
-  getNextWeapon(index: number, currentStage = STAGE_CATALOG.length): WeaponConfigDTO | null {
-    const next = WEAPON_CATALOG[index + 1];
-    if (!next) return null;
-    if (currentStage < this.getWeaponMinStage(next)) {
-      return null;
-    }
-    return next;
+  resolveCombatWeapon(weaponId: string, level = 1): WeaponConfigDTO {
+    return resolveCombatWeaponById(weaponId, level);
   },
 
   getStageConfig(stage: number): StageConfigDTO {
@@ -236,9 +183,11 @@ export const weaponService = {
     return STAGE_CATALOG.length;
   },
 
-  getCrateTargetForBatch(batchNumber: number): number {
-    const safeBatch = Math.max(0, Math.min(batchNumber, CRATE_TARGETS.length - 1));
-    return CRATE_TARGETS[safeBatch];
+  getOverdriveTargetHits(overdriveLevel: number): number {
+    if (overdriveLevel < OVERDRIVE_TARGETS.length) {
+      return OVERDRIVE_TARGETS[Math.max(0, overdriveLevel)];
+    }
+    return 46 + (overdriveLevel - OVERDRIVE_TARGETS.length + 1) * 16;
   },
 
   getEffectiveFireRate(weapon: WeaponConfigDTO, overdriveLevel: number): number {

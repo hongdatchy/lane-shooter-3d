@@ -39,13 +39,20 @@ const dummy = new THREE.Object3D();
 const tempColor = new THREE.Color();
 
 export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
-  const weaponIndex = useGameStore((s) => s.weaponIndex);
+  const combatLoadoutIds = useGameStore((s) => s.combatLoadoutIds);
+  const activeLoadoutSlot = useGameStore((s) => s.activeLoadoutSlot);
+  const weaponLevels = useGameStore((s) => s.saveData.weaponLevels);
   const sessionId = useGameStore((s) => s.sessionId);
   const icbmAiming = useGameStore((s) => s.icbmAiming);
   const icbmPending = useGameStore((s) => s.icbmPending);
   const trans = useTransClientSide();
 
-  const activeWeapon = weaponService.getWeaponByIndex(weaponIndex);
+  const activeWeaponId =
+    combatLoadoutIds[activeLoadoutSlot] ?? combatLoadoutIds[0] ?? "pistol";
+  const activeWeapon = weaponService.resolveCombatWeapon(
+    activeWeaponId,
+    weaponLevels[activeWeaponId] ?? 1
+  );
 
   const playerGroupRef = useRef<THREE.Group>(null);
   const muzzleFlashRef = useRef(0);
@@ -491,7 +498,14 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
       fireCooldownRef.current -= delta;
       const shouldFire = store.autoFire || gameInput.fire;
-      const weapon = weaponService.getWeaponByIndex(store.weaponIndex);
+      const combatId =
+        store.combatLoadoutIds[store.activeLoadoutSlot] ??
+        store.combatLoadoutIds[0] ??
+        "pistol";
+      const weapon = weaponService.resolveCombatWeapon(
+        combatId,
+        store.saveData.weaponLevels[combatId] ?? 1
+      );
       const baseRate = weaponService.getEffectiveFireRate(weapon, store.overdriveLevel);
       const effectiveRate = isRaging ? baseRate * RAGE_CONFIG.fireRateMultiplier : baseRate;
       const effectiveDamage = weaponService.getEffectiveDamage(weapon, store.overdriveLevel);
@@ -504,12 +518,13 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
       if (shouldFire && fireCooldownRef.current <= 0) {
         fireCooldownRef.current = 1 / effectiveRate;
-        muzzleFlashRef.current = weapon.id === "cannon" ? 0.14 : 0.06;
+        muzzleFlashRef.current =
+          weapon.modelKind === "cannon" || weapon.modelKind === "icbm" ? 0.14 : 0.06;
         shotCounterRef.current += 1;
 
-        if (weapon.id === "pistol") soundService.play("shootPistol");
-        else if (weapon.id === "ak-rifle") soundService.play("shootAk");
-        else if (weapon.id === "machine-gun") soundService.play("shootMachineGun");
+        if (weapon.modelKind === "pistol") soundService.play("shootPistol");
+        else if (weapon.modelKind === "ak-rifle") soundService.play("shootAk");
+        else if (weapon.modelKind === "machine-gun") soundService.play("shootMachineGun");
         else soundService.play("shootCannon");
 
         if (isRaging) {
@@ -538,28 +553,34 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             );
           }
         } else {
-          // Bắn thường theo loại súng
+          // Bắn thường theo thông số vũ khí (hỗ trợ cả súng đơn lẫn súng chùm đa viên)
           const barrelOffsetX =
-            weapon.id === "machine-gun"
+            weapon.modelKind === "machine-gun"
               ? ((shotCounterRef.current % 3) - 1) * 0.16
               : 0;
+          const pellets = Math.max(1, weapon.bulletCount);
+          const coneRad = THREE.MathUtils.degToRad(weapon.spreadDeg);
 
-          const jitterRad = THREE.MathUtils.degToRad(
-            (Math.random() - 0.5) * weapon.spreadDeg
-          );
-          const vx = Math.sin(jitterRad) * effectiveBulletSpeed;
-          const vz = -Math.cos(jitterRad) * effectiveBulletSpeed;
+          for (let p = 0; p < pellets; p++) {
+            const baseAngle =
+              pellets === 1
+                ? THREE.MathUtils.degToRad((Math.random() - 0.5) * weapon.spreadDeg)
+                : (p / (pellets - 1) - 0.5) * coneRad +
+                  THREE.MathUtils.degToRad((Math.random() - 0.5) * 1.4);
+            const vx = Math.sin(baseAngle) * effectiveBulletSpeed;
+            const vz = -Math.cos(baseAngle) * effectiveBulletSpeed;
 
-          spawnBullet(
-            runtimeRef.current.playerX + barrelOffsetX,
-            ARENA_CONFIG.playerZ - 1.15,
-            vx,
-            vz,
-            effectiveDamage,
-            weapon.splashRadius,
-            weapon.bulletSize,
-            weapon.bulletColor
-          );
+            spawnBullet(
+              runtimeRef.current.playerX + barrelOffsetX,
+              ARENA_CONFIG.playerZ - 1.15,
+              vx,
+              vz,
+              effectiveDamage,
+              weapon.splashRadius,
+              weapon.bulletSize,
+              weapon.bulletColor
+            );
+          }
         }
       }
 
@@ -613,33 +634,29 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         const midX = (prevX + b.x) * 0.5;
         const midZ = (prevZ + b.z) * 0.5;
 
-        // Va chạm với bệ Vũ Khí bên làn phải (chỉ nhận đạn khi vẫn còn súng tiếp theo có thể mở ở màn hiện tại)
-        const canUpgradeCrate =
-          weaponService.getNextWeapon(store.weaponIndex, store.wave) !== null;
-        if (canUpgradeCrate) {
-          const hitCrateNow =
-            Math.abs(b.x - ARENA_CONFIG.crateX) <= ARENA_CONFIG.crateHalfWidth &&
-            Math.abs(b.z - ARENA_CONFIG.crateZ) <= ARENA_CONFIG.crateHalfDepth;
-          const hitCrateMid =
-            Math.abs(midX - ARENA_CONFIG.crateX) <= ARENA_CONFIG.crateHalfWidth &&
-            Math.abs(midZ - ARENA_CONFIG.crateZ) <= ARENA_CONFIG.crateHalfDepth;
+        // Va chạm với bệ Overdrive Buff bên làn phải (chỉ tăng DMG/ROF cho súng đang cầm, không đổi súng)
+        const hitCrateNow =
+          Math.abs(b.x - ARENA_CONFIG.crateX) <= ARENA_CONFIG.crateHalfWidth &&
+          Math.abs(b.z - ARENA_CONFIG.crateZ) <= ARENA_CONFIG.crateHalfDepth;
+        const hitCrateMid =
+          Math.abs(midX - ARENA_CONFIG.crateX) <= ARENA_CONFIG.crateHalfWidth &&
+          Math.abs(midZ - ARENA_CONFIG.crateZ) <= ARENA_CONFIG.crateHalfDepth;
 
-          if (hitCrateNow || hitCrateMid) {
-            b.active = false;
-            runtimeRef.current.cratePulse = 1;
-            soundService.play("hitCrate");
-            spawnParticles(b.x, 1.0, b.z, b.color, b.splashRadius > 0 ? 10 : 4, 0.9);
+        if (hitCrateNow || hitCrateMid) {
+          b.active = false;
+          runtimeRef.current.cratePulse = 1;
+          soundService.play("hitCrate");
+          spawnParticles(b.x, 1.0, b.z, b.color, b.splashRadius > 0 ? 10 : 4, 0.9);
 
-            const result = store.registerCrateHit();
-            if (result.upgraded) {
-              spawnParticles(ARENA_CONFIG.crateX, 1.4, ARENA_CONFIG.crateZ, "#fbbf24", 26, 1.5);
-              if (!isRageLocked) {
-                rageBufferRef.current +=
-                  RAGE_CONFIG.gainPerCrateUpgrade * RAGE_CONFIG.gainMultiplier;
-              }
+          const result = store.registerCrateHit();
+          if (result.upgraded) {
+            spawnParticles(ARENA_CONFIG.crateX, 1.4, ARENA_CONFIG.crateZ, "#fbbf24", 26, 1.5);
+            if (!isRageLocked) {
+              rageBufferRef.current +=
+                RAGE_CONFIG.gainPerCrateUpgrade * RAGE_CONFIG.gainMultiplier;
             }
-            continue;
           }
+          continue;
         }
 
         // Va chạm với Quái ở làn trái (tính khoảng cách từ đoạn đường đạn đi tới tâm quái để không xuyên qua khi bay x2)

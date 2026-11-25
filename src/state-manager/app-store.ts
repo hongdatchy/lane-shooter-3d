@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { AppStatus } from "@/dto/CommonDTO";
 
 export type ThemeMode = "light" | "dark";
@@ -34,7 +33,7 @@ interface Actions {
 }
 
 const DEFAULT_LOCALE: LocaleMode = normalizeLocale(
-  process.env.NEXT_PUBLIC_DEFAULT_LANGUAGE,
+  process.env.NEXT_PUBLIC_DEFAULT_LANGUAGE
 );
 
 const initialState: State = {
@@ -42,41 +41,29 @@ const initialState: State = {
   status: "IDLE",
   isLoading: false,
   isSidebarOpen: true,
-  theme: "light",
+  theme: "dark",
   locale: DEFAULT_LOCALE,
 };
 
-export const useAppStore = create<State & Actions>()(
-  persist(
-    (set) => ({
-      ...initialState,
+export const useAppStore = create<State & Actions>()((set) => ({
+  ...initialState,
 
-      setAppTitle: (appTitle) => set({ appTitle }),
-      setStatus: (status) => set({ status }),
-      setLoading: (isLoading) => set({ isLoading }),
-      toggleSidebar: () =>
-        set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-      setTheme: (theme) => set({ theme }),
-      toggleTheme: () =>
-        set((state) => ({ theme: state.theme === "light" ? "dark" : "light" })),
-      setLocale: (locale) => set({ locale: normalizeLocale(locale) }),
-      toggleLocale: () =>
-        set((state) => {
-          const idx = VALID_LOCALES.indexOf(state.locale);
-          const next = VALID_LOCALES[(idx + 1) % VALID_LOCALES.length];
-          return { locale: next };
-        }),
-      reset: () => set(initialState),
+  setAppTitle: (appTitle) => set({ appTitle }),
+  setStatus: (status) => set({ status }),
+  setLoading: (isLoading) => set({ isLoading }),
+  toggleSidebar: () =>
+    set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  setTheme: (theme) => set({ theme }),
+  toggleTheme: () =>
+    set((state) => ({ theme: state.theme === "light" ? "dark" : "light" })),
+  setLocale: (locale) => set({ locale: normalizeLocale(locale) }),
+  toggleLocale: () =>
+    set((state) => {
+      const idx = VALID_LOCALES.indexOf(state.locale);
+      const next = VALID_LOCALES[(idx + 1) % VALID_LOCALES.length];
+      return { locale: next };
     }),
-    {
-      name: "3d-demo-app-store",
-      partialize: (state) => ({
-        isSidebarOpen: state.isSidebarOpen,
-        theme: state.theme,
-        locale: state.locale,
-      }),
-    },
-  ),
-);
+  reset: () => set(initialState),
+}));
 
 export default useAppStore;

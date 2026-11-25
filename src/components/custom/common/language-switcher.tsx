@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@/lang/useTransClientSide";
 import { useAppStore } from "@/state-manager/app-store";
+import { useGameStore } from "@/state-manager/game-store";
 
 interface LanguageSwitcherProps {
   variant?: "header" | "hud";
@@ -68,6 +69,7 @@ export function LanguageSwitcher({ variant = "header" }: LanguageSwitcherProps) 
                 onClick={(e) => {
                   e.currentTarget.blur();
                   setLocale(item.code);
+                  void useGameStore.getState().saveLocalePreference(item.code);
                   setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors ${

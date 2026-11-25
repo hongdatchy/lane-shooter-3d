@@ -334,7 +334,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
         muzzleFlashRef.current = Math.max(0, muzzleFlashRef.current - delta);
       }
       if (flashMeshRef.current) {
-        const isHeavyWeapon = weapon.id === "cannon" || weapon.id === "icbm";
+        const isHeavyWeapon = weapon.modelKind === "cannon" || weapon.modelKind === "icbm";
         const baseFlash = (isHeavyWeapon ? 1.25 : 0.65) * (rageActive ? 1.35 : 1);
         const s = muzzleFlashRef.current > 0 ? baseFlash + muzzleFlashRef.current * 9 : 0.001;
         flashMeshRef.current.visible = muzzleFlashRef.current > 0;
@@ -371,7 +371,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
 
     const weaponNode = (
       <>
-        <WeaponModel3D weapon={weapon} spinBarrels={rageActive || weapon.id === "machine-gun"} />
+        <WeaponModel3D weapon={weapon} spinBarrels={rageActive || weapon.modelKind === "machine-gun"} />
         <mesh ref={flashMeshRef} position={[0, 0.06, -1.15]} visible={false}>
           <sphereGeometry args={[0.28, 10, 10]} />
           <meshBasicMaterial color={activeAccent} transparent opacity={0.9} />

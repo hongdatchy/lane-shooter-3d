@@ -4,9 +4,11 @@ export type CameraMode = "TOP_DOWN" | "THIRD_PERSON" | "FREE_ORBIT";
 
 export type EnemyKind = "NORMAL" | "ELITE" | "BOSS";
 
+export type WeaponModelKindDTO = "pistol" | "ak-rifle" | "machine-gun" | "cannon" | "icbm";
+
 export interface WeaponConfigDTO {
-  tier: number;
-  id: "pistol" | "ak-rifle" | "machine-gun" | "cannon" | "icbm";
+  id: string;
+  modelKind: WeaponModelKindDTO;
   name: string;
   description: string;
   fireRate: number;                    // Số phát bắn mỗi giây
@@ -18,8 +20,6 @@ export interface WeaponConfigDTO {
   splashRadius: number;                // Bán kính nổ lan (0 nếu không nổ lan)
   bulletColor: string;
   accentColor: string;
-  minStage?: number;                   // Màn tối thiểu để vũ khí bắt đầu xuất hiện ở hòm phải (mặc định: 1)
-  finalStageOnly?: boolean;            // Chỉ xuất hiện để nhặt ở màn cuối (ưu tiên minStage nếu có)
 }
 
 export interface LeaderboardEntryDTO {
