@@ -174,7 +174,7 @@
     "guestHintWeb": "ゲストでプレイ可能。クラウド保存とランキングにはログインしてください。",
     "customizeLoadout": "装備・ロードアウト変更",
     "sectorTitle": "アイアン地区",
-    "sectorSubtitle": "第1章 · WAVE 1 / 6 · 環境: 廃墟メガシティ",
+    "sectorSubtitle": "第1章 · WAVE 1 / 4 · 環境: 廃墟メガシティ",
     "startLabel": "開始",
     "waveLabel": "WAVE {wave}",
     "radarTitle": "デュアルレーン・レーダー",
@@ -352,6 +352,12 @@
     "savingBtn": "保存同期中...",
     "combatNoteTitle": "3種切替 & 右レーン仕様",
     "combatNoteDesc": "戦闘には最大3種類の銃を持ち込み、[1][2][3] または [Q] でいつでも切替可能。右レーンは火力・連射バフ専用で、銃の切替は起きません。",
+    "buyCostShort": "{cost} G",
+    "readyToBuyBadge": "CH.{ch} · {cost}G",
+    "unlockCostPreview": "CH.{ch} 到達後の解放価格: {cost} G",
+    "unlockWeaponBtn": "武器を解放 · {cost} G",
+    "needGoldUnlockBtn": "解放に {cost} G 必要",
+    "prereqMetNote": "CH.{ch} 条件達成 · {cost} G で購入解放",
     "escHint": "ESC: 戻る"
   }
 }

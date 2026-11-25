@@ -3,12 +3,11 @@ import { isLocalAssetMode, withAssetBase } from "@/lib/utils";
 import { isModelCached } from "@/service/model-cache";
 import { useGameStore } from "@/state-manager/game-store";
 
-// Thứ tự tải: 3 model quái (.glb dung lượng rất nhẹ ~1MB) trước để % tăng nhanh ngay lập tức,
-// sau đó đến 3 model Mixamo của nhân vật (.fbx).
+// Thứ tự tải: 3 model Cửa 1 (.glb: Quái 1, Quái 2, Boss 1) và 3 model Mixamo nhân vật (.fbx).
 export const PRELOAD_MODEL_FILES = [
-  "models/enemy-normal.glb",
-  "models/enemy-elite.glb",
-  "models/enemy-boss.glb",
+  "models/classic/stage1/crawler_walk.glb",
+  "models/classic/stage1/husk_rigged Walking.glb",
+  "models/classic/stage1/enemy-boss.glb",
   "models/player-idle.fbx",
   "models/player-left.fbx",
   "models/player-right.fbx",
@@ -52,7 +51,7 @@ export async function startBackgroundPreload(): Promise<boolean> {
   let firstErrorMessage: string | null = null;
 
   for (const filePath of PRELOAD_MODEL_FILES) {
-    const url = withAssetBase(filePath);
+    const url = withAssetBase(encodeURI(filePath));
     const isFbx = filePath.toLowerCase().endsWith(".fbx");
 
     try {

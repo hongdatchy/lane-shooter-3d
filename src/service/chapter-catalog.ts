@@ -30,7 +30,7 @@ export const CHAPTER_CATALOG: ChapterConfig[] = [
     title: "IRON DISTRICT",
     biome: "RUINED STEEL MEGACITY",
     hazardLevel: 2,
-    waves: 6,
+    waves: 4,
     mapPos: { xPct: 12, yPct: 74 },
     themeGradient: "from-[#0b2333] via-[#122a3a] to-[#0a131f]",
     accentHex: "#00F0FF",

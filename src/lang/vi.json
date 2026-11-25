@@ -174,7 +174,7 @@
     "guestHintWeb": "Chế độ Khách chơi tự do. Đăng nhập để lưu cloud & ghi điểm BXH.",
     "customizeLoadout": "TÙY CHỈNH TRANG BỊ",
     "sectorTitle": "KHU CÔNG NGHIỆP THÉP",
-    "sectorSubtitle": "CHƯƠNG 1 · MÀN 1 / 6 · BỐI CẢNH: ĐÔ THỊ HOANG TÀN",
+    "sectorSubtitle": "CHƯƠNG 1 · MÀN 1 / 4 · BỐI CẢNH: ĐÔ THỊ HOANG TÀN",
     "startLabel": "XUẤT PHÁT",
     "waveLabel": "MÀN {wave}",
     "radarTitle": "TỔNG QUAN 2 LÀN CHIẾN ĐẤU",
@@ -352,6 +352,12 @@
     "savingBtn": "ĐANG LƯU...",
     "combatNoteTitle": "ĐỔI 3 SÚNG TRONG TRẬN & LÀN PHẢI",
     "combatNoteDesc": "Mang tối đa 3 súng vào trận và chuyển đổi bất cứ lúc nào bằng phím [1][2][3] hoặc [Q]. Làn phải chỉ dùng để kích hoạt Buff tăng sức mạnh, KHÔNG đổi súng.",
+    "buyCostShort": "{cost} VÀNG",
+    "readyToBuyBadge": "CH.{ch} · {cost} G",
+    "unlockCostPreview": "GIÁ MỞ KHÓA KHI ĐẠT CH.{ch}: {cost} VÀNG",
+    "unlockWeaponBtn": "MỞ KHÓA VŨ KHÍ · {cost} VÀNG",
+    "needGoldUnlockBtn": "CẦN {cost} VÀNG ĐỂ MỞ KHÓA",
+    "prereqMetNote": "ĐỦ ĐIỀU KIỆN CH.{ch} · TRẢ {cost} VÀNG ĐỂ MỞ",
     "escHint": "ESC: QUAY LẠI"
   }
 }

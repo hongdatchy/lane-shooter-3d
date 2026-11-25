@@ -174,7 +174,7 @@
     "guestHintWeb": "游客可自由游玩。登录后可保存云端进度并上传分数。",
     "customizeLoadout": "自定义装备与武器",
     "sectorTitle": "钢铁废区",
-    "sectorSubtitle": "第 1 章 · 第 1 / 6 波 · 生态: 废墟巨城",
+    "sectorSubtitle": "第 1 章 · 第 1 / 4 波 · 生态: 废墟巨城",
     "startLabel": "开始",
     "waveLabel": "第 {wave} 波",
     "radarTitle": "双通道雷达总览",
@@ -352,6 +352,12 @@
     "savingBtn": "正在保存...",
     "combatNoteTitle": "战中切枪 & 右侧通道说明",
     "combatNoteDesc": "每场可携带3把武器并使用 [1][2][3] 或 [Q] 随时切换。右侧通道仅提供超载伤害/射速增益，绝不会强制更换当前武器。",
+    "buyCostShort": "{cost} 金币",
+    "readyToBuyBadge": "第{ch}章 · {cost}G",
+    "unlockCostPreview": "达到第 {ch} 章后解锁价格: {cost} 金币",
+    "unlockWeaponBtn": "解锁武器 · {cost} 金币",
+    "needGoldUnlockBtn": "需要 {cost} 金币解锁",
+    "prereqMetNote": "已满足第 {ch} 章条件 · 支付 {cost} 金币解锁",
     "escHint": "ESC: 返回"
   }
 }

@@ -2,6 +2,7 @@ import { getPlatformAdapter } from "@/platform";
 import {
   ARMORY_WEAPONS,
   DEFAULT_LOADOUT_IDS,
+  DEFAULT_UNLOCKED_WEAPON_IDS,
   MAX_LOADOUT_SLOTS,
 } from "@/service/armory-catalog";
 
@@ -16,6 +17,7 @@ export interface PlayerSaveData {
   gold: number;
   gems: number;
   unlockedChapter: number;
+  unlockedWeaponIds: string[];
   equippedWeaponId: string;
   equippedLoadoutIds: string[];
   weaponLevels: Record<string, number>;
@@ -31,6 +33,7 @@ export function createDefaultSaveData(): PlayerSaveData {
     gold: 0,
     gems: 0,
     unlockedChapter: 1,
+    unlockedWeaponIds: [...DEFAULT_UNLOCKED_WEAPON_IDS],
     equippedWeaponId: DEFAULT_LOADOUT_IDS[0],
     equippedLoadoutIds: [...DEFAULT_LOADOUT_IDS],
     weaponLevels: {},
@@ -38,21 +41,46 @@ export function createDefaultSaveData(): PlayerSaveData {
   };
 }
 
+function normalizeUnlockedWeaponIds(
+  rawUnlocked: unknown,
+  unlockedChapter: number
+): string[] {
+  const byId = new Map(ARMORY_WEAPONS.map((w) => [w.id, w]));
+  const result: string[] = [];
+
+  // Súng có unlockCost === 0 (như Pistol) luôn mở sẵn khi đủ điều kiện Chapter
+  for (const w of ARMORY_WEAPONS) {
+    if (w.unlockCost === 0 && w.unlockChapter <= unlockedChapter && !result.includes(w.id)) {
+      result.push(w.id);
+    }
+  }
+
+  if (Array.isArray(rawUnlocked)) {
+    for (const item of rawUnlocked) {
+      if (typeof item !== "string" || result.includes(item)) continue;
+      const spec = byId.get(item);
+      if (spec && spec.unlockChapter <= unlockedChapter) {
+        result.push(item);
+      }
+    }
+  }
+
+  return result.length > 0 ? result : [ARMORY_WEAPONS[0].id];
+}
+
 function normalizeLoadoutIds(
   rawLoadout: unknown,
   fallbackPrimary: string,
-  unlockedChapter: number
+  unlockedWeaponIds: string[]
 ): string[] {
-  const unlockedIds = new Set(
-    ARMORY_WEAPONS.filter((w) => w.unlockChapter <= unlockedChapter).map((w) => w.id)
-  );
+  const ownedSet = new Set(unlockedWeaponIds);
   const result: string[] = [];
 
   if (Array.isArray(rawLoadout)) {
     for (const item of rawLoadout) {
       if (
         typeof item === "string" &&
-        unlockedIds.has(item) &&
+        ownedSet.has(item) &&
         !result.includes(item) &&
         result.length < MAX_LOADOUT_SLOTS
       ) {
@@ -65,16 +93,16 @@ function normalizeLoadoutIds(
     return result;
   }
 
-  if (unlockedIds.has(fallbackPrimary)) {
+  if (ownedSet.has(fallbackPrimary)) {
     result.push(fallbackPrimary);
   }
   for (const id of DEFAULT_LOADOUT_IDS) {
     if (result.length >= MAX_LOADOUT_SLOTS) break;
-    if (unlockedIds.has(id) && !result.includes(id)) {
+    if (ownedSet.has(id) && !result.includes(id)) {
       result.push(id);
     }
   }
-  return result.length > 0 ? result : [ARMORY_WEAPONS[0].id];
+  return result.length > 0 ? result : [unlockedWeaponIds[0] ?? ARMORY_WEAPONS[0].id];
 }
 
 function normalizeWeaponLevels(raw: unknown): Record<string, number> {
@@ -100,6 +128,10 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     typeof candidate.unlockedChapter === "number" && Number.isFinite(candidate.unlockedChapter)
       ? Math.max(1, candidate.unlockedChapter)
       : defaults.unlockedChapter;
+  const unlockedWeaponIds = normalizeUnlockedWeaponIds(
+    candidate.unlockedWeaponIds,
+    unlockedChapter
+  );
   const rawEquipped =
     typeof candidate.equippedWeaponId === "string" && candidate.equippedWeaponId.trim()
       ? candidate.equippedWeaponId.trim()
@@ -107,7 +139,7 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
   const equippedLoadoutIds = normalizeLoadoutIds(
     candidate.equippedLoadoutIds,
     rawEquipped,
-    unlockedChapter
+    unlockedWeaponIds
   );
 
   return {
@@ -134,6 +166,7 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
         ? Math.max(0, candidate.gems)
         : defaults.gems,
     unlockedChapter,
+    unlockedWeaponIds,
     equippedWeaponId: equippedLoadoutIds[0],
     equippedLoadoutIds,
     weaponLevels: normalizeWeaponLevels(candidate.weaponLevels),

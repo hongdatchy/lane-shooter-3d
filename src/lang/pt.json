@@ -174,7 +174,7 @@
     "guestHintWeb": "Jogue livremente como visitante. Entre para salvar na nuvem e ranquear.",
     "customizeLoadout": "PERSONALIZAR EQUIPAMENTO",
     "sectorTitle": "DISTRITO DE FERRO",
-    "sectorSubtitle": "CAPÍTULO 1 · ONDA 1 / 6 · BIOMA: MEGACIDADE",
+    "sectorSubtitle": "CAPÍTULO 1 · ONDA 1 / 4 · BIOMA: MEGACIDADE",
     "startLabel": "INÍCIO",
     "waveLabel": "ONDA {wave}",
     "radarTitle": "RADAR DE DUAS FAIXAS",
@@ -352,6 +352,12 @@
     "savingBtn": "SALVANDO...",
     "combatNoteTitle": "TROCA DE 3 ARMAS E FAIXA DIREITA",
     "combatNoteDesc": "Leve até 3 armas para o combate e alterne com [1][2][3] ou [Q]. A faixa direita concede apenas Buffs Overdrive de dano/cadência e nunca troca sua arma.",
+    "buyCostShort": "{cost} OURO",
+    "readyToBuyBadge": "CAP.{ch} · {cost}G",
+    "unlockCostPreview": "PREÇO NO CAP.{ch}: {cost} OURO",
+    "unlockWeaponBtn": "DESBLOQUEAR · {cost} OURO",
+    "needGoldUnlockBtn": "PRECISA {cost} OURO PARA ABRIR",
+    "prereqMetNote": "CAP.{ch} LIBERADO · PAGUE {cost} OURO",
     "escHint": "ESC: VOLTAR"
   }
 }

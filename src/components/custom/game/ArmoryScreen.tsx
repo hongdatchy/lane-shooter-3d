@@ -147,7 +147,8 @@ function WeaponGridCard({
   level,
   isSelected,
   loadoutSlotIndex,
-  isUnlocked,
+  chapterMet,
+  isOwned,
   t,
   onSelect,
 }: {
@@ -155,13 +156,15 @@ function WeaponGridCard({
   level: number;
   isSelected: boolean;
   loadoutSlotIndex: number; // -1 if not in loadout
-  isUnlocked: boolean;
+  chapterMet: boolean;
+  isOwned: boolean;
   t: TranslationData["armory"];
   onSelect: () => void;
 }) {
   const stats = getWeaponStatsAtLevel(weapon, level);
   const rofText = weapon.fireRateLabel ?? `${stats.fireRate}/s`;
   const inLoadout = loadoutSlotIndex >= 0;
+  const isUsable = chapterMet && isOwned;
 
   return (
     <button
@@ -199,10 +202,15 @@ function WeaponGridCard({
             <Check className="w-2.5 h-2.5" />
             <span>{formatText(t.inLoadoutBadge, { slot: loadoutSlotIndex + 1 })}</span>
           </span>
-        ) : !isUnlocked ? (
+        ) : !chapterMet ? (
           <span className="px-1.5 py-0.5 rounded bg-[#272A32] text-[#849495] font-mono text-[9px] flex items-center gap-0.5 shrink-0">
             <Lock className="w-2.5 h-2.5" />
             <span>CH.{weapon.unlockChapter}</span>
+          </span>
+        ) : !isOwned ? (
+          <span className="px-1.5 py-0.5 rounded bg-[#FE9800]/20 text-[#FE9800] border border-[#FE9800]/40 font-mono text-[9px] font-bold flex items-center gap-0.5 shrink-0">
+            <Coins className="w-2.5 h-2.5" />
+            <span>{weapon.unlockCost.toLocaleString()}G</span>
           </span>
         ) : (
           <span
@@ -222,10 +230,10 @@ function WeaponGridCard({
           alt={weapon.name}
           loading="lazy"
           className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${
-            !isUnlocked ? "grayscale opacity-45" : ""
+            !isUsable ? "grayscale opacity-45" : ""
           }`}
         />
-        {!isUnlocked && (
+        {!chapterMet ? (
           <div className="absolute inset-0 bg-[#0A0D14]/45 flex items-center justify-center">
             <div className="px-2 py-1 rounded bg-[#0B0E14]/90 border border-[#3B494B] font-mono text-[9px] text-[#B9CACB] flex items-center gap-1">
               <Lock className="w-3 h-3 text-[#FE9800]" />
@@ -234,7 +242,18 @@ function WeaponGridCard({
               </span>
             </div>
           </div>
-        )}
+        ) : !isOwned ? (
+          <div className="absolute inset-0 bg-[#0A0D14]/35 flex items-center justify-center">
+            <div className="px-2 py-1 rounded bg-[#0B0E14]/90 border border-[#FE9800]/55 font-mono text-[9px] font-bold text-[#FE9800] flex items-center gap-1">
+              <Coins className="w-3 h-3" />
+              <span>
+                {formatText(t.buyCostShort, {
+                  cost: weapon.unlockCost.toLocaleString(),
+                })}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Name & Telemetry */}
@@ -268,6 +287,7 @@ export function ArmoryScreen() {
   const closeArmory = useGameStore((s) => s.closeArmory);
   const openLobby = useGameStore((s) => s.openLobby);
   const openWorldMap = useGameStore((s) => s.openWorldMap);
+  const unlockArmoryWeapon = useGameStore((s) => s.unlockArmoryWeapon);
   const assignWeaponToLoadout = useGameStore((s) => s.assignWeaponToLoadout);
   const removeWeaponFromLoadout = useGameStore((s) => s.removeWeaponFromLoadout);
   const upgradeArmoryWeapon = useGameStore((s) => s.upgradeArmoryWeapon);
@@ -295,6 +315,10 @@ export function ArmoryScreen() {
   }, [closeArmory]);
 
   const loadoutIds = saveData.equippedLoadoutIds;
+  const ownedWeaponSet = useMemo(
+    () => new Set(saveData.unlockedWeaponIds),
+    [saveData.unlockedWeaponIds]
+  );
 
   const inspectedWeapon = useMemo(
     () => getArmoryWeaponById(inspectedId),
@@ -303,9 +327,11 @@ export function ArmoryScreen() {
 
   const unlockedCount = useMemo(
     () =>
-      ARMORY_WEAPONS.filter((w) => saveData.unlockedChapter >= w.unlockChapter)
-        .length,
-    [saveData.unlockedChapter]
+      ARMORY_WEAPONS.filter(
+        (w) =>
+          saveData.unlockedChapter >= w.unlockChapter && ownedWeaponSet.has(w.id)
+      ).length,
+    [saveData.unlockedChapter, ownedWeaponSet]
   );
 
   const filteredWeapons = useMemo(() => {
@@ -314,7 +340,9 @@ export function ArmoryScreen() {
         ? ARMORY_WEAPONS
         : classFilter === "UNLOCKED"
           ? ARMORY_WEAPONS.filter(
-              (w) => saveData.unlockedChapter >= w.unlockChapter
+              (w) =>
+                saveData.unlockedChapter >= w.unlockChapter &&
+                ownedWeaponSet.has(w.id)
             )
           : ARMORY_WEAPONS.filter((w) => w.weaponClass === classFilter);
 
@@ -329,14 +357,23 @@ export function ArmoryScreen() {
       }
       return a.slotNumber - b.slotNumber;
     });
-  }, [classFilter, sortMode, saveData.weaponLevels, saveData.unlockedChapter]);
+  }, [
+    classFilter,
+    sortMode,
+    saveData.weaponLevels,
+    saveData.unlockedChapter,
+    ownedWeaponSet,
+  ]);
 
   const inspectedLevel = Math.max(
     1,
     saveData.weaponLevels[inspectedWeapon.id] ?? 1
   );
-  const inspectedUnlocked =
+  const inspectedChapterMet =
     saveData.unlockedChapter >= inspectedWeapon.unlockChapter;
+  const inspectedOwned = ownedWeaponSet.has(inspectedWeapon.id);
+  const inspectedUnlocked = inspectedChapterMet && inspectedOwned;
+  const canAffordUnlock = saveData.gold >= inspectedWeapon.unlockCost;
   const inspectedLoadoutSlot = loadoutIds.indexOf(inspectedWeapon.id);
   const inspectedIsMax = inspectedLevel >= MAX_WEAPON_LEVEL;
   const inspectedStats = getWeaponStatsAtLevel(inspectedWeapon, inspectedLevel);
@@ -696,7 +733,8 @@ export function ArmoryScreen() {
                     level={Math.max(1, saveData.weaponLevels[weapon.id] ?? 1)}
                     isSelected={inspectedWeapon.id === weapon.id}
                     loadoutSlotIndex={loadoutIds.indexOf(weapon.id)}
-                    isUnlocked={saveData.unlockedChapter >= weapon.unlockChapter}
+                    chapterMet={saveData.unlockedChapter >= weapon.unlockChapter}
+                    isOwned={ownedWeaponSet.has(weapon.id)}
                     t={t}
                     onSelect={() => handleSelectWeapon(weapon.id)}
                   />
@@ -786,18 +824,25 @@ export function ArmoryScreen() {
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold uppercase shrink-0 ${
-                    inspectedUnlocked
-                      ? "bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40"
-                      : "bg-[#93000A]/50 text-[#FFB4AB] border border-[#FFB4AB]/40"
+                    !inspectedChapterMet
+                      ? "bg-[#93000A]/50 text-[#FFB4AB] border border-[#FFB4AB]/40"
+                      : !inspectedOwned
+                        ? "bg-[#FE9800]/20 text-[#FE9800] border border-[#FE9800]/45"
+                        : "bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40"
                   }`}
                 >
-                  {inspectedUnlocked
-                    ? formatText(t.unlockedChapter, {
+                  {!inspectedChapterMet
+                    ? formatText(t.lockedChapter, {
                         ch: inspectedWeapon.unlockChapter,
                       })
-                    : formatText(t.lockedChapter, {
-                        ch: inspectedWeapon.unlockChapter,
-                      })}
+                    : !inspectedOwned
+                      ? formatText(t.readyToBuyBadge, {
+                          ch: inspectedWeapon.unlockChapter,
+                          cost: inspectedWeapon.unlockCost.toLocaleString(),
+                        })
+                      : formatText(t.unlockedChapter, {
+                          ch: inspectedWeapon.unlockChapter,
+                        })}
                 </span>
               </div>
             </div>
@@ -897,19 +942,63 @@ export function ArmoryScreen() {
 
             {/* Action Dock: 3-Slot Assignment + Upgrade */}
             <div className="flex flex-col gap-2 mt-auto pt-1 shrink-0">
-              {!inspectedUnlocked ? (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full py-2.5 rounded-lg bg-[#272A32] border border-[#3B494B] font-mono text-xs font-bold text-[#849495] uppercase flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>
-                    {formatText(t.unlockHintBtn, {
-                      prev: Math.max(1, inspectedWeapon.unlockChapter - 1),
+              {!inspectedChapterMet ? (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full py-2.5 rounded-lg bg-[#272A32] border border-[#3B494B] font-mono text-xs font-bold text-[#849495] uppercase flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>
+                      {formatText(t.unlockHintBtn, {
+                        prev: Math.max(1, inspectedWeapon.unlockChapter - 1),
+                      })}
+                    </span>
+                  </button>
+                  <div className="px-3 py-1.5 rounded-lg bg-[#0E121B] border border-[#272A32] font-mono text-[10px] text-[#FE9800] text-center">
+                    {formatText(t.unlockCostPreview, {
+                      ch: inspectedWeapon.unlockChapter,
+                      cost: inspectedWeapon.unlockCost.toLocaleString(),
                     })}
-                  </span>
-                </button>
+                  </div>
+                </div>
+              ) : !inspectedOwned ? (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!canAffordUnlock || !canPersist}
+                    onClick={() => void unlockArmoryWeapon(inspectedWeapon.id)}
+                    className={`w-full py-3 rounded-lg font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
+                      canAffordUnlock && canPersist
+                        ? "bg-[#FE9800] hover:bg-[#FFB03B] text-[#140B00] cursor-pointer shadow-[0_0_18px_rgba(254,152,0,0.3)]"
+                        : "bg-[#272A32] text-[#FFB4AB] border border-[#93000A]/60 cursor-not-allowed opacity-85"
+                    }`}
+                  >
+                    {canAffordUnlock ? (
+                      <Coins className="w-4 h-4" />
+                    ) : (
+                      <Lock className="w-4 h-4" />
+                    )}
+                    <span>
+                      {armorySaving
+                        ? t.savingBtn
+                        : canAffordUnlock
+                          ? formatText(t.unlockWeaponBtn, {
+                              cost: inspectedWeapon.unlockCost.toLocaleString(),
+                            })
+                          : formatText(t.needGoldUnlockBtn, {
+                              cost: inspectedWeapon.unlockCost.toLocaleString(),
+                            })}
+                    </span>
+                  </button>
+                  <div className="px-3 py-1.5 rounded-lg bg-[#0E121B] border border-[#272A32] font-mono text-[10px] text-[#7DF4FF] text-center">
+                    {formatText(t.prereqMetNote, {
+                      ch: inspectedWeapon.unlockChapter,
+                      cost: inspectedWeapon.unlockCost.toLocaleString(),
+                    })}
+                  </div>
+                </div>
               ) : (
                 <div className="rounded-xl bg-[#0E121B] border border-[#272A32] p-2.5 flex flex-col gap-2">
                   <div className="flex items-center justify-between font-mono text-[10px] text-[#7DF4FF] uppercase">

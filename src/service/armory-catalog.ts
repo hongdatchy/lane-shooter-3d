@@ -24,6 +24,7 @@ export interface ArmoryWeaponSpec {
   tracerLabel: string;
   tracerHex: string;
   unlockChapter: number;
+  unlockCost: number;
   upgradeBaseCost: number;
   rageSkillName: string;
   rageSkillDescEn: string;
@@ -32,7 +33,8 @@ export interface ArmoryWeaponSpec {
 
 export const MAX_WEAPON_LEVEL = 10;
 export const MAX_LOADOUT_SLOTS = 3;
-export const DEFAULT_LOADOUT_IDS: string[] = ["pistol", "ak47", "shotgun"];
+export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol"];
+export const DEFAULT_LOADOUT_IDS: string[] = ["pistol"];
 
 export function getWeaponUpgradeCost(weapon: ArmoryWeaponSpec, currentLevel: number): number {
   return weapon.upgradeBaseCost * currentLevel;
@@ -85,6 +87,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "CYAN PULSE FX",
     tracerHex: "#7DF4FF",
     unlockChapter: 1,
+    unlockCost: 0,
     upgradeBaseCost: 200,
     rageSkillName: "HYPER VELOCITY",
     rageSkillDescEn: "All pistol rounds travel 4x faster for 5s and pierce enemies infinitely.",
@@ -110,6 +113,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "GOLD TRACER FX",
     tracerHex: "#FE9800",
     unlockChapter: 1,
+    unlockCost: 350,
     upgradeBaseCost: 300,
     rageSkillName: "AK BULLET RAIN",
     rageSkillDescEn: "Fires 10 rounds/sec with 1.5x damage multiplier for 5 seconds.",
@@ -134,6 +138,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "AMBER SHARD FX",
     tracerHex: "#FFC080",
     unlockChapter: 1,
+    unlockCost: 500,
     upgradeBaseCost: 350,
     rageSkillName: "NOVA BLAST",
     rageSkillDescEn: "Emits a 360° spherical shockwave knocking back all enemies within 5m.",
@@ -158,6 +163,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "NEON CYAN FX",
     tracerHex: "#00F0FF",
     unlockChapter: 2,
+    unlockCost: 900,
     upgradeBaseCost: 450,
     rageSkillName: "BULLET STORM",
     rageSkillDescEn: "Fires 3 parallel SMG bullet streams simultaneously for 6 seconds.",
@@ -182,6 +188,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "ICE WHITE FX",
     tracerHex: "#DBFCFF",
     unlockChapter: 2,
+    unlockCost: 1100,
     upgradeBaseCost: 500,
     rageSkillName: "BLIZZARD",
     rageSkillDescEn: "Freezes the entire combat lane for 6s, slowing all enemies by 70%.",
@@ -206,6 +213,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "SOLAR WHITE FX",
     tracerHex: "#FFE082",
     unlockChapter: 3,
+    unlockCost: 1500,
     upgradeBaseCost: 600,
     rageSkillName: "VULCAN MODE",
     rageSkillDescEn: "Doubles fire rate and projectile caliber size for 5 seconds.",
@@ -230,6 +238,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "VIOLET ARC FX",
     tracerHex: "#C084FC",
     unlockChapter: 3,
+    unlockCost: 1800,
     upgradeBaseCost: 650,
     rageSkillName: "ELECTROMAGNETIC PULSE",
     rageSkillDescEn: "Shocks all enemies on screen, stunning for 3s and shredding 50% armor.",
@@ -254,6 +263,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "OCEAN BLUE FX",
     tracerHex: "#38BDF8",
     unlockChapter: 3,
+    unlockCost: 2100,
     upgradeBaseCost: 700,
     rageSkillName: "CARPET FIRE",
     rageSkillDescEn: "Sprays an unstoppable 180° wave of energy pellets across the arena for 4s.",
@@ -278,6 +288,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "CRIMSON SHELL FX",
     tracerHex: "#FF2A6D",
     unlockChapter: 4,
+    unlockCost: 3000,
     upgradeBaseCost: 900,
     rageSkillName: "ORBITAL STRIKE",
     rageSkillDescEn: "Calls 3 consecutive orbital cannon barrages (6m splash radius each).",
@@ -302,6 +313,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "ORANGE FLARE FX",
     tracerHex: "#F97316",
     unlockChapter: 5,
+    unlockCost: 4200,
     upgradeBaseCost: 1100,
     rageSkillName: "MISSILE SWARM",
     rageSkillDescEn: "Launches 12 homing micro-missiles that automatically track hostiles for 6s.",
@@ -326,6 +338,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "TOXIC GREEN FX",
     tracerHex: "#10B981",
     unlockChapter: 5,
+    unlockCost: 4600,
     upgradeBaseCost: 1200,
     rageSkillName: "MINEFIELD",
     rageSkillDescEn: "Scatters 20 proximity grenades across the lane triggering chain explosions.",
@@ -350,6 +363,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "BLAZE ORANGE FX",
     tracerHex: "#FB923C",
     unlockChapter: 6,
+    unlockCost: 5400,
     upgradeBaseCost: 1300,
     rageSkillName: "INFERNO",
     rageSkillDescEn: "Engulfs the entire left combat lane in continuous scorching fire for 6s.",
@@ -374,6 +388,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "NEON ACID FX",
     tracerHex: "#4ADE80",
     unlockChapter: 6,
+    unlockCost: 6000,
     upgradeBaseCost: 1400,
     rageSkillName: "MELTDOWN",
     rageSkillDescEn: "Coats the field in acid mist for 5s; infected hostiles melt after 3s.",
@@ -398,6 +413,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "VIOLET PLASMA FX",
     tracerHex: "#A855F7",
     unlockChapter: 7,
+    unlockCost: 7800,
     upgradeBaseCost: 1700,
     rageSkillName: "PLASMA NOVA",
     rageSkillDescEn: "Detonates an 8m plasma shockwave around the player, repelling all threats.",
@@ -422,6 +438,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "HYPER WHITE-CYAN",
     tracerHex: "#E0F2FE",
     unlockChapter: 8,
+    unlockCost: 9800,
     upgradeBaseCost: 2000,
     rageSkillName: "HYPERSONIC VOLLEY",
     rageSkillDescEn: "Fires 5 full-piercing Rail Gun slugs consecutively within 2 seconds.",
@@ -447,6 +464,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "CRIMSON BEAM FX",
     tracerHex: "#EF4444",
     unlockChapter: 8,
+    unlockCost: 11000,
     upgradeBaseCost: 2200,
     rageSkillName: "SUPERBEAM",
     rageSkillDescEn: "Projects an ultra-high-output sweeper laser beam for 8 seconds.",
@@ -471,6 +489,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "DARK VOID FX",
     tracerHex: "#9333EA",
     unlockChapter: 9,
+    unlockCost: 14000,
     upgradeBaseCost: 2500,
     rageSkillName: "SINGULARITY",
     rageSkillDescEn: "Opens a central black hole for 6s, pulling and crushing every monster inside.",
@@ -495,6 +514,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "BLINDING WHITE FX",
     tracerHex: "#FFFFFF",
     unlockChapter: 9,
+    unlockCost: 16000,
     upgradeBaseCost: 2800,
     rageSkillName: "SUPERNOVA",
     rageSkillDescEn: "Unleashes a 15m arena-wide blinding flash vaporizing standard hostiles.",
@@ -519,6 +539,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "RADIOACTIVE GOLD",
     tracerHex: "#EAB308",
     unlockChapter: 10,
+    unlockCost: 22000,
     upgradeBaseCost: 4000,
     rageSkillName: "NUCLEAR WINTER",
     rageSkillDescEn: "Drops a tactical warhead (12m blast) leaving lethal radiation fallout for 10s.",
@@ -544,6 +565,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "SOLAR CRIMSON FX",
     tracerHex: "#FF5500",
     unlockChapter: 10,
+    unlockCost: 30000,
     upgradeBaseCost: 5000,
     rageSkillName: "ARMAGEDDON",
     rageSkillDescEn: "Launches 3 ICBM warheads onto 3 impact zones simultaneously (7.5m each).",

@@ -31,8 +31,5 @@ yarn-error.log*
 next-env.d.ts
 
 # 3D models (đã lưu trên Cloudflare R2) & bản nén đóng gói game
-/public/models/*.fbx
-/public/models/*.glb
-/public/models/*.gltf
-/public/models/*.bin
+/public/models/**
 *.zip

@@ -126,6 +126,7 @@ interface GameActions {
   openArmory: (tab?: ArmoryTab) => void;
   closeArmory: () => void;
   setArmoryTab: (tab: ArmoryTab) => void;
+  unlockArmoryWeapon: (weaponId: string) => Promise<void>;
   assignWeaponToLoadout: (weaponId: string, slotIndex?: number) => Promise<void>;
   removeWeaponFromLoadout: (weaponId: string) => Promise<void>;
   upgradeArmoryWeapon: (weaponId: string) => Promise<void>;
@@ -170,6 +171,22 @@ function resolveActiveCombatWeapon(state: {
     DEFAULT_LOADOUT_IDS[0];
   const level = state.saveData.weaponLevels[id] ?? 1;
   return weaponService.resolveCombatWeapon(id, level);
+}
+
+async function commitArmorySave(
+  nextSave: PlayerSaveData,
+  setState: (partial: Partial<GameState & GameActions>) => void
+): Promise<void> {
+  setState({ armorySaving: true });
+  try {
+    const saved = await playerSaveService.writeSave(nextSave);
+    setState({ saveData: saved, saveError: null, armorySaving: false });
+  } catch (err) {
+    setState({
+      saveError: err instanceof Error ? err.message : String(err),
+      armorySaving: false,
+    });
+  }
 }
 
 function computeBestScore(
@@ -577,11 +594,36 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
 
   setArmoryTab: (tab) => set({ armoryTab: tab }),
 
+  unlockArmoryWeapon: async (weaponId) => {
+    const state = get();
+    if (!state.platformReady || state.saveError || state.armorySaving) return;
+    const weapon = ARMORY_WEAPONS.find((item) => item.id === weaponId);
+    if (!weapon) return;
+    // Điều kiện cần: đạt Chapter yêu cầu
+    if (state.saveData.unlockedChapter < weapon.unlockChapter) return;
+    if (state.saveData.unlockedWeaponIds.includes(weaponId)) return;
+    // Điều kiện đủ: đủ Gold để mở khóa
+    if (state.saveData.gold < weapon.unlockCost) return;
+
+    const nextSave: PlayerSaveData = {
+      ...state.saveData,
+      gold: state.saveData.gold - weapon.unlockCost,
+      unlockedWeaponIds: [...state.saveData.unlockedWeaponIds, weaponId],
+    };
+    await commitArmorySave(nextSave, set);
+  },
+
   assignWeaponToLoadout: async (weaponId, slotIndex) => {
     const state = get();
     if (!state.platformReady || state.saveError || state.armorySaving) return;
     const weapon = ARMORY_WEAPONS.find((item) => item.id === weaponId);
-    if (!weapon || state.saveData.unlockedChapter < weapon.unlockChapter) return;
+    if (
+      !weapon ||
+      state.saveData.unlockedChapter < weapon.unlockChapter ||
+      !state.saveData.unlockedWeaponIds.includes(weaponId)
+    ) {
+      return;
+    }
 
     const current = [...state.saveData.equippedLoadoutIds];
     const existingIdx = current.indexOf(weaponId);
@@ -611,21 +653,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       }
     }
 
-    set({ armorySaving: true });
     const nextSave: PlayerSaveData = {
       ...state.saveData,
       equippedWeaponId: current[0],
       equippedLoadoutIds: current,
     };
-    try {
-      const saved = await playerSaveService.writeSave(nextSave);
-      set({ saveData: saved, saveError: null, armorySaving: false });
-    } catch (err) {
-      set({
-        saveError: err instanceof Error ? err.message : String(err),
-        armorySaving: false,
-      });
-    }
+    await commitArmorySave(nextSave, set);
   },
 
   removeWeaponFromLoadout: async (weaponId) => {
@@ -635,21 +668,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     if (current.length <= 1 || !current.includes(weaponId)) return;
 
     const nextLoadout = current.filter((id) => id !== weaponId);
-    set({ armorySaving: true });
     const nextSave: PlayerSaveData = {
       ...state.saveData,
       equippedWeaponId: nextLoadout[0],
       equippedLoadoutIds: nextLoadout,
     };
-    try {
-      const saved = await playerSaveService.writeSave(nextSave);
-      set({ saveData: saved, saveError: null, armorySaving: false });
-    } catch (err) {
-      set({
-        saveError: err instanceof Error ? err.message : String(err),
-        armorySaving: false,
-      });
-    }
+    await commitArmorySave(nextSave, set);
   },
 
   upgradeArmoryWeapon: async (weaponId) => {
@@ -657,7 +681,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     if (!state.platformReady || state.saveError || state.armorySaving) return;
     const weapon = ARMORY_WEAPONS.find((item) => item.id === weaponId);
     if (!weapon) return;
-    if (state.saveData.unlockedChapter < weapon.unlockChapter) return;
+    if (
+      state.saveData.unlockedChapter < weapon.unlockChapter ||
+      !state.saveData.unlockedWeaponIds.includes(weaponId)
+    ) {
+      return;
+    }
 
     const currentLevel = Math.max(1, state.saveData.weaponLevels[weaponId] ?? 1);
     if (currentLevel >= MAX_WEAPON_LEVEL) return;
@@ -665,7 +694,6 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const cost = getWeaponUpgradeCost(weapon, currentLevel);
     if (state.saveData.gold < cost) return;
 
-    set({ armorySaving: true });
     const nextSave: PlayerSaveData = {
       ...state.saveData,
       gold: state.saveData.gold - cost,
@@ -674,15 +702,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         [weaponId]: currentLevel + 1,
       },
     };
-    try {
-      const saved = await playerSaveService.writeSave(nextSave);
-      set({ saveData: saved, saveError: null, armorySaving: false });
-    } catch (err) {
-      set({
-        saveError: err instanceof Error ? err.message : String(err),
-        armorySaving: false,
-      });
-    }
+    await commitArmorySave(nextSave, set);
   },
 
   selectChapter: (chapterId) =>

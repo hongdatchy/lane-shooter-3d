@@ -174,7 +174,7 @@
     "guestHintWeb": "Juega libremente como invitado. Inicia sesión para guardar en la nube y puntuar.",
     "customizeLoadout": "PERSONALIZAR EQUIPO",
     "sectorTitle": "DISTRITO DE HIERRO",
-    "sectorSubtitle": "CAPÍTULO 1 · OLEADA 1 / 6 · BIOMA: MEGACIUDAD",
+    "sectorSubtitle": "CAPÍTULO 1 · OLEADA 1 / 4 · BIOMA: MEGACIUDAD",
     "startLabel": "INICIO",
     "waveLabel": "OLEADA {wave}",
     "radarTitle": "RADAR DE DOBLE CARRIL",
@@ -352,6 +352,12 @@
     "savingBtn": "GUARDANDO...",
     "combatNoteTitle": "CAMBIO DE 3 ARMAS Y CARRIL DERECHO",
     "combatNoteDesc": "Lleva hasta 3 armas al combate y cambia con [1][2][3] o [Q]. El carril derecho solo otorga Buffs Overdrive de daño/cadencia, nunca cambia el arma.",
+    "buyCostShort": "{cost} ORO",
+    "readyToBuyBadge": "CAP.{ch} · {cost}G",
+    "unlockCostPreview": "PRECIO AL LLEGAR A CAP.{ch}: {cost} ORO",
+    "unlockWeaponBtn": "DESBLOQUEAR · {cost} ORO",
+    "needGoldUnlockBtn": "REQUIERE {cost} ORO PARA ABRIR",
+    "prereqMetNote": "REQUISITO CAP.{ch} LISTO · PAGA {cost} ORO",
     "escHint": "ESC: ATRÁS"
   }
 }

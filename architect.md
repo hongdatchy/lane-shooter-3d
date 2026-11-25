@@ -66,8 +66,11 @@
 
 ## 3. VŨ KHÍ — 20 LOẠI (Weapon Catalog — Không chia Tier)
 
-> - **Không phân chia theo Tier.** Mỗi khẩu súng là một trang bị độc lập trong Kho Trang Bị (Armory), mở khóa theo tiến trình Chapter và nâng cấp cấp độ (Lv.1 → Lv.10) bằng Gold.
-> - **Loadout 3 Súng mang ra trận:** Người chơi chọn tối đa **3 loại súng mang theo** ngay trong Tab Trang Bị trước trận, và có thể **chuyển đổi qua lại giữa 3 súng ngay trong trận** (`1` / `2` / `3`, `Q`, hoặc chạm ô súng trên HUD).
+> - **Không phân chia theo Tier.** Mỗi khẩu súng là một trang bị độc lập trong Kho Trang Bị (Armory).
+> - **Điều kiện mở khóa (Cần + Đủ):**
+>   - **Điều kiện cần:** Vượt/mở đến **Chapter tương ứng** (`CH.1 → CH.10`).
+>   - **Điều kiện đủ:** Trả **Gold** trong Tab Trang Bị để chính thức mở khóa súng (`Pistol` mở sẵn miễn phí lúc khởi đầu), sau đó nâng cấp tiếp `Lv.1 → Lv.10` bằng Gold.
+> - **Loadout 3 Súng mang ra trận:** Người chơi chọn tối đa **3 loại súng đã mở mang theo** ngay trong Tab Trang Bị trước trận, và có thể **chuyển đổi qua lại giữa 3 súng ngay trong trận** (`1` / `2` / `3`, `Q`, hoặc chạm ô súng trên HUD).
 > - **Nộ (Rage Skill)** của mỗi súng là khác nhau hoàn toàn.
 
 | # | Tên | Mở khóa | Nhóm | Kiểu bắn | Phát/giây | Đạn/phát | Sát thương/viên | Splash | Màu đạn |
@@ -310,7 +313,7 @@
 
 | Chapter | Tên | Bối cảnh | Số Wave | Quái Nổi Bật | Boss Cuối |
 |---|---|---|---|---|---|
-| 1 | **Iron District** | Thành phố hoang tàn, bầu trời ô nhiễm đỏ | 6 | Crawler, Husk, Shell Brute | IRON WARDEN |
+| 1 | **Iron District** | Thành phố hoang tàn, bầu trời ô nhiễm đỏ | 4 | Crawler, Husk | IRON WARDEN |
 | 2 | **Bio Lab Omega** | Phòng thí nghiệm sinh hóa dưới lòng đất | 6 | Dasher, Bloater, Regen Beast, Parasite | NANO HYDRA |
 | 3 | **Crystal Tundra** | Hành tinh băng giá, tường pha lê | 7 | Wraith, Cryo Leech, Shell Brute + Force Bubble | CRYSTAL COLOSSUS |
 | 4 | **Hive Core** | Tổ hữu cơ khổng lồ | 7 | Swarm Queen, Brood Carrier, Splitter | SWARM MOTHER |
@@ -325,7 +328,7 @@
 
 ### Lịch trình mở khóa Vũ khí trong Kho Trang Bị (Armory) theo Chapter
 
-> Vũ khí được mở khóa tại màn **Trang Bị** theo tiến trình Chapter để người chơi nâng cấp và đưa vào **bộ 3 súng mang ra trận** (không còn mở qua Cổng làn phải).
+> Đạt Chapter chỉ là **điều kiện cần** để mở quyền mua vũ khí tại **Tab Trang Bị**; người chơi cần dùng **Gold (điều kiện đủ)** để mở khóa vĩnh viễn và đưa vào **bộ 3 súng mang ra trận** (không còn mở qua Cổng làn phải).
 
 | Chapter | Vũ khí mở khóa mới trong Armory |
 |---|---|

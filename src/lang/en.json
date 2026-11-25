@@ -174,7 +174,7 @@
     "guestHintWeb": "Guest can play freely. Sign in to save cloud progress & submit scores.",
     "customizeLoadout": "CUSTOMIZE LOADOUT & GEAR",
     "sectorTitle": "IRON DISTRICT",
-    "sectorSubtitle": "CHAPTER 1 · WAVE 1 / 6 · BIOME: RUINED MEGACITY",
+    "sectorSubtitle": "CHAPTER 1 · WAVE 1 / 4 · BIOME: RUINED MEGACITY",
     "startLabel": "START",
     "waveLabel": "WAVE {wave}",
     "radarTitle": "DUAL-LANE RADAR OVERVIEW",
@@ -352,6 +352,12 @@
     "savingBtn": "SYNCING SAVE...",
     "combatNoteTitle": "3-GUN SWITCHING & RIGHT LANE",
     "combatNoteDesc": "Carry up to 3 weapons into combat and switch anytime using [1][2][3] or [Q]. The right lane only grants Overdrive DMG/ROF buffs and never switches guns.",
+    "buyCostShort": "{cost} G",
+    "readyToBuyBadge": "CH.{ch} · {cost} G",
+    "unlockCostPreview": "UNLOCK PRICE ONCE CH.{ch} CLEARED: {cost} G",
+    "unlockWeaponBtn": "UNLOCK WEAPON · {cost} G",
+    "needGoldUnlockBtn": "NEED {cost} GOLD TO UNLOCK",
+    "prereqMetNote": "CH.{ch} PREREQUISITE MET · PAY {cost} G TO UNLOCK",
     "escHint": "ESC: BACK"
   }
 }

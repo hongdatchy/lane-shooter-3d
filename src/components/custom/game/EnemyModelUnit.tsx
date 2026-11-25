@@ -10,14 +10,14 @@ import { installModelBrowserCache } from "@/service/model-cache";
 
 installModelBrowserCache();
 
-// Cấu hình 3 model quái trên Cloudflare R2 /models/ (hỗ trợ cả .glb/.gltf lẫn .fbx)
+// Cấu hình 3 model Cửa 1 trong public/models/classic/stage1/ (Quái 1, Quái 2, Boss 1)
 export const ENEMY_MODEL_CONFIG: Record<
   EnemyKind,
   { fileName: string; rotationY: number; targetHeight: number }
 > = {
-  NORMAL: { fileName: "enemy-normal.glb", rotationY: 0, targetHeight: 1.05 },
-  ELITE: { fileName: "enemy-elite.glb", rotationY: 0, targetHeight: 1.15 },
-  BOSS: { fileName: "enemy-boss.glb", rotationY: 0, targetHeight: 1.2 },
+  NORMAL: { fileName: "classic/stage1/crawler_walk.glb", rotationY: 0, targetHeight: 1.05 },
+  ELITE: { fileName: "classic/stage1/husk_rigged Walking.glb", rotationY: 0, targetHeight: 1.2 },
+  BOSS: { fileName: "classic/stage1/enemy-boss.glb", rotationY: 0, targetHeight: 1.2 },
 };
 
 const toModelUrl = (fileName: string) => withAssetBase(encodeURI(`models/${fileName}`));
@@ -49,8 +49,8 @@ class EnemyErrorBoundary extends Component<EnemyErrorBoundaryProps, EnemyErrorBo
     return { hasError: true };
   }
 
-  componentDidCatch() {
-    // Nếu chưa có file model tương ứng trong public/models/ -> tự dùng khối quái mặc định
+  componentDidCatch(error: unknown) {
+    console.warn("[EnemyModelUnit] Không nạp được model quái 3D:", error);
   }
 
   render() {
