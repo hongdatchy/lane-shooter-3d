@@ -136,6 +136,8 @@ const STRIKE_INDICES = [0, 1, 2];
 const FALLOUT_INDICES = [0, 1, 2];
 const POISON_CAST_DURATION = 0.9;
 const BOSS1_SHOOT_DURATION = 1.8;
+const BOSS2_SPAWN_DURATION = 2.77;
+const BOSS2_SHOOT_DURATION = 4.13;
 const BOSS3_SHOOT_DURATION = 3.2;
 const POISON_INTERVAL_MIN = 2.8;
 const POISON_INTERVAL_MAX = 3.6;
@@ -675,13 +677,13 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         e.dying = false;
         e.deathTimer = 0;
         e.deathDuration = 0;
-        e.stunTimer = 0;
+        e.stunTimer = store.activeChapter === 2 ? BOSS2_SPAWN_DURATION : 0;
         e.acidTimer = 0;
         e.armorBroken = false;
         e.shellArmorHp = 0;
         e.enraged = false;
         e.attackCooldown =
-          store.activeChapter === 3 ? 1.6 : store.activeChapter === 2 ? 2.6 : 0.65;
+          store.activeChapter === 3 ? 1.6 : store.activeChapter === 2 ? 1.0 : 0.65;
         e.castTimer = 0;
         e.castFired = false;
         e.id = enemyIdSeqRef.current++;
@@ -697,7 +699,10 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         e.phase = 0;
         e.knockbackVx = 0;
         e.knockbackVz = 0;
-        enemyUnitRefs.current[i]?.setMode("WALK");
+        enemyUnitRefs.current[i]?.setMode(
+          store.activeChapter === 2 ? "SPAWN" : "WALK",
+          store.activeChapter === 2 ? BOSS2_SPAWN_DURATION : undefined
+        );
         runtimeRef.current.screenShake = 0.55;
         return;
       }
@@ -1970,31 +1975,45 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
                 spawnParticles(e.x - 1.35, 2.0, e.z + 1.0, "#f97316", 8, 0.7);
               }
             }
-          } else if (
-            e.kind === "BOSS" &&
-            store.activeChapter === 2 &&
-            e.z > ARENA_CONFIG.spawnZ + 2 &&
-            e.z < ARENA_CONFIG.defenseLineZ - 4.0
-          ) {
-            e.attackCooldown -= delta * freezeFactor;
-            if (e.attackCooldown <= 0) {
-              e.attackCooldown = 3.4 + Math.random() * 0.8;
-              const muzzleZ = e.z + 1.1;
-              spawnParticles(e.x, 2.2, muzzleZ, "#10b981", 16, 1.1);
-              for (const offset of [-1.05, 0, 1.05]) {
-                spawnEnemyProjectile(
-                  e.x + offset,
-                  2.1,
-                  muzzleZ,
-                  THREE.MathUtils.clamp(
-                    runtimeRef.current.playerX + offset * 1.1,
-                    ARENA_CONFIG.playerMinX,
-                    ARENA_CONFIG.playerMaxX
-                  ),
-                  ARENA_CONFIG.playerZ,
-                  POISON_PROJECTILE_SPEED * 0.9 * freezeFactor,
-                  "#10b981"
-                );
+          } else if (e.kind === "BOSS" && store.activeChapter === 2) {
+            // Boss 2 (Nano Hydra v4): chạy Ultimate_LaserSweep khi tấn công, rồi quay lại clip Walk
+            if (e.castTimer > 0) {
+              e.castTimer = Math.max(0, e.castTimer - delta * freezeFactor);
+              if (!e.castFired && e.castTimer <= BOSS2_SHOOT_DURATION * 0.62) {
+                e.castFired = true;
+                const muzzleZ = e.z + 1.1;
+                spawnParticles(e.x, 2.2, muzzleZ, "#10b981", 16, 1.1);
+                soundService.play("shootCannon");
+                for (const offset of [-1.05, 0, 1.05]) {
+                  spawnEnemyProjectile(
+                    e.x + offset,
+                    2.1,
+                    muzzleZ,
+                    THREE.MathUtils.clamp(
+                      runtimeRef.current.playerX + offset * 1.1,
+                      ARENA_CONFIG.playerMinX,
+                      ARENA_CONFIG.playerMaxX
+                    ),
+                    ARENA_CONFIG.playerZ,
+                    POISON_PROJECTILE_SPEED * 0.9 * freezeFactor,
+                    "#10b981"
+                  );
+                }
+              }
+              if (e.castTimer <= 0) {
+                enemyUnitRefs.current[i]?.setMode("WALK");
+                e.attackCooldown = 2.6 + Math.random() * 0.8;
+              }
+            } else if (
+              e.z > ARENA_CONFIG.spawnZ + 0.5 &&
+              e.z < ARENA_CONFIG.defenseLineZ - 4.0
+            ) {
+              e.attackCooldown -= delta * freezeFactor;
+              if (e.attackCooldown <= 0) {
+                e.castTimer = BOSS2_SHOOT_DURATION;
+                e.castFired = false;
+                enemyUnitRefs.current[i]?.setMode("ATTACK", BOSS2_SHOOT_DURATION);
+                spawnParticles(e.x, 2.2, e.z + 1.0, "#10b981", 8, 0.7);
               }
             }
           } else if (e.kind === "BOSS" && store.activeChapter === 3) {
@@ -2262,11 +2281,6 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           slot.position.set(e.x, hoverY, e.z);
           slot.scale.setScalar(e.scale);
           slot.rotation.set(0, 0, bankZ);
-        } else if (isBoss && store.activeChapter === 2) {
-          // Boss 2 (Nano Hydra mesh tĩnh): lượn nhẹ tạo chuyển động 3 đầu sống động
-          slot.position.set(e.x, 0.08 + Math.sin(elapsed * 2.6) * 0.12, e.z);
-          slot.scale.setScalar(e.scale);
-          slot.rotation.set(0, Math.sin(elapsed * 1.7) * 0.12, 0);
         } else {
           // Quái đi bộ bám sát mặt sàn, giữ nguyên animation bước chân từ file GLB
           slot.position.set(e.x, 0, e.z);

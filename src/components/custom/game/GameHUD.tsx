@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   Camera,
   ChevronLeft,
   ChevronRight,
-  Crosshair,
   Crown,
   Flame,
   Heart,
@@ -17,6 +17,7 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Shield,
   Sparkles,
   Sun,
   Trophy,
@@ -376,780 +377,905 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   }, []);
 
   const isInMenu = gameStatus === "MENU";
+  const isBossWave = wave >= maxWaves;
   const currentCameraLabel = trans.camera[cameraMode] || cameraMode;
-  const stageDisplay = wave >= maxWaves ? `${wave} / ${maxWaves}` : `${wave}`;
+  const stageDisplay = isBossWave ? `${wave} / ${maxWaves}` : `${wave}`;
+  const rageStatusText = icbmAiming
+    ? trans.hud.rageAimingShort
+    : icbmPending
+      ? trans.hud.rageMissileFlying
+      : rageActive
+        ? formatText(trans.hud.rageSkillActive, {
+            skill: ragingSkillName,
+            time: rageTimeLeft.toFixed(1),
+          })
+        : rageReady
+          ? weapon.id === "icbm"
+            ? trans.hud.rageButtonCenterIcbm
+            : formatText(trans.hud.rageSkillButton, {
+                skill: readySkillName,
+              })
+          : formatText(trans.hud.ragePercent, { pct: ragePercent });
 
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-10 flex flex-col ${
-        isInMenu ? "items-center justify-center p-3 sm:p-4" : "justify-between p-2 sm:p-4"
+        isInMenu ? "items-center justify-center p-3 sm:p-4" : "justify-between"
       } transition-shadow duration-300 ${
         rageActive
-          ? "shadow-[inset_0_0_70px_rgba(245,158,11,0.32)] ring-2 ring-inset ring-amber-400/50"
+          ? "shadow-[inset_0_0_70px_rgba(254,152,0,0.28)] ring-2 ring-inset ring-[#FE9800]/55"
           : ""
       }`}
     >
-      {/* Thanh trạng thái trên cùng (chỉ hiện khi đã vào game) */}
+      {/* ═══ TOP COMBAT HUD BAR (Cyber Lane Arcade) ═══ */}
       {!isInMenu && (
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-3">
-          {/* Trái: Tên + Máu + Màn + Điểm */}
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="pointer-events-auto flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-950/80 px-2.5 py-1.5 sm:justify-start sm:gap-2.5 sm:px-3.5 sm:py-2 text-white shadow-lg backdrop-blur-md"
-          >
-            {playerName && (
-              <div className="hidden sm:flex items-center gap-1.5 border-r border-slate-700 pr-2.5 text-xs font-bold text-sky-300">
-                <User className="h-3.5 w-3.5 text-sky-400" />
-                <span className="max-w-[110px] truncate">{playerName}</span>
-              </div>
-            )}
+        <motion.header
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pointer-events-auto w-full px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2 bg-[#191B23]/88 backdrop-blur-md border-b border-[#3B494B]/40 shadow-2xl text-[#E1E2EC]"
+        >
+          {/* TOP-LEFT: Player + Hearts HP + Wave/Kills + Score */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
+            <div className="flex items-center gap-2.5">
+              {playerName && (
+                <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0B0E15] border border-[#00F0FF]/30 text-[#7DF4FF] font-mono text-[11px] font-bold">
+                  <User className="h-3.5 w-3.5 text-[#00F0FF]" />
+                  <span className="max-w-[110px] truncate">{playerName}</span>
+                </div>
+              )}
 
-            <div className="flex items-center gap-1 sm:gap-1.5 border-r border-slate-700 pr-2 sm:pr-3">
-              {Array.from({ length: maxHp }).map((_, i) => (
-                <Heart
-                  key={i}
-                  className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform ${
-                    i < hp
-                      ? "fill-rose-500 text-rose-500 scale-100"
-                      : "text-slate-600 scale-90"
-                  }`}
-                />
-              ))}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: maxHp }).map((_, i) => (
+                  <Heart
+                    key={i}
+                    className={`h-4 w-4 sm:h-[18px] sm:w-[18px] transition-transform ${
+                      i < hp
+                        ? "fill-[#FF2A6D] text-[#FF2A6D] drop-shadow-[0_0_6px_rgba(255,42,109,0.75)] scale-100"
+                        : "text-[#32353D] scale-90"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {activeBuffs.shieldCharges > 0 && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#00F0FF]/15 border border-[#00F0FF]/45 font-mono text-[10px] font-bold text-[#7DF4FF]">
+                  <Shield className="h-3 w-3 text-[#00F0FF]" />
+                  {activeBuffs.shieldCharges}
+                </span>
+              )}
             </div>
 
-            <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] sm:text-sm">
-              <div>
-                <span className="text-slate-400 mr-1">{trans.hud.stage}:</span>
-                <span className="font-black text-sky-300">
-                  CH.{activeChapter} · {stageDisplay}/{maxWaves}
-                </span>
-              </div>
-              <div>
-                <span className="hidden sm:inline text-slate-400 mr-1">
-                  {trans.hud.stageKillsLong}
-                </span>
-                <span className="sm:hidden text-slate-400 mr-1">{trans.hud.stageKillsShort}</span>
-                <span className="font-bold text-emerald-300">
-                  {stageKills} / {stageTargetKills}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 mr-1">{trans.hud.score}</span>
-                <span className="font-black text-amber-300">{score}</span>
-              </div>
-            </div>
-          </motion.div>
+            <div className="hidden sm:block w-px h-6 bg-[#32353D]" />
 
-          {/* Phải: Đổi góc Camera + Tự bắn + Âm thanh + Ngôn ngữ + Theme + Toàn màn hình + Tạm dừng */}
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="pointer-events-auto flex flex-wrap items-center justify-between gap-1.5 sm:justify-end sm:gap-2"
-          >
-            {/* Mobile: 1 nút gọn bấm chuyển góc camera */}
-            <Button
+            {/* Chapter / Wave / Kills */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1D1F27] border border-[#3B494B]/45 font-mono">
+                <span className="text-[10px] font-bold text-[#849495] uppercase">
+                  CH.{String(activeChapter).padStart(2, "0")}
+                </span>
+                <span className="text-[#3B494B]">•</span>
+                <span className="text-[10px] text-[#849495] uppercase hidden sm:inline">
+                  {trans.hud.stage}
+                </span>
+                <span className="text-sm sm:text-base font-extrabold text-[#DBFCFF] leading-none tabular-nums">
+                  {wave}/{maxWaves}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1D1F27] border border-[#3B494B]/35 font-mono text-[11px]">
+                <span className="text-[#849495] hidden sm:inline">{trans.hud.stageKillsLong}</span>
+                <span className="text-[#849495] sm:hidden">{trans.hud.stageKillsShort}</span>
+                <span className="font-bold text-[#10B981] tabular-nums">
+                  {stageKills}/{stageTargetKills}
+                </span>
+              </div>
+
+              {isBossWave && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#93000A]/45 border border-[#FFB4AB]/50 text-[#FFB4AB] font-mono text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>BOSS</span>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden md:block w-px h-6 bg-[#32353D]" />
+
+            {/* Score */}
+            <div className="flex items-baseline gap-1.5 font-mono">
+              <span className="text-[10px] uppercase tracking-wider text-[#849495]">
+                {trans.hud.score}
+              </span>
+              <span className="text-sm sm:text-lg font-extrabold text-[#7DF4FF] tabular-nums tracking-wide">
+                {score.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* TOP-RIGHT: Camera Selector Pills + Auto-Fire + Utility Controls */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Mobile Camera Cycle */}
+            <button
               type="button"
-              size="sm"
-              variant="outline"
               onClick={(e) => {
                 e.currentTarget.blur();
                 cycleCameraMode();
               }}
-              className="sm:hidden h-7 gap-1 border-slate-700 bg-slate-950/80 px-2 text-[11px] font-semibold text-sky-300 backdrop-blur-md hover:bg-slate-800 hover:text-white"
+              className="sm:hidden h-7 px-2 rounded-lg bg-[#1D1F27] border border-[#3B494B]/50 text-[#7DF4FF] font-mono text-[10px] font-bold uppercase flex items-center gap-1 cursor-pointer"
             >
-              <Camera className="h-3.5 w-3.5" />
+              <Camera className="h-3.5 w-3.5 text-[#00F0FF]" />
               <span>{currentCameraLabel}</span>
-            </Button>
+            </button>
 
-            {/* Desktop/Tablet: thanh chọn 3 góc camera */}
-            <div className="hidden sm:flex items-center rounded-xl border border-slate-700/80 bg-slate-950/80 p-1 shadow-lg backdrop-blur-md">
-              <Camera className="mx-1.5 h-3.5 w-3.5 text-sky-400" />
-              {cameraModes.map((item) => (
-                <button
-                  key={item.mode}
-                  type="button"
-                  onClick={(e) => {
-                    e.currentTarget.blur();
-                    setCameraMode(item.mode);
-                  }}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
-                    cameraMode === item.mode
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            {/* Desktop Camera Selector Pills */}
+            <div className="hidden sm:flex items-center p-0.5 rounded-lg bg-[#0B0E15] border border-[#3B494B]/50">
+              <Camera className="mx-1.5 h-3.5 w-3.5 text-[#00F0FF]" />
+              {cameraModes.map((item) => {
+                const active = cameraMode === item.mode;
+                return (
+                  <button
+                    key={item.mode}
+                    type="button"
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      setCameraMode(item.mode);
+                    }}
+                    className={`px-2.5 py-1 rounded font-mono text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      active
+                        ? "bg-[#00F0FF] text-[#00363A] shadow-[0_0_12px_rgba(0,240,255,0.4)]"
+                        : "text-[#849495] hover:text-[#E1E2EC]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  toggleAutoFire();
-                }}
-                className={`h-7 sm:h-8 px-2 sm:px-3 border-slate-700 text-[11px] sm:text-xs font-semibold backdrop-blur-md ${
-                  autoFire
-                    ? "bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900/90 hover:text-emerald-200"
-                    : "bg-slate-950/80 text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`}
-              >
-                <Crosshair className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">
-                  {autoFire ? trans.hud.autoFireOn : trans.hud.autoFireOff}
-                </span>
-                <span className="sm:hidden">
-                  {autoFire ? trans.hud.autoFireShortOn : trans.hud.autoFireShortOff}
-                </span>
-              </Button>
-
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label={isMuted ? trans.hud.unmute : trans.hud.mute}
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  toggleMute();
-                }}
-                className={`h-7 w-7 sm:h-8 sm:w-8 border-slate-700 backdrop-blur-md ${
-                  isMuted
-                    ? "bg-rose-950/80 text-rose-300 hover:bg-rose-900/80 hover:text-rose-200"
-                    : "bg-slate-950/80 text-sky-300 hover:bg-slate-800 hover:text-white"
-                }`}
-              >
-                {isMuted ? (
-                  <VolumeX className="h-3.5 w-3.5" />
-                ) : (
-                  <Volume2 className="h-3.5 w-3.5" />
-                )}
-              </Button>
-
-              <LanguageSwitcher variant="hud" />
-
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label={theme === "light" ? trans.app.toDark : trans.app.toLight}
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  toggleTheme();
-                }}
-                className="h-7 w-7 sm:h-8 sm:w-8 border-slate-700 bg-slate-950/80 text-amber-300 backdrop-blur-md hover:bg-slate-800 hover:text-amber-200"
-              >
-                {theme === "light" ? (
-                  <Moon className="h-3.5 w-3.5" />
-                ) : (
-                  <Sun className="h-3.5 w-3.5" />
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label={isFullscreen ? trans.hud.fullscreenExit : trans.hud.fullscreenEnter}
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  toggleFullscreen();
-                }}
-                className="h-7 w-7 sm:h-8 sm:w-8 border-slate-700 bg-slate-950/80 text-sky-300 backdrop-blur-md hover:bg-slate-800 hover:text-white"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Maximize2 className="h-3.5 w-3.5" />
-                )}
-              </Button>
-
-              {(gameStatus === "PLAYING" || gameStatus === "PAUSED") && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.currentTarget.blur();
-                    togglePause();
-                  }}
-                  className="h-7 sm:h-8 px-2 sm:px-3 border-slate-700 bg-slate-950/80 text-[11px] sm:text-xs font-semibold text-white backdrop-blur-md hover:bg-slate-800 hover:text-white"
-                >
-                  {gameStatus === "PAUSED" ? (
-                    <>
-                      <Play className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{trans.hud.resume}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{trans.hud.pause}</span>
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Thông báo qua màn / nâng cấp vũ khí nổi giữa màn hình */}
-      <AnimatePresence>
-        {!isInMenu && rewardBanner && (
-          <motion.div
-            key={rewardBanner}
-            initial={{ opacity: 0, scale: 0.85, y: -16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: -12 }}
-            className="mx-auto flex max-w-[92vw] items-center gap-1.5 sm:gap-2 rounded-full border border-amber-400/60 bg-slate-950/90 px-3 py-1.5 sm:px-4 sm:py-2 text-center text-xs sm:text-sm font-bold text-amber-300 shadow-xl backdrop-blur-md"
-          >
-            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-amber-400" />
-            <span>{rewardBanner}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Nút Bật Nộ / Phóng Tên Lửa cỡ lớn nổi giữa màn hình khi đầy 100% Nộ */}
-      <AnimatePresence>
-        {gameStatus === "PLAYING" && rageReady && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.85 }}
-            className="pointer-events-auto mx-auto my-auto flex flex-col items-center"
-          >
+            {/* Auto-Fire Toggle */}
             <button
               type="button"
               onClick={(e) => {
-                e.stopPropagation();
                 e.currentTarget.blur();
-                activateRage();
+                toggleAutoFire();
               }}
-              className="group flex animate-pulse items-center gap-2.5 rounded-2xl border-2 border-yellow-200 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-6 py-3.5 sm:px-8 sm:py-4 text-slate-950 shadow-[0_0_35px_rgba(245,158,11,0.7)] transition-transform hover:scale-105 active:scale-95 touch-none select-none"
+              className={`h-7 sm:h-8 px-2.5 rounded-lg border font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer ${
+                autoFire
+                  ? "bg-[#1D1F27] border-[#00F0FF]/50 text-[#00F0FF]"
+                  : "bg-[#1D1F27] border-[#3B494B]/45 text-[#849495] hover:text-[#E1E2EC]"
+              }`}
             >
-              <Flame className="h-6 w-6 sm:h-7 sm:w-7 shrink-0 fill-yellow-200 text-slate-950" />
-              <div className="text-left">
-                <div className="text-base sm:text-xl font-black uppercase tracking-wide leading-none">
-                  {weapon.id === "icbm"
-                    ? trans.hud.rageButtonCenterIcbm
-                    : formatText(trans.hud.rageSkillButton, { skill: readySkillName })}
-                </div>
-                <div className="mt-1 text-[11px] sm:text-xs font-bold text-slate-900/90">
-                  {trans.hud.rageCenterHint}
-                </div>
-              </div>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  autoFire ? "bg-[#00F0FF] animate-pulse" : "bg-[#586568]"
+                }`}
+              />
+              <span className="hidden sm:inline">
+                {autoFire ? trans.hud.autoFireOn : trans.hud.autoFireOff}
+              </span>
+              <span className="sm:hidden">
+                {autoFire ? trans.hud.autoFireShortOn : trans.hud.autoFireShortOff}
+              </span>
             </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Thông báo chờ 3s khi vừa Thắng/Thua để xem nốt hiệu ứng 3D */}
-      <AnimatePresence>
-        {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && !delayedResultReady && (
-          <motion.div
-            key="result-delay-banner"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className={`mx-auto my-auto flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm sm:text-base font-black shadow-2xl backdrop-blur-md ${
-              gameStatus === "VICTORY"
-                ? "border-emerald-400/70 bg-emerald-950/90 text-emerald-300"
-                : "border-rose-400/70 bg-rose-950/90 text-rose-300"
-            }`}
-          >
-            <Trophy className="h-5 w-5 shrink-0" />
-            <span>
-              {gameStatus === "VICTORY"
-                ? trans.hud.rageResultDelayVictory
-                : trans.hud.rageResultDelayDefeat}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <button
+              type="button"
+              aria-label={isMuted ? trans.hud.unmute : trans.hud.mute}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                toggleMute();
+              }}
+              className={`h-7 w-7 sm:h-8 sm:w-8 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
+                isMuted
+                  ? "bg-[#93000A]/35 border-[#FFB4AB]/45 text-[#FFB4AB]"
+                  : "bg-[#1D1F27] border-[#3B494B]/45 text-[#B9CACB] hover:text-[#DBFCFF]"
+              }`}
+            >
+              {isMuted ? (
+                <VolumeX className="h-3.5 w-3.5" />
+              ) : (
+                <Volume2 className="h-3.5 w-3.5" />
+              )}
+            </button>
 
-      {/* Modal Pause / Game Over / Victory (Game Over & Victory đợi 3s) */}
-      <AnimatePresence>
-        {(gameStatus === "PAUSED" ||
-          ((gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
-            delayedResultReady)) && (
-          <motion.div
-            key={gameStatus}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            className="pointer-events-auto mx-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-slate-700/90 bg-slate-950/95 p-5 sm:p-6 text-center text-white shadow-2xl backdrop-blur-lg"
-          >
-            {gameStatus === "PAUSED" && (
-              <>
-                <h2 className="text-xl font-black">
-                  {formatText(trans.modals.pausedTitle, { stage: stageDisplay })}
-                </h2>
-                <p className="mt-1 text-sm text-slate-400">{trans.modals.pausedDesc}</p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={togglePause}
-                    className="flex-1 gap-2 bg-blue-600 hover:bg-blue-500"
-                  >
-                    <Play className="h-4 w-4" />
-                    {trans.hud.resume}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleRestart}
-                    className="gap-2 border-slate-700 bg-slate-900 text-white hover:bg-slate-800 hover:text-white"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    {trans.modals.restartShort}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBackToMenu}
-                    className="w-full gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
-                  >
-                    <Trophy className="h-4 w-4 text-amber-400" />
-                    {trans.modals.backToMenu}
-                  </Button>
-                </div>
-              </>
+            <LanguageSwitcher variant="hud" />
+
+            <button
+              type="button"
+              aria-label={theme === "light" ? trans.app.toDark : trans.app.toLight}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                toggleTheme();
+              }}
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg border border-[#3B494B]/45 bg-[#1D1F27] text-[#FFC080] hover:bg-[#272A32] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              {theme === "light" ? (
+                <Moon className="h-3.5 w-3.5" />
+              ) : (
+                <Sun className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              aria-label={isFullscreen ? trans.hud.fullscreenExit : trans.hud.fullscreenEnter}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                toggleFullscreen();
+              }}
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg border border-[#3B494B]/45 bg-[#1D1F27] text-[#7DF4FF] hover:bg-[#272A32] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            {(gameStatus === "PLAYING" || gameStatus === "PAUSED") && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  togglePause();
+                }}
+                className="h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg bg-[#272A32] hover:bg-[#32353D] border border-[#3B494B]/55 text-[#E1E2EC] font-mono text-[10px] sm:text-[11px] font-bold uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {gameStatus === "PAUSED" ? (
+                  <>
+                    <Play className="h-3.5 w-3.5 text-[#00F0FF]" />
+                    <span className="hidden sm:inline">{trans.hud.resume}</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{trans.hud.pause}</span>
+                  </>
+                )}
+              </button>
             )}
+          </div>
+        </motion.header>
+      )}
 
-            {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && (
-              <>
-                <div
-                  className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl ${
-                    gameStatus === "VICTORY"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-rose-500/20 text-rose-400"
-                  }`}
-                >
-                  <Trophy className="h-6 w-6" />
-                </div>
-                <h2
-                  className={`text-2xl font-black ${
-                    gameStatus === "VICTORY" ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {gameStatus === "VICTORY"
-                    ? formatText(trans.modals.victoryTitle, { max: maxWaves })
-                    : trans.modals.gameOverTitle}
-                </h2>
-                <p className="mt-1 text-xs text-slate-400">
-                  {playerName ? `${playerName} • ` : `${trans.modals.guestLabel} • `}
-                  {gameStatus === "VICTORY"
-                    ? trans.modals.victoryDesc
-                    : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
-                </p>
-                {!player && (
-                  <div className="mt-3 rounded-xl border border-cyan-400/45 bg-cyan-950/35 px-3.5 py-2.5 text-xs text-cyan-100 flex flex-col gap-2 text-left">
-                    <div className="flex items-start gap-2">
-                      <User className="h-4 w-4 shrink-0 text-cyan-300 mt-0.5" />
-                      <span>
-                        {formatText(trans.modals.guestLoginToSave, {
-                          platform:
-                            platformTarget === "web" ? "Google" : "CrazyGames",
-                        })}
+      {/* ═══ CENTER NON-BLOCKING NOTIFICATIONS ═══ */}
+      <div className="flex-1 flex flex-col items-center justify-between py-3 px-3 pointer-events-none min-h-0">
+        <AnimatePresence>
+          {!isInMenu && rewardBanner && (
+            <motion.div
+              key={rewardBanner}
+              initial={{ opacity: 0, scale: 0.9, y: -12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -8 }}
+              className="flex max-w-[92vw] items-center gap-2 rounded-lg border border-[#FE9800]/60 bg-[#0B0E15]/92 px-4 py-1.5 text-center font-['Space_Grotesk'] text-xs sm:text-sm font-bold text-[#FFC080] shadow-[0_0_24px_rgba(254,152,0,0.28)] backdrop-blur-md"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-[#FE9800]" />
+              <span>{rewardBanner}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Thông báo chờ 3s khi vừa Thắng/Thua để xem nốt hiệu ứng 3D */}
+        <AnimatePresence>
+          {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && !delayedResultReady && (
+            <motion.div
+              key="result-delay-banner"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className={`my-auto flex items-center gap-2.5 rounded-xl border px-5 py-2.5 font-['Space_Grotesk'] text-sm sm:text-base font-bold shadow-2xl backdrop-blur-md ${
+                gameStatus === "VICTORY"
+                  ? "border-[#10B981]/65 bg-[#0A2A24]/92 text-[#6EE7B7]"
+                  : "border-[#FF2A6D]/65 bg-[#450A1A]/92 text-[#FFB4AB]"
+              }`}
+            >
+              <Trophy className="h-5 w-5 shrink-0" />
+              <span>
+                {gameStatus === "VICTORY"
+                  ? trans.hud.rageResultDelayVictory
+                  : trans.hud.rageResultDelayDefeat}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal Pause / Game Over / Victory (Game Over & Victory đợi 3s) */}
+        <AnimatePresence>
+          {(gameStatus === "PAUSED" ||
+            ((gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
+              delayedResultReady)) && (
+            <motion.div
+              key={gameStatus}
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              className="pointer-events-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-[#3B494B]/60 bg-[#191B23]/96 p-5 sm:p-6 text-center text-[#E1E2EC] shadow-[0_0_50px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+            >
+              {gameStatus === "PAUSED" && (
+                <>
+                  <h2 className="font-['Space_Grotesk'] text-xl font-bold uppercase tracking-wide text-[#DBFCFF]">
+                    {formatText(trans.modals.pausedTitle, { stage: stageDisplay })}
+                  </h2>
+                  <p className="mt-1 text-sm text-[#B9CACB]">{trans.modals.pausedDesc}</p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={togglePause}
+                      className="flex-1 gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
+                    >
+                      <Play className="h-4 w-4" />
+                      {trans.hud.resume}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRestart}
+                      className="gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      {trans.modals.restartShort}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBackToMenu}
+                      className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#B9CACB] hover:bg-[#272A32] hover:text-white"
+                    >
+                      <Trophy className="h-4 w-4 text-[#FE9800]" />
+                      {trans.modals.backToMenu}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && (
+                <>
+                  <div
+                    className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border ${
+                      gameStatus === "VICTORY"
+                        ? "bg-[#10B981]/15 border-[#10B981]/40 text-[#34D399]"
+                        : "bg-[#FF2A6D]/15 border-[#FF2A6D]/40 text-[#FFB4AB]"
+                    }`}
+                  >
+                    <Trophy className="h-6 w-6" />
+                  </div>
+                  <h2
+                    className={`font-['Space_Grotesk'] text-2xl font-bold uppercase tracking-tight ${
+                      gameStatus === "VICTORY" ? "text-[#34D399]" : "text-[#FFB4AB]"
+                    }`}
+                  >
+                    {gameStatus === "VICTORY"
+                      ? formatText(trans.modals.victoryTitle, { max: maxWaves })
+                      : trans.modals.gameOverTitle}
+                  </h2>
+                  <p className="mt-1 font-mono text-xs text-[#849495]">
+                    {playerName ? `${playerName} • ` : `${trans.modals.guestLabel} • `}
+                    {gameStatus === "VICTORY"
+                      ? trans.modals.victoryDesc
+                      : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
+                  </p>
+                  {!player && (
+                    <div className="mt-3 rounded-xl border border-[#00F0FF]/40 bg-[#0B0E15]/80 px-3.5 py-2.5 text-xs text-[#DBFCFF] flex flex-col gap-2 text-left">
+                      <div className="flex items-start gap-2">
+                        <User className="h-4 w-4 shrink-0 text-[#00F0FF] mt-0.5" />
+                        <span>
+                          {formatText(trans.modals.guestLoginToSave, {
+                            platform:
+                              platformTarget === "web" ? "Google" : "CrazyGames",
+                          })}
+                        </span>
+                      </div>
+                      {(platformTarget === "crazygames" ||
+                        platformCapabilities?.supportsLoginPrompt) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={authLoading}
+                          onClick={() => void loginWithPlatform()}
+                          className="w-full bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF] uppercase tracking-wider"
+                        >
+                          {authLoading
+                            ? trans.lobby.authenticating
+                            : platformTarget === "web"
+                              ? trans.lobby.loginGoogle
+                              : trans.lobby.loginCrazyGames}
+                        </Button>
+                      )}
+                      {authError && (
+                        <div className="rounded-md border border-[#FE9800]/45 bg-[#FE9800]/10 px-2.5 py-1.5 text-[11px] text-[#FFC080]">
+                          {authError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {player && scoreSyncError && (
+                    <div className="mt-3 rounded-lg border border-[#FF2A6D]/45 bg-[#93000A]/30 px-3 py-2 text-xs text-[#FFB4AB] text-left">
+                      {formatText(trans.modals.scoreSyncFailed, { err: scoreSyncError })}
+                    </div>
+                  )}
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-[#272A32] bg-[#0B0E15]/75 p-3 font-mono text-xs">
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">{trans.modals.score}</span>
+                      <span className="text-base font-extrabold text-[#FFC080] tabular-nums">{score}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">{trans.modals.highScore}</span>
+                      <span className="text-base font-extrabold text-[#7DF4FF] tabular-nums">{highScore}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">{trans.modals.goldEarned}</span>
+                      <span className="text-base font-extrabold text-[#FE9800] tabular-nums">
+                        +{lastGoldEarned}
                       </span>
                     </div>
-                    {(platformTarget === "crazygames" ||
-                      platformCapabilities?.supportsLoginPrompt) && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={authLoading}
-                        onClick={() => void loginWithPlatform()}
-                        className="w-full bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300 uppercase tracking-wider"
-                      >
-                        {authLoading
-                          ? trans.lobby.authenticating
-                          : platformTarget === "web"
-                            ? trans.lobby.loginGoogle
-                            : trans.lobby.loginCrazyGames}
-                      </Button>
-                    )}
-                    {authError && (
-                      <div className="rounded-md border border-amber-500/40 bg-amber-950/40 px-2.5 py-1.5 text-[11px] text-amber-200">
-                        {authError}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {player && scoreSyncError && (
-                  <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-xs text-rose-300 text-left">
-                    {formatText(trans.modals.scoreSyncFailed, { err: scoreSyncError })}
-                  </div>
-                )}
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
-                  <div>
-                    <span className="block text-slate-400">{trans.modals.score}</span>
-                    <span className="text-base font-black text-amber-300">{score}</span>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400">{trans.modals.highScore}</span>
-                    <span className="text-base font-black text-sky-300">{highScore}</span>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400">{trans.modals.goldEarned}</span>
-                    <span className="text-base font-black text-yellow-300">
-                      +{lastGoldEarned}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400">{trans.modals.totalKills}</span>
-                    <span className="text-base font-black text-emerald-300">{kills}</span>
-                  </div>
-                </div>
-                <div className="mt-5 flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleRestart}
-                    className="w-full gap-2 bg-blue-600 font-bold hover:bg-blue-500"
-                    size="lg"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    {trans.modals.restartFull}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBackToMenu}
-                    className="w-full gap-2 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
-                  >
-                    <Crown className="h-4 w-4 text-amber-400" />
-                    {trans.modals.backToMenu}
-                  </Button>
-                </div>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Thanh thông tin vũ khí & nút điều khiển bên dưới (chỉ hiện khi đã vào game) */}
-      {!isInMenu && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3">
-          {/* Thanh chọn 3 súng mang theo + Thông số súng hiện tại & Tiến độ Overdrive làn phải */}
-          <div className="pointer-events-auto flex w-full sm:w-auto flex-col gap-1.5 rounded-xl border border-slate-700/80 bg-slate-950/85 px-2.5 py-2 sm:px-3.5 text-[11px] sm:text-xs text-white shadow-lg backdrop-blur-md">
-            {/* 3 ô chọn súng kiểu Alien Shooter ([1][2][3] / Q / lăn chuột) */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, idx) => {
-                const slotId = combatLoadoutIds[idx];
-                const slotWeapon = slotId ? loadoutWeapons[idx] : null;
-                if (!slotWeapon) {
-                  return (
-                    <div
-                      key={`empty-${idx}`}
-                      title={trans.armory.combatNoteDesc}
-                      className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-700/70 bg-slate-900/45 px-2 py-1 text-[10px] font-semibold text-slate-500 opacity-60 select-none"
-                    >
-                      <kbd className="rounded bg-slate-800 px-1 text-[9px] font-black text-slate-400">
-                        {idx + 1}
-                      </kbd>
-                      <span className="max-w-[74px] truncate">{trans.worldMap.emptySlot}</span>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">{trans.modals.totalKills}</span>
+                      <span className="text-base font-extrabold text-[#34D399] tabular-nums">{kills}</span>
                     </div>
-                  );
-                }
+                  </div>
+                  <div className="mt-5 flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      onClick={handleRestart}
+                      className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
+                      size="lg"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      {trans.modals.restartFull}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBackToMenu}
+                      className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                    >
+                      <Crown className="h-4 w-4 text-[#FE9800]" />
+                      {trans.modals.backToMenu}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div />
+      </div>
 
-                const isActive = idx === activeLoadoutSlot;
-                const slotLv = saveData.weaponLevels[slotWeapon.id] ?? 1;
-                const slotArmorySpec = getArmoryWeaponById(slotWeapon.id);
-                return (
+      {/* ═══ BOTTOM COMBAT DECK & RAGE BAR (Stitch Cyber Lane Arcade) ═══ */}
+      {!isInMenu && (
+        <div className="pointer-events-auto w-full bg-[#191B23]/90 backdrop-blur-md border-t border-[#3B494B]/40 px-2.5 sm:px-5 py-2 sm:py-2.5 shadow-2xl">
+          <div className="flex flex-col lg:grid lg:grid-cols-[auto_minmax(260px,1fr)_auto] items-stretch lg:items-center justify-between gap-2 lg:gap-4 max-w-[1600px] mx-auto">
+            {/* BOTTOM-LEFT: 3-Slot Weapon Loadout + Stats + Real Active Buff Chips */}
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 bg-[#0B0E15]/90 p-1 rounded-xl border border-[#3B494B]/40">
+                {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, idx) => {
+                  const slotId = combatLoadoutIds[idx];
+                  const slotWeapon = slotId ? loadoutWeapons[idx] : null;
+                  if (!slotWeapon) {
+                    return (
+                      <div
+                        key={`empty-${idx}`}
+                        title={trans.armory.combatNoteDesc}
+                        className="flex flex-col justify-between rounded-lg border border-dashed border-[#272A32] bg-[#191B23]/55 px-2.5 py-1.5 text-[10px] font-mono text-[#586568] opacity-60 select-none min-w-[78px]"
+                      >
+                        <span className="text-[9px] font-bold">[{idx + 1}]</span>
+                        <span className="max-w-[72px] truncate uppercase">
+                          {trans.worldMap.emptySlot}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  const isActive = idx === activeLoadoutSlot;
+                  const slotLv = saveData.weaponLevels[slotWeapon.id] ?? 1;
+                  const slotArmorySpec = getArmoryWeaponById(slotWeapon.id);
+                  return (
+                    <button
+                      key={`${slotWeapon.id}-${idx}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.currentTarget.blur();
+                        switchCombatWeaponSlot(idx);
+                      }}
+                      className={`flex flex-col gap-0.5 rounded-lg border px-2 py-1 text-left transition-all cursor-pointer touch-none min-w-[88px] sm:min-w-[104px] ${
+                        isActive
+                          ? "border-[#00F0FF]/70 bg-[#00F0FF]/12 shadow-[0_0_16px_rgba(0,240,255,0.2)]"
+                          : "border-[#272A32] bg-[#1D1F27] opacity-75 hover:opacity-100 hover:border-[#3B494B]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5 w-full">
+                        <span
+                          className={`rounded px-1 py-0.5 font-mono text-[9px] font-extrabold leading-none ${
+                            isActive
+                              ? "bg-[#00F0FF] text-[#00363A]"
+                              : "bg-[#0B0E15] text-[#849495]"
+                          }`}
+                        >
+                          [{idx + 1}]
+                        </span>
+                        <img
+                          src={getWeaponImageUrl(slotArmorySpec)}
+                          alt={slotWeapon.name}
+                          className="h-3.5 w-5 rounded-sm object-cover border border-[#3B494B]/50 shrink-0"
+                        />
+                        <span
+                          className={`font-mono text-[9px] font-bold ${
+                            isActive ? "text-[#7DF4FF]" : "text-[#849495]"
+                          }`}
+                        >
+                          L{slotLv}
+                        </span>
+                      </div>
+                      <span
+                        className={`font-mono text-[10px] font-bold truncate max-w-[96px] ${
+                          isActive ? "text-[#DBFCFF]" : "text-[#B9CACB]"
+                        }`}
+                      >
+                        {slotWeapon.name}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {loadoutWeapons.length > 1 && (
                   <button
-                    key={`${slotWeapon.id}-${idx}`}
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       e.currentTarget.blur();
-                      switchCombatWeaponSlot(idx);
+                      cycleCombatWeapon();
                     }}
-                    className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer touch-none ${
-                      isActive
-                        ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.28)]"
-                        : "border-slate-700/80 bg-slate-900/80 text-slate-400 hover:border-slate-500 hover:text-white"
-                    }`}
+                    title={trans.hud.keySwitchWeapon}
+                    className="self-stretch flex flex-col items-center justify-center rounded-lg border border-[#272A32] bg-[#1D1F27] px-2 font-mono text-[9px] font-bold text-[#00F0FF] hover:border-[#00F0FF]/60 hover:bg-[#272A32] cursor-pointer touch-none"
                   >
-                    <kbd
-                      className={`rounded px-1 text-[9px] font-black ${
-                        isActive
-                          ? "bg-cyan-400 text-slate-950"
-                          : "bg-slate-800 text-slate-300"
-                      }`}
-                    >
-                      {idx + 1}
-                    </kbd>
-                    <img
-                      src={getWeaponImageUrl(slotArmorySpec)}
-                      alt={slotWeapon.name}
-                      className="h-4 w-6 rounded-sm object-cover border border-slate-700/70 shrink-0"
-                    />
-                    <span className="max-w-[82px] truncate">{slotWeapon.name}</span>
-                    <span className="text-[9px] opacity-75">L{slotLv}</span>
+                    <span>[Q]</span>
+                    <span className="text-xs leading-none">↻</span>
                   </button>
-                );
-              })}
+                )}
+              </div>
 
-              {loadoutWeapons.length > 1 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.currentTarget.blur();
-                    cycleCombatWeapon();
-                  }}
-                  title={trans.hud.keySwitchWeapon}
-                  className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/85 px-2 py-1 text-[10px] font-black text-cyan-300 hover:border-cyan-400 hover:text-white cursor-pointer touch-none"
-                >
-                  <kbd className="text-[9px]">Q</kbd>
-                  <span>↻</span>
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2.5 sm:gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 font-bold text-sky-300">
-                  <Zap className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{weapon.name}</span>
+              {/* Active Weapon Stats + Right-Lane Gates + Dynamic Buff Chips */}
+              <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+                  <span className="flex items-center gap-1 text-[#7DF4FF] font-bold">
+                    <Zap className="h-3 w-3 text-[#00F0FF]" />
+                    {trans.hud.damage} <strong className="text-[#FFC080]">{effectiveDamage}</strong>
+                    <span className="text-[#3B494B]">•</span>
+                    {trans.hud.fireRate}{" "}
+                    <strong className="text-[#10B981]">
+                      {effectiveRate}
+                      {trans.hud.perSec}
+                    </strong>
+                  </span>
                   {weapon.splashRadius > 0 && (
-                    <span className="shrink-0 rounded bg-rose-500/30 px-1.5 py-0.5 text-[10px] text-rose-200">
+                    <span className="rounded bg-[#FF2A6D]/25 border border-[#FF2A6D]/45 px-1.5 py-0.5 text-[9px] font-bold text-[#FFB4AB]">
                       {trans.hud.splash}
                     </span>
                   )}
                   {overdriveLevel > 0 && (
-                    <span className="shrink-0 rounded bg-purple-500/30 px-1.5 py-0.5 text-[10px] text-purple-200">
+                    <span className="rounded bg-[#A855F7]/20 border border-[#A855F7]/45 px-1.5 py-0.5 text-[9px] font-bold text-[#E9D5FF]">
                       Lv.+{overdriveLevel}
                     </span>
                   )}
+                  <span className="rounded bg-[#0B0E15] border border-[#3B494B]/45 px-1.5 py-0.5 text-[9px] font-bold text-[#7DF4FF]">
+                    {trans.hud.overdriveBuffShort}{" "}
+                    {formatText(trans.hud.gatesRemaining, {
+                      left: remainingGatesCount,
+                      max: rightLaneGates.length,
+                    })}
+                  </span>
                 </div>
-                <div className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
-                  {trans.hud.damage}{" "}
-                  <strong className="text-amber-300">{effectiveDamage}</strong> •{" "}
-                  {trans.hud.fireRate}{" "}
-                  <strong className="text-emerald-300">{effectiveRate}</strong>
-                  {trans.hud.perSec}
-                  {rageActive && (
-                    <span className="ml-1.5 font-bold text-amber-300">
-                      • {ragingSkillName}
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              <div className="shrink-0 border-l border-slate-700 pl-2.5 sm:pl-3 text-right sm:text-left">
-                <div className="text-[10px] sm:text-[11px] text-slate-400">
-                  <span className="hidden sm:inline">{trans.hud.overdriveBuffLabel}</span>
-                  <span className="sm:hidden">{trans.hud.overdriveBuffShort}</span>
-                </div>
-                <div className="font-black text-cyan-300">
-                  {formatText(trans.hud.gatesRemaining, {
-                    left: remainingGatesCount,
-                    max: rightLaneGates.length,
-                  })}
-                </div>
+                {activeBuffChips.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {activeBuffChips.map((chip) => (
+                      <span
+                        key={chip.label}
+                        className="rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide"
+                        style={{
+                          color: chip.color,
+                          borderColor: `${chip.color}55`,
+                          backgroundColor: `${chip.color}18`,
+                        }}
+                      >
+                        {chip.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {activeBuffChips.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                {activeBuffChips.map((chip) => (
-                  <span
-                    key={chip.label}
-                    className="rounded border px-1.5 py-0.5 text-[9px] font-black tracking-wide"
-                    style={{
-                      color: chip.color,
-                      borderColor: `${chip.color}55`,
-                      backgroundColor: `${chip.color}18`,
-                    }}
-                  >
-                    {chip.label}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Nút bấm cảm ứng / chuột trái-phải + Kích hoạt Nộ chủ động + Hướng dẫn phím */}
-          {/* Mobile: [◀ Trái] — [Nộ ở giữa] — [▶ Phải]; Desktop: [Nộ] [Hướng dẫn] [◀][▶] */}
-          <div className="pointer-events-auto flex w-full sm:w-auto items-center justify-between gap-2">
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label={trans.hud.moveLeft}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                gameInput.left = true;
-              }}
-              onPointerUp={() => {
-                gameInput.left = false;
-              }}
-              onPointerLeave={() => {
-                gameInput.left = false;
-              }}
-              onPointerCancel={() => {
-                gameInput.left = false;
-              }}
-              className="order-1 sm:order-3 h-14 w-20 sm:h-10 sm:w-10 shrink-0 rounded-xl sm:rounded-md border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
-            >
-              <ChevronLeft className="h-8 w-8 sm:h-5 sm:w-5" />
-            </Button>
-
-            <div className="order-2 sm:order-1 flex flex-1 sm:flex-none items-center gap-1.5 min-w-0">
-              {gameStatus === "PLAYING" && (
-                <Button
+            {/* BOTTOM-CENTER + RIGHT WRAPPED CLEANLY FOR BOTH MOBILE & DESKTOP */}
+            <div className="contents lg:flex lg:flex-1 lg:items-center lg:gap-4">
+              {/* Mobile thumb row combines [◀] + [RAGE] + [▶]; Desktop splits Center Rage & Right Move */}
+              <div className="flex items-center gap-2 lg:contents">
+                {/* Mobile Left Move */}
+                <button
                   type="button"
-                  size="sm"
-                  disabled={!rageReady}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.currentTarget.blur();
-                    activateRage();
-                  }}
-                  className={`h-14 sm:h-10 flex-1 sm:flex-none gap-1.5 px-3 text-xs sm:text-xs font-black rounded-xl sm:rounded-md transition-all touch-none select-none ${
-                    rageActive || icbmAiming || icbmPending !== null
-                      ? "border border-amber-400 bg-amber-950/90 text-amber-300 opacity-100"
-                      : rageReady
-                        ? "animate-pulse bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-orange-500"
-                        : "border border-slate-700 bg-slate-950/80 text-slate-400"
-                  }`}
-                >
-                  <Flame className="h-4 w-4 shrink-0" />
-                  <span className="truncate">
-                    {icbmAiming
-                      ? trans.hud.rageAimingShort
-                      : icbmPending
-                        ? trans.hud.rageMissileFlying
-                        : rageActive
-                          ? formatText(trans.hud.rageSkillActive, {
-                              skill: ragingSkillName,
-                              time: rageTimeLeft.toFixed(1),
-                            })
-                          : rageReady
-                            ? weapon.id === "icbm"
-                              ? trans.hud.rageButtonCenterIcbm
-                              : formatText(trans.hud.rageSkillButton, {
-                                  skill: readySkillName,
-                                })
-                            : formatText(trans.hud.ragePercent, { pct: ragePercent })}
-                  </span>
-                </Button>
-              )}
-
-              {!autoFire && gameStatus === "PLAYING" && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
+                  aria-label={trans.hud.moveLeft}
                   onPointerDown={(e) => {
                     e.preventDefault();
-                    gameInput.fire = true;
+                    gameInput.left = true;
                   }}
                   onPointerUp={() => {
-                    gameInput.fire = false;
+                    gameInput.left = false;
                   }}
                   onPointerLeave={() => {
-                    gameInput.fire = false;
+                    gameInput.left = false;
                   }}
                   onPointerCancel={() => {
-                    gameInput.fire = false;
+                    gameInput.left = false;
                   }}
-                  className="h-14 sm:h-10 px-3 rounded-xl sm:rounded-md border-rose-500/70 bg-rose-950/85 text-xs font-black text-rose-200 hover:bg-rose-900 active:scale-95 touch-none select-none"
+                  className="lg:hidden h-12 w-16 shrink-0 rounded-xl bg-[#00F0FF] text-[#00363A] font-mono font-black flex items-center justify-center active:scale-95 touch-none select-none shadow-[0_0_16px_rgba(0,240,255,0.28)]"
                 >
-                  {trans.hud.fireBtn}
-                </Button>
-              )}
+                  <ChevronLeft className="h-7 w-7 stroke-[2.75]" />
+                </button>
+
+                {/* Glowing Rage Ultimate Meter / Button ([R]) */}
+                <div className="flex-1 flex flex-col items-center min-w-0 max-w-xl mx-auto w-full">
+                  <div className="flex items-center justify-between w-full mb-1 px-0.5">
+                    <div className="flex items-center gap-1.5 font-['Space_Grotesk'] text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#FFC080] truncate">
+                      <Flame
+                        className={`h-3.5 w-3.5 shrink-0 ${
+                          rageReady ? "text-[#FE9800] animate-bounce" : "text-[#849495]"
+                        }`}
+                      />
+                      <span className="truncate">
+                        [R] {rageActive ? ragingSkillName : readySkillName}
+                      </span>
+                    </div>
+                    <span
+                      className={`font-mono text-[11px] sm:text-xs font-extrabold tabular-nums ${
+                        rageReady || rageActive ? "text-[#FFC080]" : "text-[#7DF4FF]"
+                      }`}
+                    >
+                      {rageActive
+                        ? `${rageTimeLeft.toFixed(1)}s`
+                        : rageReady
+                          ? "100% READY"
+                          : `${ragePercent}%`}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!rageReady || gameStatus !== "PLAYING"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.currentTarget.blur();
+                      activateRage();
+                    }}
+                    className={`relative w-full h-10 sm:h-10 rounded-xl overflow-hidden border flex items-center justify-center transition-all touch-none select-none ${
+                      rageActive || icbmAiming || icbmPending !== null
+                        ? "border-[#FE9800] bg-[#2C1600]/80 text-[#FFC080] shadow-[0_0_20px_rgba(254,152,0,0.35)]"
+                        : rageReady && gameStatus === "PLAYING"
+                          ? "border-[#FFC080]/80 bg-[#0B0E15] text-[#002022] shadow-[0_0_26px_rgba(254,152,0,0.45)] cursor-pointer active:scale-[0.99] animate-pulse"
+                          : "border-[#3B494B]/50 bg-[#0B0E15] text-[#B9CACB] cursor-default"
+                    }`}
+                  >
+                    {/* Progress Fill */}
+                    <div
+                      className={`absolute inset-y-0 left-0 transition-all duration-150 ${
+                        rageReady
+                          ? "w-full bg-gradient-to-r from-[#FE9800] via-[#FFC080] to-[#00F0FF]"
+                          : rageActive
+                            ? "w-full bg-gradient-to-r from-[#FE9800]/35 to-[#FF2A6D]/35"
+                            : "bg-gradient-to-r from-[#006970] to-[#00F0FF]/80"
+                      }`}
+                      style={
+                        rageReady || rageActive
+                          ? undefined
+                          : { width: `${ragePercent}%` }
+                      }
+                    />
+                    <div className="relative z-10 flex items-center gap-2 px-3 min-w-0">
+                      {rageReady && (
+                        <kbd className="rounded bg-[#0B0E15]/85 text-[#FFC080] px-1.5 py-0.5 font-mono text-[10px] font-black tracking-wider shrink-0">
+                          [R]
+                        </kbd>
+                      )}
+                      <span
+                        className={`font-mono text-[11px] sm:text-xs font-extrabold uppercase tracking-wider truncate ${
+                          rageReady && gameStatus === "PLAYING"
+                            ? "text-[#002022]"
+                            : "text-[#E1E2EC]"
+                        }`}
+                      >
+                        {rageStatusText}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Compact Keybind Strip (Desktop only) */}
+                  <div className="hidden lg:flex items-center justify-center gap-3 mt-1 font-mono text-[10px] text-[#849495]">
+                    <span>
+                      <strong className="text-[#DBFCFF]">A / D</strong> {trans.hud.keyMove}
+                    </span>
+                    <span className="text-[#3B494B]">•</span>
+                    <span>
+                      <strong className="text-[#00F0FF]">1-3 / Q</strong> {trans.hud.keySwitchWeapon}
+                    </span>
+                    <span className="text-[#3B494B]">•</span>
+                    <span>
+                      <strong className="text-[#FFC080]">R</strong> {trans.hud.keyRage}
+                    </span>
+                    <span className="text-[#3B494B]">•</span>
+                    <span>
+                      <strong className="text-[#DBFCFF]">V</strong> {trans.hud.keyCamera}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mobile Manual Fire */}
+                {!autoFire && gameStatus === "PLAYING" && (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      gameInput.fire = true;
+                    }}
+                    onPointerUp={() => {
+                      gameInput.fire = false;
+                    }}
+                    onPointerLeave={() => {
+                      gameInput.fire = false;
+                    }}
+                    onPointerCancel={() => {
+                      gameInput.fire = false;
+                    }}
+                    className="lg:hidden h-12 px-3 shrink-0 rounded-xl border border-[#FF2A6D]/70 bg-[#93000A]/80 font-mono text-[11px] font-black text-[#FFDAD6] active:scale-95 touch-none select-none"
+                  >
+                    {trans.hud.fireBtn}
+                  </button>
+                )}
+
+                {/* Mobile Right Move */}
+                <button
+                  type="button"
+                  aria-label={trans.hud.moveRight}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    gameInput.right = true;
+                  }}
+                  onPointerUp={() => {
+                    gameInput.right = false;
+                  }}
+                  onPointerLeave={() => {
+                    gameInput.right = false;
+                  }}
+                  onPointerCancel={() => {
+                    gameInput.right = false;
+                  }}
+                  className="lg:hidden h-12 w-16 shrink-0 rounded-xl bg-[#1D1F27] border border-[#3B494B]/60 text-[#DBFCFF] font-mono font-black flex items-center justify-center active:scale-95 touch-none select-none"
+                >
+                  <ChevronRight className="h-7 w-7 stroke-[2.75]" />
+                </button>
+              </div>
+
+              {/* Desktop Bottom-Right Movement Dock (Stitch style) */}
+              <div className="hidden lg:flex items-center gap-1.5 bg-[#0B0E15]/90 p-1 rounded-xl border border-[#3B494B]/40 shrink-0">
+                <button
+                  type="button"
+                  aria-label={trans.hud.moveLeft}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    gameInput.left = true;
+                  }}
+                  onPointerUp={() => {
+                    gameInput.left = false;
+                  }}
+                  onPointerLeave={() => {
+                    gameInput.left = false;
+                  }}
+                  onPointerCancel={() => {
+                    gameInput.left = false;
+                  }}
+                  className="flex flex-col items-center justify-center px-3 py-1.5 rounded-lg bg-[#00F0FF] text-[#00363A] font-mono cursor-pointer active:scale-95 select-none shadow-[0_0_12px_rgba(0,240,255,0.3)] min-w-[78px]"
+                >
+                  <span className="text-[11px] font-extrabold leading-none">[A] / [←]</span>
+                  <span className="text-[9px] font-bold uppercase tracking-tight mt-0.5">
+                    {trans.hud.moveLeft}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-label={trans.hud.moveRight}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    gameInput.right = true;
+                  }}
+                  onPointerUp={() => {
+                    gameInput.right = false;
+                  }}
+                  onPointerLeave={() => {
+                    gameInput.right = false;
+                  }}
+                  onPointerCancel={() => {
+                    gameInput.right = false;
+                  }}
+                  className="flex flex-col items-center justify-center px-3 py-1.5 rounded-lg bg-[#1D1F27] border border-[#3B494B]/45 text-[#B9CACB] hover:bg-[#272A32] hover:text-[#DBFCFF] font-mono cursor-pointer active:scale-95 select-none min-w-[78px]"
+                >
+                  <span className="text-[11px] font-extrabold leading-none">[D] / [→]</span>
+                  <span className="text-[9px] font-bold uppercase tracking-tight mt-0.5">
+                    {trans.hud.moveRight}
+                  </span>
+                </button>
+
+                {!autoFire && gameStatus === "PLAYING" && (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      gameInput.fire = true;
+                    }}
+                    onPointerUp={() => {
+                      gameInput.fire = false;
+                    }}
+                    onPointerLeave={() => {
+                      gameInput.fire = false;
+                    }}
+                    onPointerCancel={() => {
+                      gameInput.fire = false;
+                    }}
+                    className="self-stretch px-3 rounded-lg border border-[#FF2A6D]/60 bg-[#93000A]/65 font-mono text-[11px] font-extrabold uppercase text-[#FFDAD6] hover:bg-[#93000A] active:scale-95 cursor-pointer select-none"
+                  >
+                    {trans.hud.fireBtn}
+                  </button>
+                )}
+              </div>
             </div>
-
-            <span className="hidden lg:inline-block lg:order-2 rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
-              <strong className="text-white">A / D</strong> {trans.hud.keyOr}{" "}
-              <strong className="text-white">← / →</strong> {trans.hud.keyMove} •{" "}
-              <strong className="text-cyan-300">1-3 / Q / Scroll</strong>{" "}
-              {trans.hud.keySwitchWeapon} •{" "}
-              <strong className="text-amber-300">R</strong> {trans.hud.keyRage} •{" "}
-              <strong className="text-white">V</strong> {trans.hud.keyCamera} •{" "}
-              {cameraMode === "FREE_ORBIT"
-                ? trans.hud.keyOrbitActive
-                : trans.hud.keyOrbitHint}
-            </span>
-
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label={trans.hud.moveRight}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                gameInput.right = true;
-              }}
-              onPointerUp={() => {
-                gameInput.right = false;
-              }}
-              onPointerLeave={() => {
-                gameInput.right = false;
-              }}
-              onPointerCancel={() => {
-                gameInput.right = false;
-              }}
-              className="order-3 sm:order-4 h-14 w-20 sm:h-10 sm:w-10 shrink-0 rounded-xl sm:rounded-md border-slate-700 bg-slate-950/85 text-white hover:bg-slate-800 hover:text-white active:scale-95 touch-none select-none"
-            >
-              <ChevronRight className="h-8 w-8 sm:h-5 sm:w-5" />
-            </Button>
           </div>
         </div>
       )}
 
-      {/* Modal chờ nạp tài nguyên game: hiện khi bấm Chơi ngay nhưng tải ngầm chưa hoàn thành 100% */}
+      {/* Modal chờ nạp tài nguyên game */}
       <AnimatePresence>
         {assetsWaitingToStart && !assetsReady && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md"
+            className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#070B14]/88 p-4 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-900/95 p-6 text-center text-white shadow-2xl"
+              className="flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-[#3B494B]/60 bg-[#191B23]/96 p-6 text-center text-[#E1E2EC] shadow-2xl"
             >
               <div className="relative mb-4 flex items-center justify-center">
-                <div className="absolute h-16 w-16 rounded-full border-4 border-sky-500/20" />
-                <Loader2 className="h-10 w-10 animate-spin text-sky-400" />
+                <div className="absolute h-16 w-16 rounded-full border-4 border-[#00F0FF]/20" />
+                <Loader2 className="h-10 w-10 animate-spin text-[#00F0FF]" />
               </div>
 
-              <h3 className="text-lg font-black tracking-wide text-sky-300">
+              <h3 className="font-['Space_Grotesk'] text-lg font-bold tracking-wide text-[#DBFCFF] uppercase">
                 {trans.menu.loadingAssetsTitle}
               </h3>
 
-              <div className="mt-3 flex items-baseline justify-center gap-1.5">
-                <span className="text-3xl font-black text-amber-300">
+              <div className="mt-3 flex items-baseline justify-center gap-1.5 font-mono">
+                <span className="text-3xl font-extrabold text-[#FFC080] tabular-nums">
                   {assetsPercent}%
                 </span>
-                <span className="text-xs font-semibold text-slate-400">
+                <span className="text-xs font-semibold text-[#849495]">
                   ({assetsLoadedCount}/{assetsTotal} {trans.menu.filesUnit})
                 </span>
               </div>
 
-              <div className="mt-3.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#0B0E15]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 via-sky-400 to-amber-400 transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-[#006970] via-[#00F0FF] to-[#FE9800] transition-all duration-300"
                   style={{ width: `${assetsPercent}%` }}
                 />
               </div>
 
-              <p className="mt-3 text-xs leading-relaxed text-slate-400">
+              <p className="mt-3 text-xs leading-relaxed text-[#B9CACB]">
                 {trans.menu.loadingAssetsHint}
               </p>
 
               {assetsError && (
-                <div className="mt-4 w-full rounded-lg border border-rose-500/40 bg-rose-950/40 p-3 text-xs text-rose-300">
+                <div className="mt-4 w-full rounded-lg border border-[#FF2A6D]/45 bg-[#93000A]/30 p-3 text-xs text-[#FFB4AB]">
                   <p className="font-semibold">{assetsError}</p>
                   <div className="mt-2.5 flex flex-wrap justify-center gap-2">
                     <Button
@@ -1157,7 +1283,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                       size="sm"
                       variant="outline"
                       onClick={() => startBackgroundPreload()}
-                      className="border-slate-700 bg-slate-800 text-xs text-white hover:bg-slate-700"
+                      className="border-[#3B494B] bg-[#1D1F27] text-xs text-[#E1E2EC] hover:bg-[#272A32]"
                     >
                       <RotateCcw className="mr-1 h-3.5 w-3.5" />
                       {trans.menu.loadingAssetsRetry}
@@ -1172,7 +1298,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setAssetsWaitingToStart(false)}
-                  className="text-xs text-slate-400 hover:text-white"
+                  className="text-xs text-[#849495] hover:text-[#E1E2EC]"
                 >
                   {trans.menu.cancel}
                 </Button>

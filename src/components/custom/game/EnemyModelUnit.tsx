@@ -21,7 +21,14 @@ import { useGameStore } from "@/state-manager/game-store";
 
 installModelBrowserCache();
 
-export type EnemyModelMode = "IDLE" | "WALK" | "RUN" | "ATTACK" | "ARMOR_BREAK" | "DEATH";
+export type EnemyModelMode =
+  | "IDLE"
+  | "SPAWN"
+  | "WALK"
+  | "RUN"
+  | "ATTACK"
+  | "ARMOR_BREAK"
+  | "DEATH";
 
 export interface EnemyModelUnitHandle {
   setMode: (mode: EnemyModelMode, duration?: number) => void;
@@ -72,7 +79,7 @@ export const ENEMY_MODEL_CONFIG: Record<EnemyVisualKind, EnemyModelSpec> = {
     targetHeight: 1.2,
   },
   BOSS_STAGE2: {
-    walkFile: "bosses/stage2/nano-hydra-base-v3.glb",
+    walkFile: "bosses/stage2/nano-hydra-base-v4.glb",
     rotationY: 0,
     targetHeight: 1.25,
   },
@@ -217,6 +224,8 @@ function NormalizedDualRig({
   const modeRef = useRef<EnemyModelMode>("IDLE");
   const deathElapsedRef = useRef(0);
   const deathDurationRef = useRef(1.2);
+  const spawnElapsedRef = useRef(0);
+  const spawnDurationRef = useRef(1.5);
   const armorBreakElapsedRef = useRef(0);
   const armorBreakDurationRef = useRef(1.1);
 
@@ -235,8 +244,11 @@ function NormalizedDualRig({
 
   const animBundle = useMemo(() => {
     const walkMixer = new THREE.AnimationMixer(walkData.clonedScene);
-    const walkClip = pickAnimationClip(walkAnimations, /walk|fly|move|march|idle|spawn|intro/i, true);
+    const walkClip = pickAnimationClip(walkAnimations, /walk|fly|move|march|idle/i, true);
     const walkAction = walkClip ? walkMixer.clipAction(walkClip) : null;
+
+    const spawnClip = pickAnimationClip(walkAnimations, /spawn|intro/i, false);
+    const spawnAction = spawnClip && spawnClip !== walkClip ? walkMixer.clipAction(spawnClip) : null;
 
     const runClip = pickAnimationClip(walkAnimations, /run|sprint/i, false);
     const runAction = runClip ? walkMixer.clipAction(runClip) : null;
@@ -266,6 +278,7 @@ function NormalizedDualRig({
     return {
       walkMixer,
       walkAction,
+      spawnAction,
       runAction,
       attackAction,
       armorBreakAction,
@@ -291,6 +304,8 @@ function NormalizedDualRig({
       modeRef.current = mode;
       deathElapsedRef.current = 0;
       deathDurationRef.current = Math.max(0.25, duration);
+      spawnElapsedRef.current = 0;
+      spawnDurationRef.current = Math.max(0.35, duration);
       armorBreakElapsedRef.current = 0;
       armorBreakDurationRef.current = Math.max(0.35, duration);
 
@@ -308,6 +323,7 @@ function NormalizedDualRig({
       if (mode === "IDLE") {
         if (walkHolder) walkHolder.visible = false;
         if (deathHolder) deathHolder.visible = false;
+        animBundle.spawnAction?.stop();
         animBundle.walkAction?.stop();
         animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
@@ -316,9 +332,32 @@ function NormalizedDualRig({
         return;
       }
 
-      if (mode === "WALK") {
+      if (mode === "SPAWN") {
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
+        animBundle.walkAction?.stop();
+        animBundle.runAction?.stop();
+        animBundle.attackAction?.stop();
+        animBundle.armorBreakAction?.stop();
+        animBundle.deathAction?.stop();
+        if (animBundle.spawnAction) {
+          const clipDur = animBundle.spawnAction.getClip().duration || 1.5;
+          spawnDurationRef.current = clipDur;
+          animBundle.spawnAction.reset();
+          animBundle.spawnAction.setLoop(THREE.LoopOnce, 1);
+          animBundle.spawnAction.clampWhenFinished = true;
+          animBundle.spawnAction.timeScale = 1;
+          animBundle.spawnAction.play();
+          animBundle.walkMixer.update(0);
+          return;
+        }
+        modeRef.current = "WALK";
+      }
+
+      if (modeRef.current === "WALK") {
+        if (walkHolder) walkHolder.visible = true;
+        if (deathHolder) deathHolder.visible = false;
+        animBundle.spawnAction?.stop();
         animBundle.deathAction?.stop();
         animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
@@ -338,6 +377,7 @@ function NormalizedDualRig({
       if (mode === "RUN") {
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
+        animBundle.spawnAction?.stop();
         animBundle.deathAction?.stop();
         animBundle.attackAction?.stop();
         animBundle.armorBreakAction?.stop();
@@ -358,6 +398,7 @@ function NormalizedDualRig({
       if (mode === "ATTACK") {
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
+        animBundle.spawnAction?.stop();
         animBundle.walkAction?.stop();
         animBundle.runAction?.stop();
         animBundle.armorBreakAction?.stop();
@@ -377,6 +418,7 @@ function NormalizedDualRig({
       if (mode === "ARMOR_BREAK") {
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
+        animBundle.spawnAction?.stop();
         animBundle.walkAction?.stop();
         animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
@@ -397,6 +439,7 @@ function NormalizedDualRig({
       // mode === "DEATH"
       if (walkHolder) walkHolder.visible = !hasSeparateDeath;
       if (deathHolder) deathHolder.visible = hasSeparateDeath;
+      animBundle.spawnAction?.stop();
       animBundle.walkAction?.stop();
       animBundle.runAction?.stop();
       animBundle.attackAction?.stop();
@@ -430,6 +473,17 @@ function NormalizedDualRig({
     if (useGameStore.getState().gameStatus === "PAUSED") return;
 
     const delta = Math.min(rawDelta, 0.05);
+
+    if (modeRef.current === "SPAWN") {
+      spawnElapsedRef.current += delta;
+      if (animBundle.spawnAction) {
+        animBundle.walkMixer.update(delta);
+      }
+      if (spawnElapsedRef.current >= spawnDurationRef.current) {
+        applyHandlerRef.current?.("WALK");
+      }
+      return;
+    }
 
     if (modeRef.current === "WALK") {
       if (animBundle.walkAction) {

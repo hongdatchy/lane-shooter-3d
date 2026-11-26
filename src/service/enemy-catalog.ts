@@ -449,7 +449,7 @@ export const BOSS_CATALOG: BossSpec[] = [
     hp: 1200,
     scale: 5.0,
     speed: 1.35,
-    modelFile: "bosses/stage2/nano-hydra-base-v3.glb",
+    modelFile: "bosses/stage2/nano-hydra-base-v4.glb",
     goldReward: 400,
     scoreReward: 900,
     appearanceVi: "3 đầu rắn robot nối thân kim loại linh hoạt.",

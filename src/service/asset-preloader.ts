@@ -12,7 +12,7 @@ export const PRELOAD_MODEL_FILES = [
   "models/enemies/dasher.glb",
   "models/enemies/bloater.glb",
   "models/bosses/stage1/iron-warden-mechanical.glb",
-  "models/bosses/stage2/nano-hydra-base-v3.glb",
+  "models/bosses/stage2/nano-hydra-base-v4.glb",
   "models/bosses/stage3/chien-binh-thoi-gian-v2.glb",
   "models/linh-cyber-v3.glb",
 ];
