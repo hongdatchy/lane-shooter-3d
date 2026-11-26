@@ -128,6 +128,9 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     typeof candidate.unlockedChapter === "number" && Number.isFinite(candidate.unlockedChapter)
       ? Math.max(1, candidate.unlockedChapter)
       : defaults.unlockedChapter;
+  const hadAkBefore =
+    Array.isArray(candidate.unlockedWeaponIds) &&
+    candidate.unlockedWeaponIds.includes("ak47");
   const unlockedWeaponIds = normalizeUnlockedWeaponIds(
     candidate.unlockedWeaponIds,
     unlockedChapter
@@ -141,6 +144,15 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     rawEquipped,
     unlockedWeaponIds
   );
+  // Nâng cấp từ bản save cũ (chỉ có 1 súng mặc định): tự lắp thêm Súng 2 (AK Hyperion) vào ô 2
+  if (
+    !hadAkBefore &&
+    unlockedWeaponIds.includes("ak47") &&
+    equippedLoadoutIds.length === 1 &&
+    !equippedLoadoutIds.includes("ak47")
+  ) {
+    equippedLoadoutIds.push("ak47");
+  }
 
   return {
     version: 1,

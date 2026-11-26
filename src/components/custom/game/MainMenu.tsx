@@ -1,9 +1,13 @@
 "use client";
 
+import { useCallback, useEffect } from "react";
+import { GitFork, Lock, Radar, Rocket } from "lucide-react";
 import { useGameStore } from "@/state-manager/game-store";
 import { LeaderboardEntryDTO } from "@/dto/GameDTO";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import { MAX_LOADOUT_SLOTS, getArmoryWeaponById } from "@/service/armory-catalog";
+import { CHAPTER_CATALOG } from "@/service/chapter-catalog";
+import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -133,10 +137,11 @@ export function MainMenu() {
   const leaderboardError = useGameStore((s) => s.leaderboardError);
   const scoreSyncError = useGameStore((s) => s.scoreSyncError);
 
-  const adLoading = useGameStore((s) => s.adLoading);
-  const adError = useGameStore((s) => s.adError);
-  const rewardedAdClaimed = useGameStore((s) => s.rewardedAdClaimed);
-  const claimRewardedAdPerk = useGameStore((s) => s.claimRewardedAdPerk);
+  // Tạm ẩn phần Rewarded Ad theo yêu cầu
+  // const adLoading = useGameStore((s) => s.adLoading);
+  // const adError = useGameStore((s) => s.adError);
+  // const rewardedAdClaimed = useGameStore((s) => s.rewardedAdClaimed);
+  // const claimRewardedAdPerk = useGameStore((s) => s.claimRewardedAdPerk);
 
   const trans = useTransClientSide();
 
@@ -150,24 +155,72 @@ export function MainMenu() {
     1,
     saveData.weaponLevels[equippedWeapon.id] ?? 1
   );
+  const targetLobbyChapter = Math.min(
+    MAX_PLAYABLE_CHAPTER,
+    Math.max(1, saveData.unlockedChapter)
+  );
+  const displayChapter =
+    CHAPTER_CATALOG.find((c) => c.id === targetLobbyChapter) ?? CHAPTER_CATALOG[0];
 
   const canOpenMap = platformReady && !platformError;
   const loginButtonLabel =
     platformTarget === "web" ? trans.lobby.loginGoogle : trans.lobby.loginCrazyGames;
 
-  function handleDeploy() {
+  const handleDeploy = useCallback(() => {
     if (!canOpenMap) return;
     openWorldMap();
-  }
+  }, [canOpenMap, openWorldMap]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || e.code !== "Space") return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "BUTTON" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      handleDeploy();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleDeploy]);
 
   return (
     <div className="w-full flex-1 flex flex-col overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none">
       {/* Platform / Save Fatal Error Bar (Zero Fallback) */}
-      {(platformError || saveError || scoreSyncError) && (
+      {(platformError || (player && (saveError || scoreSyncError))) && (
         <div className="px-3 py-2 rounded-lg bg-[#93000A]/35 border border-[#FFB4AB]/40 font-mono text-[11px] text-[#FFB4AB] shrink-0">
           {platformError && <div>⚠ PLATFORM ERROR: {platformError}</div>}
-          {saveError && <div>⚠ SAVE DATA ERROR: {saveError}</div>}
-          {scoreSyncError && <div>⚠ LEADERBOARD SUBMIT ERROR: {scoreSyncError}</div>}
+          {player && saveError && <div>⚠ SAVE DATA ERROR: {saveError}</div>}
+          {player && scoreSyncError && (
+            <div>⚠ LEADERBOARD SUBMIT ERROR: {scoreSyncError}</div>
+          )}
+        </div>
+      )}
+      {!player && !platformError && (saveError || scoreSyncError) && (
+        <div className="px-3 py-2 rounded-lg bg-[#00F0FF]/10 border border-[#00F0FF]/45 font-mono text-[11px] text-[#E1FBFF] flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <span>
+            {formatText(trans.modals.guestLoginToSave, {
+              platform: platformTarget === "web" ? "Google" : "CrazyGames",
+            })}
+          </span>
+          {(platformTarget === "crazygames" ||
+            platformCapabilities?.supportsLoginPrompt) && (
+            <button
+              type="button"
+              disabled={authLoading}
+              onClick={() => void loginWithPlatform()}
+              className="px-2.5 py-1 rounded bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-[10px] font-bold uppercase cursor-pointer disabled:opacity-50"
+            >
+              {authLoading ? trans.lobby.authenticating : loginButtonLabel}
+            </button>
+          )}
         </div>
       )}
 
@@ -326,150 +379,182 @@ export function MainMenu() {
           )}
         </div>
 
-        {/* ══ COL 2: MISSION TERMINAL ══ */}
-        <div className="col-span-12 lg:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32]">
-          {/* Sector info */}
-          <div className="flex items-center justify-between pb-2 shrink-0">
-            <div className="flex flex-col">
+        {/* ══ COL 2: MISSION TERMINAL & 2 MODES ══ */}
+        <div className="col-span-12 lg:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32] gap-2.5">
+          {/* Sector info bar */}
+          <div className="flex items-center justify-between pb-1 shrink-0 gap-2">
+            <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[#00F0FF] text-lg">📍</span>
-                <span className="font-['Space_Grotesk'] text-xl md:text-2xl font-bold text-[#00F0FF] tracking-wide uppercase leading-tight">
-                  {trans.lobby.sectorTitle}
+                <span className="text-[#00F0FF] text-lg shrink-0">📍</span>
+                <span className="font-['Space_Grotesk'] text-xl md:text-2xl font-bold text-[#00F0FF] tracking-wide uppercase leading-tight truncate">
+                  {displayChapter.id === 1 ? trans.lobby.sectorTitle : displayChapter.title}
                 </span>
               </div>
-              <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider">
-                {trans.lobby.sectorSubtitle}
+              <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider truncate">
+                {displayChapter.id === 1
+                  ? trans.lobby.sectorSubtitle
+                  : `CHAPTER ${displayChapter.id} · WAVE 1 / ${displayChapter.waves} · ${displayChapter.biome}`}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#272A32]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#272A32] shrink-0">
               <span className="font-mono text-[10px] text-[#B9CACB] uppercase">
-                {trans.lobby.startLabel}
+                {trans.lobby.progressLabel}
               </span>
-              <span className="font-mono text-lg font-bold text-[#FE9800]">
-                {formatText(trans.lobby.waveLabel, { wave: 1 })}
+              <span className="font-mono text-base md:text-lg font-bold text-[#FE9800]">
+                WAVE 1 / {displayChapter.waves}
               </span>
             </div>
           </div>
 
-          {/* Dual-Lane preview */}
-          <div className="flex-1 min-h-[160px] my-2 flex flex-col justify-between bg-[#191B23] rounded-lg p-3 relative overflow-hidden border border-[#272A32]/60">
-            <div className="flex items-center justify-between px-1 mb-2 shrink-0">
-              <span className="font-mono text-[10px] text-[#7DF4FF] uppercase tracking-wider flex items-center gap-1.5">
+          {/* 2 COMBAT MODES SECTION */}
+          <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+            <div className="flex items-center justify-between px-1 shrink-0">
+              <span className="font-mono text-[10px] text-[#7DF4FF] uppercase tracking-wider flex items-center gap-1.5 font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-ping inline-block" />
-                {trans.lobby.radarTitle}
+                {trans.lobby.selectModeTitle}
               </span>
               <span className="font-mono text-[10px] text-[#B9CACB] uppercase">
-                {trans.lobby.distanceBoss}
+                {trans.lobby.modesAvailable}
               </span>
             </div>
 
-            {/* Two lanes */}
-            <div className="grid grid-cols-2 gap-2 flex-1">
-              {/* Lane 1: Defense */}
-              <div className="flex flex-col justify-between p-2.5 rounded-lg bg-[#272A32]/90 relative overflow-hidden">
-                <div className="flex items-center justify-between shrink-0">
-                  <span className="px-2 py-0.5 rounded bg-[#93000A]/80 text-[#FFD9DD] font-mono text-[10px] tracking-wider">
-                    {trans.lobby.lane1Badge}
-                  </span>
-                  <span className="text-[#FFB4AB] text-sm">⚠</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-h-0">
+              {/* CHẾ ĐỘ 1: CLASSIC RUNNER (2-Lane Truyền Thống) */}
+              <button
+                type="button"
+                id="btnModeClassic"
+                disabled={!canOpenMap}
+                onClick={handleDeploy}
+                className={`relative flex flex-col justify-between p-3 rounded-xl bg-[#191B23] border-2 overflow-hidden transition-all text-left group min-h-[210px] ${
+                  canOpenMap
+                    ? "border-[#00F0FF] shadow-[0_0_24px_rgba(0,240,255,0.22)] hover:shadow-[0_0_32px_rgba(0,240,255,0.42)] cursor-pointer active:translate-y-0.5"
+                    : "border-[#3B494B] opacity-70 cursor-not-allowed"
+                }`}
+              >
+                {/* Cyber 2-Lane tactical backdrop */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <div
+                    className="w-full h-full opacity-25"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 50% 25%, rgba(0, 240, 255, 0.35), transparent 65%)",
+                    }}
+                  />
+                  <svg
+                    viewBox="0 0 200 220"
+                    className="absolute inset-x-0 top-0 w-full h-[65%] opacity-30 group-hover:opacity-45 transition-opacity"
+                    preserveAspectRatio="none"
+                  >
+                    <path d="M55,200 L85,20" stroke="#00F0FF" strokeWidth="1.5" strokeDasharray="6 6" />
+                    <path d="M100,200 L100,20" stroke="#00DBE9" strokeWidth="1" />
+                    <path d="M145,200 L115,20" stroke="#FE9800" strokeWidth="1.5" strokeDasharray="6 6" />
+                    <rect x="64" y="65" width="24" height="12" rx="2" fill="#00F0FF" fillOpacity="0.3" />
+                    <rect x="114" y="90" width="24" height="12" rx="2" fill="#FE9800" fillOpacity="0.4" />
+                  </svg>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/80 to-transparent" />
                 </div>
-                <div className="flex flex-col my-auto py-2">
-                  <span className="font-['Space_Grotesk'] text-sm font-bold text-[#E1E2EC] uppercase">
-                    {trans.lobby.lane1Title}
+
+                {/* Top Badges */}
+                <div className="relative z-10 flex items-center justify-between shrink-0 w-full gap-1">
+                  <span className="px-2 py-0.5 rounded bg-[#00F0FF] text-[#00363A] font-mono text-[10px] font-bold tracking-wider flex items-center gap-1 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00363A] animate-ping" />
+                    {trans.lobby.modeSelectedBadge}
                   </span>
-                  <span className="font-mono text-[10px] text-[#FFB2BD]">
-                    {trans.lobby.lane1Desc}
+                  <span className="px-2 py-0.5 rounded bg-[#32353D]/90 text-[#00DBE9] font-mono text-[10px] font-bold">
+                    {trans.lobby.modeClassicTag}
                   </span>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="font-mono text-[10px] text-[#B9CACB]">
-                      {trans.lobby.threatLabel}
+                </div>
+
+                {/* Bottom Content & CTA */}
+                <div className="relative z-10 flex flex-col pt-3 w-full mt-auto">
+                  <div className="flex items-center gap-1.5">
+                    <GitFork className="w-4 h-4 text-[#00F0FF] shrink-0" />
+                    <span className="font-['Space_Grotesk'] text-[15px] md:text-base text-[#DBFCFF] uppercase font-bold leading-tight">
+                      {trans.lobby.modeClassicTitle}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-[#FFB4AB]/20 text-[#FFB4AB] font-mono text-[10px] uppercase font-bold tracking-wider">
-                      {trans.lobby.threatHigh}
+                  </div>
+                  <span className="font-mono text-[10px] text-[#FFDCBD] mt-0.5">
+                    {trans.lobby.modeClassicSub}
+                  </span>
+                  <p className="text-[11px] text-[#B9CACB] leading-snug mt-1">
+                    {trans.lobby.modeClassicDesc}
+                  </p>
+                  <div
+                    className={`mt-3 w-full py-2 px-3 rounded-lg font-['Space_Grotesk'] text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all font-bold ${
+                      canOpenMap
+                        ? "bg-[#00F0FF] group-hover:bg-[#7DF4FF] text-[#00363A] shadow-[0_0_16px_rgba(0,240,255,0.35)]"
+                        : "bg-[#272A32] text-[#849495]"
+                    }`}
+                  >
+                    <Rocket className="w-4 h-4 shrink-0" />
+                    <span className="truncate">
+                      {platformError
+                        ? trans.lobby.deployPlatformError
+                        : !platformReady
+                          ? trans.lobby.deployInitSdk
+                          : trans.lobby.modeClassicCta}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-1.5 shrink-0 bg-[#1D1F27]/60 px-2 py-1 rounded">
-                  <span className="font-mono text-[9px] text-[#B9CACB]">
-                    {trans.lobby.survivalReward}
+              </button>
+
+              {/* CHẾ ĐỘ 2: SURVIVOR WAVES (Đấu Trường 3D Sinh Tồn Zombie Waves) */}
+              <div className="relative flex flex-col justify-between p-3 rounded-xl bg-[#191B23] border border-[#3B494B]/45 overflow-hidden text-left min-h-[210px] opacity-80">
+                {/* 360° Arena backdrop */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <div
+                    className="w-full h-full opacity-20"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 50% 35%, rgba(254, 152, 0, 0.35), transparent 65%)",
+                    }}
+                  />
+                  <svg
+                    viewBox="0 0 200 200"
+                    className="absolute inset-x-0 top-2 w-full h-[55%] opacity-25"
+                  >
+                    <circle cx="100" cy="80" r="65" fill="none" stroke="#FE9800" strokeWidth="1" strokeDasharray="4 4" />
+                    <circle cx="100" cy="80" r="42" fill="none" stroke="#FFC080" strokeWidth="1" />
+                    <circle cx="100" cy="80" r="18" fill="none" stroke="#FE9800" strokeWidth="1.5" />
+                  </svg>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/82 to-transparent" />
+                </div>
+
+                {/* Top Badges */}
+                <div className="relative z-10 flex items-center justify-between shrink-0 w-full gap-1">
+                  <span className="px-2 py-0.5 rounded bg-[#FE9800]/20 border border-[#FE9800]/50 text-[#FE9800] font-mono text-[10px] font-bold tracking-wider">
+                    {trans.lobby.modeSurvivorBadge}
                   </span>
-                  <span className="font-mono text-[10px] font-bold text-[#FE9800]">
-                    +600 {trans.lobby.statGold}
+                  <span className="px-2 py-0.5 rounded bg-[#32353D]/90 text-[#FFDCBD] font-mono text-[10px] font-bold">
+                    {trans.lobby.modeSurvivorTag}
                   </span>
+                </div>
+
+                {/* Bottom Content & Coming Soon Status */}
+                <div className="relative z-10 flex flex-col pt-3 w-full mt-auto">
+                  <div className="flex items-center gap-1.5">
+                    <Radar className="w-4 h-4 text-[#FFC080] shrink-0" />
+                    <span className="font-['Space_Grotesk'] text-[15px] md:text-base text-[#FFC080] uppercase font-bold leading-tight">
+                      {trans.lobby.modeSurvivorTitle}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-[#FFDCBD] mt-0.5">
+                    {trans.lobby.modeSurvivorSub}
+                  </span>
+                  <p className="text-[11px] text-[#B9CACB] leading-snug mt-1">
+                    {trans.lobby.modeSurvivorDesc}
+                  </p>
+                  <div className="mt-3 w-full py-2 px-3 rounded-lg bg-[#272A32] border border-[#3B494B]/60 text-[#FFC080]/85 font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 font-bold">
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    <span>{trans.lobby.modeSurvivorBadge}</span>
+                  </div>
                 </div>
               </div>
-
-              {/* Lane 2: Arsenal */}
-              <div className="flex flex-col justify-between p-2.5 rounded-lg bg-[#272A32]/90 relative overflow-hidden">
-                <div className="flex items-center justify-between shrink-0">
-                  <span className="px-2 py-0.5 rounded bg-[#006970] text-[#7DF4FF] font-mono text-[10px] tracking-wider">
-                    {trans.lobby.lane2Badge}
-                  </span>
-                  <span className="text-[#00F0FF] text-sm">⬆</span>
-                </div>
-                <div className="flex flex-col my-auto py-2">
-                  <span className="font-['Space_Grotesk'] text-sm font-bold text-[#00F0FF] uppercase">
-                    {trans.lobby.lane2Title}
-                  </span>
-                  <div className="flex items-center gap-1 mt-1 font-mono text-[10px] text-[#7DF4FF] flex-wrap">
-                    <span>{trans.lobby.lane2Sub}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="font-mono text-[10px] text-[#B9CACB]">
-                      {trans.lobby.firepowerLabel}
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-[#00F0FF]/15 text-[#00F0FF] font-mono text-[10px] uppercase font-bold tracking-wider">
-                      {trans.lobby.firepowerValue}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-1.5 shrink-0 bg-[#1D1F27]/60 px-2 py-1 rounded">
-                  <span className="font-mono text-[9px] text-[#B9CACB]">
-                    {trans.lobby.buffMultiplier}
-                  </span>
-                  <span className="font-mono text-[10px] font-bold text-[#00F0FF]">
-                    {trans.lobby.buffFirerate}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Lane switch indicator */}
-            <div className="flex items-center justify-between pt-2 px-1 text-[#B9CACB] font-mono text-[10px] shrink-0">
-              <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#32353D] text-[#00F0FF] font-bold">A</kbd>
-                {trans.lobby.steerLeft}
-              </span>
-              <span className="text-[#FE9800] uppercase">{trans.lobby.switchSpeed}</span>
-              <span className="flex items-center gap-1">
-                {trans.lobby.steerRight}
-                <kbd className="px-1.5 py-0.5 rounded bg-[#32353D] text-[#00F0FF] font-bold">D</kbd>
-              </span>
             </div>
           </div>
 
-          {/* Environment modifier */}
-          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#191B23] shrink-0 border border-[#272A32]/60">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded bg-[#93000A]/40 flex items-center justify-center text-[#FFB4AB]">
-                ☁
-              </div>
-              <div className="flex flex-col">
-                <span className="font-mono text-[11px] text-[#FFD9DD] tracking-wider uppercase">
-                  {trans.lobby.modifierTitle}
-                </span>
-                <span className="font-mono text-[9px] text-[#B9CACB]">
-                  {trans.lobby.modifierDesc}
-                </span>
-              </div>
-            </div>
-            <span className="px-2 py-1 rounded bg-[#32353D] font-mono text-[11px] text-[#FFB4AB]">
-              {trans.lobby.modifierTag}
-            </span>
-          </div>
-
-          {/* ACTION BUTTONS */}
-          <div className="flex flex-col gap-2 pt-2 shrink-0">
+          {/* BOTTOM ACTION DECK: Asset Load Progress & Rewarded Ad */}
+          <div className="flex flex-col gap-2 pt-1 shrink-0">
             {!assetsReady && !assetsError && (
               <div className="w-full flex flex-col gap-1">
                 <div className="flex justify-between font-mono text-[10px] text-[#B9CACB]">
@@ -500,32 +585,7 @@ export function MainMenu() {
               </div>
             )}
 
-            {/* DEPLOY BUTTON -> Opens World Map / Sector Select */}
-            <button
-              type="button"
-              id="btnDeploy"
-              disabled={!canOpenMap}
-              onClick={handleDeploy}
-              className={`relative w-full py-4 rounded-xl font-['Space_Grotesk'] text-xl md:text-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-3 transition-all transform active:scale-[0.99] active:translate-y-0.5 ${
-                canOpenMap
-                  ? "bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#002022] shadow-[0_0_28px_rgba(0,240,255,0.4)] hover:shadow-[0_0_40px_rgba(0,240,255,0.65)] cursor-pointer"
-                  : "bg-[#272A32] text-[#849495] cursor-not-allowed"
-              }`}
-            >
-              <span className={canOpenMap ? "animate-bounce" : ""}>⚡</span>
-              <span>
-                {platformError
-                  ? trans.lobby.deployPlatformError
-                  : !platformReady
-                    ? trans.lobby.deployInitSdk
-                    : player
-                      ? trans.lobby.deployPlayRanked
-                      : trans.lobby.deployPlayGuest}
-              </span>
-              <span>🎮</span>
-            </button>
-
-            {/* Watch Ad for buff */}
+            {/* Tạm ẩn nút Watch Ad for buff (comment lại để bật lại sau)
             <button
               type="button"
               id="btnAdPerk"
@@ -568,6 +628,7 @@ export function MainMenu() {
                 </span>
               </div>
             </button>
+            */}
           </div>
         </div>
 
@@ -693,14 +754,15 @@ export function MainMenu() {
                 <span className="font-mono text-[9px] text-[#FE9800]">
                   {trans.lobby.guestBoardWarning}
                 </span>
-                {platformCapabilities?.supportsLoginPrompt && (
+                {(platformTarget === "crazygames" ||
+                  platformCapabilities?.supportsLoginPrompt) && (
                   <button
                     type="button"
                     disabled={authLoading}
                     onClick={() => void loginWithPlatform()}
-                    className="px-2 py-0.5 rounded bg-[#00F0FF] text-[#002022] font-mono text-[9px] font-bold uppercase cursor-pointer"
+                    className="px-2 py-0.5 rounded bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#002022] font-mono text-[9px] font-bold uppercase cursor-pointer disabled:opacity-50"
                   >
-                    {trans.header.login}
+                    {authLoading ? "..." : loginButtonLabel}
                   </button>
                 )}
               </div>

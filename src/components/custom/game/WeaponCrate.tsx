@@ -1,150 +1,213 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import * as THREE from "three";
+import { BuffGateSpecDTO, RightLaneGateEntityDTO } from "@/dto/GameDTO";
+import { getBuffGateSpec } from "@/service/buff-catalog";
 import { useGameStore } from "@/state-manager/game-store";
-import { ARENA_CONFIG } from "@/service/game-constants";
-import { GameRuntimeRef } from "@/dto/GameDTO";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { WorldHtml } from "./WorldHtml";
 
-interface WeaponCrateProps {
-  runtimeRef: React.MutableRefObject<GameRuntimeRef>;
+function resolveScopeLabel(
+  spec: BuffGateSpecDTO,
+  buffsTrans: ReturnType<typeof useTransClientSide>["buffs"]
+): string {
+  switch (spec.scope) {
+    case "RUN":
+      return buffsTrans.scopeRun;
+    case "WAVE":
+      return buffsTrans.scopeWave;
+    case "CHARGES":
+      return buffsTrans.scopeCharges;
+    case "INSTANT":
+      return buffsTrans.scopeInstant;
+    case "TIMED":
+      return formatText(buffsTrans.scopeTimed, { sec: spec.durationSeconds ?? 5 });
+  }
 }
 
-export function WeaponCrate({ runtimeRef }: WeaponCrateProps) {
+function BuffGateUnit({ gate }: { gate: RightLaneGateEntityDTO }) {
   const gameStatus = useGameStore((s) => s.gameStatus);
-  const crateHits = useGameStore((s) => s.crateHits);
-  const crateTargetHits = useGameStore((s) => s.crateTargetHits);
-  const overdriveLevel = useGameStore((s) => s.overdriveLevel);
   const trans = useTransClientSide();
+  const spec = getBuffGateSpec(gate.buffId);
 
   const corePivotRef = useRef<THREE.Group>(null);
   const haloRingRef = useRef<THREE.Mesh>(null);
   const auraRingRef = useRef<THREE.Mesh>(null);
+  const gatePulseRef = useRef(0);
+  const prevHitsRef = useRef(gate.hits);
 
-  const rewardColor = overdriveLevel >= 3 ? "#f59e0b" : "#00f0ff";
-  const progress = Math.min(1, crateHits / Math.max(1, crateTargetHits));
+  useEffect(() => {
+    if (gate.hits > prevHitsRef.current) {
+      gatePulseRef.current = 1;
+    }
+    prevHitsRef.current = gate.hits;
+  }, [gate.hits]);
+
+  const progress = Math.min(1, gate.hits / Math.max(1, gate.targetHits));
+  const barWidth = 2.05;
+  const fillWidth = Math.max(0.01, barWidth * progress);
+  const scopeLabel = resolveScopeLabel(spec, trans.buffs);
+  const itemDesc = trans.buffs.items[spec.id];
 
   useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
-    const t = state.clock.elapsedTime;
+    const t = state.clock.elapsedTime + gate.slotIndex * 1.4;
 
-    if (runtimeRef.current.cratePulse > 0) {
-      runtimeRef.current.cratePulse = Math.max(0, runtimeRef.current.cratePulse - delta * 6);
+    if (gatePulseRef.current > 0) {
+      gatePulseRef.current = Math.max(0, gatePulseRef.current - delta * 6);
     }
-
-    const pulse = runtimeRef.current.cratePulse;
+    const pulse = gatePulseRef.current;
 
     if (corePivotRef.current) {
-      const scale = 1 + pulse * 0.22;
+      const scale = 1 + pulse * 0.24;
       corePivotRef.current.scale.setScalar(scale);
-      corePivotRef.current.position.y = 1.65 + Math.sin(t * 2.8) * 0.16;
-      corePivotRef.current.rotation.y = t * 1.8;
-      corePivotRef.current.rotation.x = Math.sin(t * 1.2) * 0.22;
+      corePivotRef.current.position.y = 1.45 + Math.sin(t * 2.8) * 0.14;
+      corePivotRef.current.rotation.y = t * 1.9;
+      corePivotRef.current.rotation.x = Math.sin(t * 1.3) * 0.22;
     }
 
     if (haloRingRef.current) {
-      haloRingRef.current.rotation.z = t * 1.6;
+      haloRingRef.current.rotation.z = t * 1.7;
       haloRingRef.current.rotation.x = Math.PI / 3 + Math.sin(t * 0.9) * 0.2;
     }
 
     if (auraRingRef.current) {
       auraRingRef.current.rotation.z = -t * 1.2;
-      auraRingRef.current.scale.setScalar(1 + progress * 0.18 + pulse * 0.15);
+      auraRingRef.current.scale.setScalar(1 + progress * 0.16 + pulse * 0.14);
     }
   });
 
-  const barWidth = 2.8;
-  const fillWidth = Math.max(0.01, barWidth * progress);
+  if (gate.claimed) {
+    return null;
+  }
 
   return (
-    <group position={[ARENA_CONFIG.crateX, 0, ARENA_CONFIG.crateZ]}>
-      {/* Bệ Buff Overdrive cố định trên làn phải (không liên quan tới đổi súng) */}
-      <mesh position={[0, 0.12, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[1.6, 1.85, 0.24, 24]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.75} roughness={0.28} />
+    <group position={[gate.x, 0, gate.z]}>
+      {/* Bệ Cổng Buff */}
+      <mesh position={[0, 0.1, 0]} receiveShadow castShadow>
+        <boxGeometry args={[2.1, 0.2, 1.55]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.72} roughness={0.28} />
       </mesh>
 
-      {/* Vòng sáng định vị */}
-      <mesh ref={auraRingRef} position={[0, 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.38, 1.66, 32]} />
-        <meshBasicMaterial color={rewardColor} transparent opacity={0.85} />
+      {/* Hai trụ cổng phát sáng hai bên */}
+      <mesh position={[-0.95, 1.35, 0]} castShadow>
+        <boxGeometry args={[0.16, 2.5, 0.22]} />
+        <meshStandardMaterial color="#334155" metalness={0.65} roughness={0.3} />
+      </mesh>
+      <mesh position={[0.95, 1.35, 0]} castShadow>
+        <boxGeometry args={[0.16, 2.5, 0.22]} />
+        <meshStandardMaterial color="#334155" metalness={0.65} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 2.56, 0]} castShadow>
+        <boxGeometry args={[2.06, 0.18, 0.26]} />
+        <meshStandardMaterial
+          color={spec.color}
+          emissive={spec.color}
+          emissiveIntensity={0.8}
+          metalness={0.5}
+        />
       </mesh>
 
-      {/* Cột hologram năng lượng */}
-      <mesh position={[0, 1.45, 0]}>
-        <cylinderGeometry args={[1.32, 1.5, 2.45, 24, 1, true]} />
+      {/* Màn năng lượng bên trong cổng */}
+      <mesh position={[0, 1.32, 0]}>
+        <planeGeometry args={[1.74, 2.28]} />
         <meshBasicMaterial
-          color={rewardColor}
+          color={spec.color}
           transparent
-          opacity={0.1 + progress * 0.1}
+          opacity={0.14 + progress * 0.14}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Lõi tinh thể Overdrive Buff xoay tròn */}
-      <group ref={corePivotRef} position={[0, 1.65, 0]}>
+      {/* Vòng sáng chân cổng */}
+      <mesh ref={auraRingRef} position={[0, 0.22, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.78, 0.98, 28]} />
+        <meshBasicMaterial color={spec.color} transparent opacity={0.85} />
+      </mesh>
+
+      {/* Tinh thể lõi xoay giữa cổng */}
+      <group ref={corePivotRef} position={[0, 1.45, 0]}>
         <mesh castShadow>
-          <octahedronGeometry args={[0.72, 0]} />
+          <octahedronGeometry args={[0.48, 0]} />
           <meshStandardMaterial
-            color={rewardColor}
-            emissive={rewardColor}
+            color={spec.color}
+            emissive={spec.color}
             emissiveIntensity={1.25}
             metalness={0.45}
             roughness={0.18}
           />
         </mesh>
         <mesh ref={haloRingRef}>
-          <torusGeometry args={[1.02, 0.06, 10, 28]} />
+          <torusGeometry args={[0.72, 0.045, 10, 24]} />
           <meshStandardMaterial
-            color="#fbbf24"
-            emissive="#f59e0b"
-            emissiveIntensity={1.4}
+            color={spec.color}
+            emissive={spec.color}
+            emissiveIntensity={1.1}
             metalness={0.6}
           />
         </mesh>
       </group>
 
-      {/* Thanh tiến độ 3D */}
-      <group position={[0, 3.35, 0]}>
+      {/* Thanh tiến độ 3D trên đỉnh cổng */}
+      <group position={[0, 2.95, 0]}>
         <mesh>
-          <boxGeometry args={[barWidth + 0.1, 0.28, 0.08]} />
+          <boxGeometry args={[barWidth + 0.08, 0.22, 0.08]} />
           <meshBasicMaterial color="#0f172a" />
         </mesh>
         <mesh position={[-(barWidth - fillWidth) / 2, 0, 0.05]}>
-          <boxGeometry args={[fillWidth, 0.18, 0.04]} />
-          <meshBasicMaterial color={rewardColor} />
+          <boxGeometry args={[fillWidth, 0.14, 0.04]} />
+          <meshBasicMaterial color={spec.color} />
         </mesh>
       </group>
 
-      {/* Nhãn Buff Overdrive */}
+      {/* Nhãn thông tin Cổng Buff */}
       {gameStatus === "PLAYING" && (
-        <Html
+        <WorldHtml
           center
-          position={[0, 4.25, 0]}
-          distanceFactor={24}
+          position={[0, 3.85, 0]}
+          distanceFactor={20}
           zIndexRange={[1, 0]}
           style={{ pointerEvents: "none" }}
         >
-          <div className="select-none whitespace-nowrap rounded-xl border-2 border-slate-600/90 bg-slate-950/95 px-4 py-2 text-center shadow-2xl backdrop-blur">
-            <div className="text-base sm:text-lg font-black uppercase tracking-wide text-cyan-300 leading-tight">
-              {formatText(trans.crate.overdriveTitle, { lv: overdriveLevel + 1 })}
+          <div className="select-none whitespace-nowrap rounded-xl border-2 border-slate-600/90 bg-slate-950/95 px-3 py-1.5 text-center shadow-2xl backdrop-blur">
+            <div className="flex items-center justify-center gap-1.5">
+              <span
+                className="text-sm sm:text-base font-black uppercase tracking-wide leading-tight"
+                style={{ color: spec.color }}
+              >
+                {spec.badgeText}
+              </span>
+              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-slate-300">
+                {scopeLabel}
+              </span>
             </div>
-            <div className="text-[11px] font-bold text-emerald-300">
-              {trans.crate.overdriveBonus}
+            <div className="mt-0.5 text-[10px] sm:text-[11px] font-semibold text-slate-200">
+              {itemDesc}
             </div>
-            <div className="mt-0.5 text-sm sm:text-base font-black text-amber-300">
+            <div className="mt-0.5 text-xs sm:text-sm font-black text-amber-300">
               {formatText(trans.hud.shotsProgress, {
-                hits: crateHits,
-                target: crateTargetHits,
+                hits: gate.hits,
+                target: gate.targetHits,
               })}
             </div>
           </div>
-        </Html>
+        </WorldHtml>
       )}
+    </group>
+  );
+}
+
+export function WeaponCrate() {
+  const rightLaneGates = useGameStore((s) => s.rightLaneGates);
+
+  return (
+    <group>
+      {rightLaneGates.map((gate) => (
+        <BuffGateUnit key={`${gate.slotIndex}-${gate.buffId}`} gate={gate} />
+      ))}
     </group>
   );
 }

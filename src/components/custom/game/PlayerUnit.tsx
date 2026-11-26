@@ -2,11 +2,13 @@
 
 import React, { Component, ReactNode, Suspense, forwardRef, useEffect, useMemo, useRef } from "react";
 import { createPortal, useFrame } from "@react-three/fiber";
-import { Html, useAnimations, useFBX, useGLTF } from "@react-three/drei";
+import { useAnimations, useFBX, useGLTF } from "@react-three/drei";
+import { WorldHtml } from "./WorldHtml";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { WeaponConfigDTO } from "@/dto/GameDTO";
 import { ARENA_CONFIG, RAGE_CONFIG } from "@/service/game-constants";
+import { getArmoryWeaponById } from "@/service/armory-catalog";
 import { gameInput } from "@/service/game-input";
 import { useGameStore } from "@/state-manager/game-store";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
@@ -18,22 +20,22 @@ installModelBrowserCache();
 
 const PLAYER_MODEL_CONFIG = {
   // Đổi giữa "fbx" (3 file Mixamo: idle + left + right) hoặc "glb" (1 file .glb)
-  format: "fbx" as "fbx" | "glb",
+  format: "glb" as "fbx" | "glb",
   fbxFiles: {
     idle: "player-idle.fbx",
     left: "player-left.fbx",
     right: "player-right.fbx",
   },
-  glbFile: "player.glb",
+  glbFile: "linh-cyber-v3.glb",
   targetHeight: 1.65,
   baseY: 0,
-  // Mặc định model .fbx/.glb quay mặt +Z, xoay Math.PI (180 độ) để nhìn về phía quái (-Z).
+  // Model .glb quay mặt +Z, xoay Math.PI (180 độ) để nhìn về phía quái (-Z).
   rotationY: Math.PI,
-  // Căn chỉnh vị trí & góc xoay khẩu súng gắn vào xương bàn tay phải (mixamorigRightHand)
+  // Căn chỉnh vị trí & góc xoay khẩu súng gắn vào WeaponSocket (nòng -Z gắn theo +Z của socket)
   handAttachment: {
-    scale: 0.36,
-    position: [0.02, 0.09, 0.03] as [number, number, number],
-    rotation: [-Math.PI / 2, 0, Math.PI / 2] as [number, number, number],
+    scale: 0.48,
+    position: [0, 0.04, 0] as [number, number, number],
+    rotation: [0, Math.PI, 0] as [number, number, number],
   },
 };
 
@@ -59,6 +61,10 @@ if (typeof window !== "undefined") {
 function prepareAnimationClip(clip: THREE.AnimationClip, name: string): THREE.AnimationClip {
   const cloned = clip.clone();
   cloned.name = name;
+  // Giữ nguyên chuyển động ngã X/Z cho animation Death; chỉ khóa In Place ở các clip đứng/chạy
+  if (/death|dead|die/i.test(name)) {
+    return cloned;
+  }
   for (const track of cloned.tracks) {
     // Khóa dịch chuyển ngang X/Z trên xương gốc phòng trường hợp file Mixamo chưa tick In Place
     if (/hips\.position$|^root\.position$/i.test(track.name) && track.values.length >= 3) {
@@ -133,6 +139,7 @@ interface RiggedModelRunnerProps {
   idleClipName: string | null;
   leftClipName: string | null;
   rightClipName: string | null;
+  deathClipName?: string | null;
   weaponNode: ReactNode;
 }
 
@@ -142,27 +149,33 @@ function RiggedModelRunner({
   idleClipName,
   leftClipName,
   rightClipName,
+  deathClipName = null,
   weaponNode,
 }: RiggedModelRunnerProps) {
   const animRootRef = useRef<THREE.Group>(null);
   const activeAnimRef = useRef<string | null>(null);
 
-  const { clonedScene, autoScale, offset, handBone } = useMemo(() => {
+  const { clonedScene, autoScale, offset, handBone, handSocketInvScale } = useMemo(() => {
     const root = cloneSkinned(sourceScene);
     root.rotation.set(0, PLAYER_MODEL_CONFIG.rotationY, 0);
     root.position.set(0, 0, 0);
     root.scale.setScalar(1);
 
-    let foundHandBone: THREE.Object3D | null = null;
+    let socketBone: THREE.Object3D | null = null;
+    let fallbackRightHand: THREE.Object3D | null = null;
     root.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        obj.frustumCulled = false;
       }
-      if (!foundHandBone && /righthand|hand_r|r_hand/i.test(obj.name)) {
-        foundHandBone = obj;
+      if (!socketBone && /weaponsocket/i.test(obj.name)) {
+        socketBone = obj;
+      } else if (!fallbackRightHand && /righthand|hand_r|r_hand/i.test(obj.name)) {
+        fallbackRightHand = obj;
       }
     });
+    const chosenBone = (socketBone ?? fallbackRightHand) as THREE.Object3D | null;
     root.updateMatrixWorld(true);
 
     const box = new THREE.Box3().setFromObject(root);
@@ -171,10 +184,17 @@ function RiggedModelRunner({
     const refHeight = size.y > 0.001 ? size.y : Math.max(size.x, size.z, 1);
     const scale = PLAYER_MODEL_CONFIG.targetHeight / refHeight;
 
+    const boneWorldScale = new THREE.Vector3(1, 1, 1);
+    if (chosenBone) {
+      chosenBone.getWorldScale(boneWorldScale);
+    }
+    const invScale = 1 / Math.max(0.0001, scale * boneWorldScale.y);
+
     return {
       clonedScene: root,
       autoScale: scale,
-      handBone: foundHandBone as THREE.Object3D | null,
+      handBone: chosenBone,
+      handSocketInvScale: invScale,
       offset: [
         -center.x * scale,
         PLAYER_MODEL_CONFIG.baseY - box.min.y * scale,
@@ -188,8 +208,12 @@ function RiggedModelRunner({
   useEffect(() => {
     activeAnimRef.current = null;
     if (idleClipName && actions[idleClipName]) {
-      actions[idleClipName]?.reset().fadeIn(0.15).play();
-      activeAnimRef.current = idleClipName;
+      const idleAction = actions[idleClipName];
+      if (idleAction) {
+        idleAction.setLoop(THREE.LoopRepeat, Infinity);
+        idleAction.reset().fadeIn(0.15).play();
+        activeAnimRef.current = idleClipName;
+      }
     }
     return () => {
       for (const key of Object.keys(actions)) {
@@ -201,6 +225,23 @@ function RiggedModelRunner({
   useFrame(() => {
     if (!idleClipName) return;
     const status = useGameStore.getState().gameStatus;
+
+    if (status === "GAME_OVER" && deathClipName && actions[deathClipName]) {
+      if (activeAnimRef.current !== deathClipName) {
+        const prevAction = activeAnimRef.current ? actions[activeAnimRef.current] : null;
+        const deathAction = actions[deathClipName];
+        if (deathAction) {
+          prevAction?.fadeOut(0.12);
+          deathAction.setLoop(THREE.LoopOnce, 1);
+          deathAction.clampWhenFinished = true;
+          deathAction.timeScale = 1;
+          deathAction.reset().fadeIn(0.12).play();
+          activeAnimRef.current = deathClipName;
+        }
+      }
+      return;
+    }
+
     const movingLeft = status === "PLAYING" && gameInput.left && !gameInput.right;
     const movingRight = status === "PLAYING" && gameInput.right && !gameInput.left;
 
@@ -216,6 +257,8 @@ function RiggedModelRunner({
     const nextAction = actions[targetName];
     if (nextAction) {
       prevAction?.fadeOut(0.14);
+      nextAction.setLoop(THREE.LoopRepeat, Infinity);
+      nextAction.clampWhenFinished = false;
       nextAction.timeScale = targetName === idleClipName ? 1 : 1.45;
       nextAction.reset().fadeIn(0.14).play();
       activeAnimRef.current = targetName;
@@ -227,8 +270,8 @@ function RiggedModelRunner({
       <primitive object={clonedScene} />
       {handBone ? (
         createPortal(
-          // Bù scale ngược 1/autoScale vì xương Mixamo nằm trong hệ quy chiếu đã thu nhỏ theo autoScale
-          <group scale={1 / autoScale}>
+          // Bù scale ngược theo world scale thực của bone/WeaponSocket để súng giữ đúng kích thước chuẩn
+          <group scale={handSocketInvScale}>
             <group
               position={PLAYER_MODEL_CONFIG.handAttachment.position}
               rotation={PLAYER_MODEL_CONFIG.handAttachment.rotation}
@@ -282,17 +325,24 @@ function PlayerMixamoFbxModel({ weaponNode }: { weaponNode: ReactNode }) {
   );
 }
 
-// Nhánh 2: Nạp 1 file .glb / .gltf (chứa sẵn Idle + Run/Strafe bên trong)
+// Nhánh 2: Nạp 1 file .glb / .gltf (chứa sẵn Idle/Shoot_Stand + Strafe_Left/Right + Death bên trong)
 function PlayerGlbModel({ weaponNode }: { weaponNode: ReactNode }) {
   const gltf = useGLTF(GLB_URL);
 
-  const { clips, idleName, leftName, rightName } = useMemo(() => {
+  const { clips, idleName, leftName, rightName, deathName } = useMemo(() => {
     const prepared = gltf.animations.map((clip) => prepareAnimationClip(clip, clip.name));
     const names = prepared.map((c) => c.name);
     const idle = names.find((n) => /idle|stand|breath/i.test(n)) || names[0] || null;
-    const left = names.find((n) => /left|strafe|run|walk|move/i.test(n)) || idle;
-    const right = names.find((n) => /right|strafe|run|walk|move/i.test(n)) || left;
-    return { clips: prepared, idleName: idle, leftName: left, rightName: right };
+    const left =
+      names.find((n) => /left/i.test(n)) ||
+      names.find((n) => /strafe|run|walk|move/i.test(n)) ||
+      idle;
+    const right =
+      names.find((n) => /right/i.test(n)) ||
+      names.find((n) => /strafe|run|walk|move/i.test(n)) ||
+      left;
+    const death = names.find((n) => /death|dead|die/i.test(n)) || null;
+    return { clips: prepared, idleName: idle, leftName: left, rightName: right, deathName: death };
   }, [gltf.animations]);
 
   return (
@@ -302,6 +352,7 @@ function PlayerGlbModel({ weaponNode }: { weaponNode: ReactNode }) {
       idleClipName={idleName}
       leftClipName={leftName}
       rightClipName={rightName}
+      deathClipName={deathName}
       weaponNode={weaponNode}
     />
   );
@@ -321,9 +372,15 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
     const rageReady = useGameStore((s) => s.rageReady);
     const rageActive = useGameStore((s) => s.rageActive);
     const rageTimeLeft = useGameStore((s) => s.rageTimeLeft);
+    const activeRageWeaponId = useGameStore((s) => s.activeRageWeaponId);
     const icbmAiming = useGameStore((s) => s.icbmAiming);
     const icbmPending = useGameStore((s) => s.icbmPending);
+    const clones = useGameStore((s) => s.activeBuffs.clones);
+    const shieldCharges = useGameStore((s) => s.activeBuffs.shieldCharges);
     const trans = useTransClientSide();
+    const readySkillName = getArmoryWeaponById(weapon.id)?.rageSkillName ?? weapon.name;
+    const ragingSkillName =
+      getArmoryWeaponById(activeRageWeaponId ?? weapon.id)?.rageSkillName ?? readySkillName;
 
     const flashMeshRef = useRef<THREE.Mesh>(null);
     const rageRingRef = useRef<THREE.Mesh>(null);
@@ -407,6 +464,57 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
           <meshBasicMaterial color="#fbbf24" transparent opacity={0.9} />
         </mesh>
 
+        {/* Khiên bảo vệ [SHIELD] hấp thụ đòn đánh */}
+        {shieldCharges > 0 && (
+          <group position={[0, 0.9, 0]}>
+            <mesh>
+              <sphereGeometry args={[1.18, 20, 14]} />
+              <meshBasicMaterial
+                color="#7dd3fc"
+                transparent
+                opacity={0.14}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[1.18, 0.035, 8, 32]} />
+              <meshBasicMaterial color="#bae6fd" transparent opacity={0.8} />
+            </mesh>
+          </group>
+        )}
+
+        {/* Bản sao [x2 CLONE] dùng đúng model nhân vật 3D thật cầm súng đang trang bị */}
+        {[-1.25, 1.25].slice(0, clones).map((offsetX) => {
+          const cloneWeaponNode = (
+            <WeaponModel3D
+              weapon={weapon}
+              spinBarrels={rageActive || weapon.modelKind === "machine-gun"}
+            />
+          );
+          const cloneFallback = (
+            <>
+              <FallbackRobotMesh activeAccent={activeAccent} />
+              <group position={[0.45, 0.78, -0.58]} scale={0.75}>
+                {cloneWeaponNode}
+              </group>
+            </>
+          );
+          return (
+            <group key={offsetX} position={[offsetX, 0, 0.25]} scale={0.84}>
+              <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.58, 0.82, 24]} />
+                <meshBasicMaterial color="#06b6d4" transparent opacity={0.78} />
+              </mesh>
+              <ModelErrorBoundary fallback={cloneFallback}>
+                <Suspense fallback={cloneFallback}>
+                  <PlayerModelSwitch weaponNode={cloneWeaponNode} />
+                </Suspense>
+              </ModelErrorBoundary>
+            </group>
+          );
+        })}
+
         {/* Mô hình nhân vật 3D từ /public/models/ (súng gắn trực tiếp vào xương bàn tay phải) */}
         <ModelErrorBoundary fallback={fallbackWithWeapon}>
           <Suspense fallback={fallbackWithWeapon}>
@@ -431,7 +539,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
 
         {/* Nhãn trạng thái Nộ trên đầu nhân vật (chỉ hiện khi đang chơi, luôn nằm dưới HUD) */}
         {gameStatus === "PLAYING" && (
-          <Html
+          <WorldHtml
             center
             position={[0, 2.38, 0]}
             distanceFactor={16}
@@ -449,13 +557,16 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
                 </span>
               ) : rageActive ? (
                 <span className="rounded-full border border-amber-300/80 bg-amber-950/90 px-2 py-0.5 text-[10px] font-black text-amber-300 shadow">
-                  {formatText(trans.hud.rageBulletRainUpper, {
+                  {formatText(trans.hud.rageSkillActiveUpper, {
+                    skill: ragingSkillName,
                     time: rageTimeLeft.toFixed(1),
                   })}
                 </span>
               ) : rageReady ? (
                 <span className="animate-pulse rounded-full border border-yellow-300 bg-amber-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg">
-                  {weapon.id === "icbm" ? trans.hud.rageReadyIcbm : trans.hud.rageReadyHint}
+                  {weapon.id === "icbm"
+                    ? trans.hud.rageReadyIcbm
+                    : formatText(trans.hud.rageSkillButton, { skill: readySkillName })}
                 </span>
               ) : (
                 <span className="rounded bg-slate-950/85 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
@@ -463,7 +574,7 @@ export const PlayerUnit = forwardRef<THREE.Group, PlayerUnitProps>(
                 </span>
               )}
             </div>
-          </Html>
+          </WorldHtml>
         )}
       </group>
     );

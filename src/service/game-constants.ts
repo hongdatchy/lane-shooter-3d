@@ -20,11 +20,17 @@ export const ARENA_CONFIG = {
   leftLaneMinX: -9.1,
   leftLaneMaxX: 4.1,
 
-  // Làn bên phải: Hòm Item / Vũ khí cố định (rộng 5, tâm ở +7.5)
+  // Làn bên phải: Tối đa 2 Cổng Buff mỗi Wave (rộng 5, tâm ở +7.5)
   crateX: 7.5,
   crateZ: -7.5,
   crateHalfWidth: 1.45,
   crateHalfDepth: 1.45,
+  gateHalfWidth: 1.05,
+  gateHalfDepth: 0.9,
+  rightLaneGates: [
+    { x: 6.25, z: -6.5 },
+    { x: 8.65, z: -11.5 },
+  ],
 } as const;
 
 // Cấu hình trạng thái Nộ (Mưa Đạn)

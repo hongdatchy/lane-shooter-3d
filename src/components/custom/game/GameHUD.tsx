@@ -36,6 +36,12 @@ import { soundService } from "@/service/sound-service";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
 import { startBackgroundPreload } from "@/service/asset-preloader";
+import {
+  MAX_LOADOUT_SLOTS,
+  getArmoryWeaponById,
+  getWeaponImageUrl,
+} from "@/service/armory-catalog";
+import { getRageSkillSpec } from "@/service/rage-catalog";
 
 interface GameHUDProps {
   containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -48,13 +54,17 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     gameStatus,
     player,
     playerName,
+    platformTarget,
     platformCapabilities,
     authLoading,
+    authError,
     scoreSyncError,
     score,
     highScore,
+    lastGoldEarned,
     hp,
     maxHp,
+    activeChapter,
     wave,
     maxWaves,
     stageKills,
@@ -64,13 +74,14 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     activeLoadoutSlot,
     saveData,
     overdriveLevel,
-    crateHits,
-    crateTargetHits,
+    rightLaneGates,
+    activeBuffs,
     rewardBanner,
     rage,
     rageReady,
     rageActive,
     rageTimeLeft,
+    activeRageWeaponId,
     icbmAiming,
     icbmPending,
     cameraMode,
@@ -98,6 +109,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   } = useGameStore();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [delayedResultReady, setDelayedResultReady] = useState(false);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const trans = useTransClientSide();
@@ -113,12 +125,69 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     loadoutWeapons[activeLoadoutSlot] ??
     loadoutWeapons[0] ??
     weaponService.resolveCombatWeapon("pistol", 1);
+  const readySkillName = getArmoryWeaponById(weapon.id)?.rageSkillName ?? weapon.name;
+  const ragingWeaponId = activeRageWeaponId ?? weapon.id;
+  const ragingSkillName =
+    getArmoryWeaponById(ragingWeaponId)?.rageSkillName ?? readySkillName;
+  const activeRageSpec = rageActive ? getRageSkillSpec(ragingWeaponId) : null;
   const baseRate = weaponService.getEffectiveFireRate(weapon, overdriveLevel);
   const effectiveRate = (
-    rageActive ? baseRate * RAGE_CONFIG.fireRateMultiplier : baseRate
+    activeRageSpec?.overrideRps
+      ? activeRageSpec.overrideRps
+      : baseRate * (activeRageSpec?.fireRateMultiplier ?? 1)
   ).toFixed(1);
   const effectiveDamage = weaponService.getEffectiveDamage(weapon, overdriveLevel);
   const ragePercent = Math.round(Math.min(100, Math.max(0, (rage / RAGE_CONFIG.maxRage) * 100)));
+  const remainingGatesCount = rightLaneGates.filter((g) => !g.claimed).length;
+  const activeBuffChips: Array<{ label: string; color: string }> = [];
+  if (activeBuffs.clones > 0) {
+    activeBuffChips.push({
+      label: formatText(trans.buffs.cloneChip, { count: activeBuffs.clones }),
+      color: "#06b6d4",
+    });
+  }
+  if (activeBuffs.shieldCharges > 0) {
+    activeBuffChips.push({
+      label: formatText(trans.buffs.shieldChip, { count: activeBuffs.shieldCharges }),
+      color: "#bae6fd",
+    });
+  }
+  if (activeBuffs.piercing) {
+    activeBuffChips.push({ label: trans.buffs.piercingChip, color: "#eab308" });
+  }
+  if (activeBuffs.multishot) {
+    activeBuffChips.push({ label: trans.buffs.multishotChip, color: "#f97316" });
+  }
+  if (activeBuffs.ricochet) {
+    activeBuffChips.push({ label: trans.buffs.ricochetChip, color: "#a855f7" });
+  }
+  if (activeBuffs.explosive) {
+    activeBuffChips.push({ label: trans.buffs.explosiveChip, color: "#ef4444" });
+  }
+  if (activeBuffs.turretTimeLeft > 0) {
+    activeBuffChips.push({
+      label: formatText(trans.buffs.turretChip, {
+        sec: activeBuffs.turretTimeLeft.toFixed(1),
+      }),
+      color: "#f59e0b",
+    });
+  }
+  if (activeBuffs.freezeTimeLeft > 0) {
+    activeBuffChips.push({
+      label: formatText(trans.buffs.freezeChip, {
+        sec: activeBuffs.freezeTimeLeft.toFixed(1),
+      }),
+      color: "#38bdf8",
+    });
+  }
+  if (activeBuffs.magnetTimeLeft > 0) {
+    activeBuffChips.push({
+      label: formatText(trans.buffs.magnetChip, {
+        sec: activeBuffs.magnetTimeLeft.toFixed(1),
+      }),
+      color: "#fde047",
+    });
+  }
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -135,6 +204,19 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     }, 2600);
     return () => clearTimeout(timer);
   }, [rewardBanner, clearRewardBanner]);
+
+  // Chờ 3s sau khi Win/Thua để người chơi xem nốt hiệu ứng nổ & hạ gục trước khi hiện popup
+  useEffect(() => {
+    if (gameStatus !== "GAME_OVER" && gameStatus !== "VICTORY") {
+      setDelayedResultReady(false);
+      return;
+    }
+    setDelayedResultReady(false);
+    const timer = setTimeout(() => {
+      setDelayedResultReady(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [gameStatus]);
 
   const enterFullscreen = () => {
     const el = containerRef?.current;
@@ -268,12 +350,27 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       syncKeys();
     };
 
+    let lastWheelAt = 0;
+    const handleWheel = (e: WheelEvent) => {
+      const curr = useGameStore.getState();
+      if (curr.gameStatus !== "PLAYING" || curr.cameraMode === "FREE_ORBIT") {
+        return;
+      }
+      if (Math.abs(e.deltaY) < 4) return;
+      const now = performance.now();
+      if (now - lastWheelAt < 90) return;
+      lastWheelAt = now;
+      curr.cycleCombatWeapon(e.deltaY > 0 ? 1 : -1);
+    };
+
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keyup", handleKeyUp, { capture: true });
+    window.addEventListener("wheel", handleWheel, { passive: true });
     window.addEventListener("blur", handleBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
+      window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("blur", handleBlur);
     };
   }, []);
@@ -324,7 +421,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] sm:text-sm">
               <div>
                 <span className="text-slate-400 mr-1">{trans.hud.stage}:</span>
-                <span className="font-black text-sky-300">{stageDisplay}</span>
+                <span className="font-black text-sky-300">
+                  CH.{activeChapter} · {stageDisplay}/{maxWaves}
+                </span>
               </div>
               <div>
                 <span className="hidden sm:inline text-slate-400 mr-1">
@@ -537,7 +636,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 <div className="text-base sm:text-xl font-black uppercase tracking-wide leading-none">
                   {weapon.id === "icbm"
                     ? trans.hud.rageButtonCenterIcbm
-                    : trans.hud.rageButtonCenter}
+                    : formatText(trans.hud.rageSkillButton, { skill: readySkillName })}
                 </div>
                 <div className="mt-1 text-[11px] sm:text-xs font-bold text-slate-900/90">
                   {trans.hud.rageCenterHint}
@@ -548,11 +647,35 @@ export function GameHUD({ containerRef }: GameHUDProps) {
         )}
       </AnimatePresence>
 
-      {/* Modal Pause / Game Over / Victory */}
+      {/* Thông báo chờ 3s khi vừa Thắng/Thua để xem nốt hiệu ứng 3D */}
+      <AnimatePresence>
+        {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && !delayedResultReady && (
+          <motion.div
+            key="result-delay-banner"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className={`mx-auto my-auto flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm sm:text-base font-black shadow-2xl backdrop-blur-md ${
+              gameStatus === "VICTORY"
+                ? "border-emerald-400/70 bg-emerald-950/90 text-emerald-300"
+                : "border-rose-400/70 bg-rose-950/90 text-rose-300"
+            }`}
+          >
+            <Trophy className="h-5 w-5 shrink-0" />
+            <span>
+              {gameStatus === "VICTORY"
+                ? trans.hud.rageResultDelayVictory
+                : trans.hud.rageResultDelayDefeat}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Pause / Game Over / Victory (Game Over & Victory đợi 3s) */}
       <AnimatePresence>
         {(gameStatus === "PAUSED" ||
-          gameStatus === "GAME_OVER" ||
-          gameStatus === "VICTORY") && (
+          ((gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
+            delayedResultReady)) && (
           <motion.div
             key={gameStatus}
             initial={{ opacity: 0, scale: 0.94 }}
@@ -624,29 +747,45 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
                 </p>
                 {!player && (
-                  <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/40 px-3 py-2 text-xs text-amber-200 flex items-center justify-between gap-2">
-                    <span className="text-left">
-                      {trans.modals.guestNoRankNotice}
-                    </span>
-                    {platformCapabilities?.supportsLoginPrompt && (
+                  <div className="mt-3 rounded-xl border border-cyan-400/45 bg-cyan-950/35 px-3.5 py-2.5 text-xs text-cyan-100 flex flex-col gap-2 text-left">
+                    <div className="flex items-start gap-2">
+                      <User className="h-4 w-4 shrink-0 text-cyan-300 mt-0.5" />
+                      <span>
+                        {formatText(trans.modals.guestLoginToSave, {
+                          platform:
+                            platformTarget === "web" ? "Google" : "CrazyGames",
+                        })}
+                      </span>
+                    </div>
+                    {(platformTarget === "crazygames" ||
+                      platformCapabilities?.supportsLoginPrompt) && (
                       <Button
                         type="button"
                         size="sm"
                         disabled={authLoading}
                         onClick={() => void loginWithPlatform()}
-                        className="shrink-0 bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300"
+                        className="w-full bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300 uppercase tracking-wider"
                       >
-                        {authLoading ? "..." : trans.modals.loginBtn}
+                        {authLoading
+                          ? trans.lobby.authenticating
+                          : platformTarget === "web"
+                            ? trans.lobby.loginGoogle
+                            : trans.lobby.loginCrazyGames}
                       </Button>
+                    )}
+                    {authError && (
+                      <div className="rounded-md border border-amber-500/40 bg-amber-950/40 px-2.5 py-1.5 text-[11px] text-amber-200">
+                        {authError}
+                      </div>
                     )}
                   </div>
                 )}
-                {scoreSyncError && (
+                {player && scoreSyncError && (
                   <div className="mt-3 rounded-lg border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-xs text-rose-300 text-left">
                     {formatText(trans.modals.scoreSyncFailed, { err: scoreSyncError })}
                   </div>
                 )}
-                <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs">
                   <div>
                     <span className="block text-slate-400">{trans.modals.score}</span>
                     <span className="text-base font-black text-amber-300">{score}</span>
@@ -654,6 +793,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   <div>
                     <span className="block text-slate-400">{trans.modals.highScore}</span>
                     <span className="text-base font-black text-sky-300">{highScore}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-400">{trans.modals.goldEarned}</span>
+                    <span className="text-base font-black text-yellow-300">
+                      +{lastGoldEarned}
+                    </span>
                   </div>
                   <div>
                     <span className="block text-slate-400">{trans.modals.totalKills}</span>
@@ -691,11 +836,29 @@ export function GameHUD({ containerRef }: GameHUDProps) {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-3">
           {/* Thanh chọn 3 súng mang theo + Thông số súng hiện tại & Tiến độ Overdrive làn phải */}
           <div className="pointer-events-auto flex w-full sm:w-auto flex-col gap-1.5 rounded-xl border border-slate-700/80 bg-slate-950/85 px-2.5 py-2 sm:px-3.5 text-[11px] sm:text-xs text-white shadow-lg backdrop-blur-md">
-            {/* 3 nút đổi súng trực tiếp */}
-            <div className="flex items-center gap-1.5">
-              {loadoutWeapons.map((slotWeapon, idx) => {
+            {/* 3 ô chọn súng kiểu Alien Shooter ([1][2][3] / Q / lăn chuột) */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, idx) => {
+                const slotId = combatLoadoutIds[idx];
+                const slotWeapon = slotId ? loadoutWeapons[idx] : null;
+                if (!slotWeapon) {
+                  return (
+                    <div
+                      key={`empty-${idx}`}
+                      title={trans.armory.combatNoteDesc}
+                      className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-700/70 bg-slate-900/45 px-2 py-1 text-[10px] font-semibold text-slate-500 opacity-60 select-none"
+                    >
+                      <kbd className="rounded bg-slate-800 px-1 text-[9px] font-black text-slate-400">
+                        {idx + 1}
+                      </kbd>
+                      <span className="max-w-[74px] truncate">{trans.worldMap.emptySlot}</span>
+                    </div>
+                  );
+                }
+
                 const isActive = idx === activeLoadoutSlot;
                 const slotLv = saveData.weaponLevels[slotWeapon.id] ?? 1;
+                const slotArmorySpec = getArmoryWeaponById(slotWeapon.id);
                 return (
                   <button
                     key={`${slotWeapon.id}-${idx}`}
@@ -705,7 +868,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                       e.currentTarget.blur();
                       switchCombatWeaponSlot(idx);
                     }}
-                    className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer touch-none ${
+                    className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer touch-none ${
                       isActive
                         ? "border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.28)]"
                         : "border-slate-700/80 bg-slate-900/80 text-slate-400 hover:border-slate-500 hover:text-white"
@@ -720,11 +883,32 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     >
                       {idx + 1}
                     </kbd>
-                    <span className="max-w-[92px] truncate">{slotWeapon.name}</span>
+                    <img
+                      src={getWeaponImageUrl(slotArmorySpec)}
+                      alt={slotWeapon.name}
+                      className="h-4 w-6 rounded-sm object-cover border border-slate-700/70 shrink-0"
+                    />
+                    <span className="max-w-[82px] truncate">{slotWeapon.name}</span>
                     <span className="text-[9px] opacity-75">L{slotLv}</span>
                   </button>
                 );
               })}
+
+              {loadoutWeapons.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.blur();
+                    cycleCombatWeapon();
+                  }}
+                  title={trans.hud.keySwitchWeapon}
+                  className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/85 px-2 py-1 text-[10px] font-black text-cyan-300 hover:border-cyan-400 hover:text-white cursor-pointer touch-none"
+                >
+                  <kbd className="text-[9px]">Q</kbd>
+                  <span>↻</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-2.5 sm:gap-3">
@@ -751,7 +935,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   {trans.hud.perSec}
                   {rageActive && (
                     <span className="ml-1.5 font-bold text-amber-300">
-                      • x{RAGE_CONFIG.bulletCountMultiplier} {trans.hud.bulletsMultiplier}
+                      • {ragingSkillName}
                     </span>
                   )}
                 </div>
@@ -759,25 +943,35 @@ export function GameHUD({ containerRef }: GameHUDProps) {
 
               <div className="shrink-0 border-l border-slate-700 pl-2.5 sm:pl-3 text-right sm:text-left">
                 <div className="text-[10px] sm:text-[11px] text-slate-400">
-                  <span className="hidden sm:inline">
-                    {formatText(trans.hud.overdriveBuffLabel, {
-                      lv: overdriveLevel + 1,
-                    })}
-                  </span>
-                  <span className="sm:hidden">
-                    {formatText(trans.hud.overdriveBuffShort, {
-                      lv: overdriveLevel + 1,
-                    })}
-                  </span>
+                  <span className="hidden sm:inline">{trans.hud.overdriveBuffLabel}</span>
+                  <span className="sm:hidden">{trans.hud.overdriveBuffShort}</span>
                 </div>
-                <div className="font-black text-amber-300">
-                  {formatText(trans.hud.shotsProgress, {
-                    hits: crateHits,
-                    target: crateTargetHits,
+                <div className="font-black text-cyan-300">
+                  {formatText(trans.hud.gatesRemaining, {
+                    left: remainingGatesCount,
+                    max: rightLaneGates.length,
                   })}
                 </div>
               </div>
             </div>
+
+            {activeBuffChips.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                {activeBuffChips.map((chip) => (
+                  <span
+                    key={chip.label}
+                    className="rounded border px-1.5 py-0.5 text-[9px] font-black tracking-wide"
+                    style={{
+                      color: chip.color,
+                      borderColor: `${chip.color}55`,
+                      backgroundColor: `${chip.color}18`,
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Nút bấm cảm ứng / chuột trái-phải + Kích hoạt Nộ chủ động + Hướng dẫn phím */}
@@ -832,13 +1026,16 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                       : icbmPending
                         ? trans.hud.rageMissileFlying
                         : rageActive
-                          ? formatText(trans.hud.rageBulletRain, {
+                          ? formatText(trans.hud.rageSkillActive, {
+                              skill: ragingSkillName,
                               time: rageTimeLeft.toFixed(1),
                             })
                           : rageReady
                             ? weapon.id === "icbm"
                               ? trans.hud.rageButtonCenterIcbm
-                              : trans.hud.rageButtonCenter
+                              : formatText(trans.hud.rageSkillButton, {
+                                  skill: readySkillName,
+                                })
                             : formatText(trans.hud.ragePercent, { pct: ragePercent })}
                   </span>
                 </Button>
@@ -872,7 +1069,8 @@ export function GameHUD({ containerRef }: GameHUDProps) {
             <span className="hidden lg:inline-block lg:order-2 rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 text-[11px] text-slate-300 backdrop-blur-md">
               <strong className="text-white">A / D</strong> {trans.hud.keyOr}{" "}
               <strong className="text-white">← / →</strong> {trans.hud.keyMove} •{" "}
-              <strong className="text-cyan-300">1-3 / Q</strong> {trans.hud.keySwitchWeapon} •{" "}
+              <strong className="text-cyan-300">1-3 / Q / Scroll</strong>{" "}
+              {trans.hud.keySwitchWeapon} •{" "}
               <strong className="text-amber-300">R</strong> {trans.hud.keyRage} •{" "}
               <strong className="text-white">V</strong> {trans.hud.keyCamera} •{" "}
               {cameraMode === "FREE_ORBIT"

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { DEFAULT_R2_ASSET_URL, isLocalAssetMode } from "@/lib/utils";
 
-export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v2";
+export const MODEL_CACHE_STORAGE_NAME = "lane-shooter-3d-models-v3";
 
 // Bật bộ nhớ đệm RAM nội bộ của Three.js trong suốt phiên chơi
 THREE.Cache.enabled = true;
@@ -37,9 +37,7 @@ export function isModelAssetUrl(url: string): boolean {
   ) {
     return true;
   }
-  const r2Base = (
-    process.env.NEXT_PUBLIC_R2_ASSET_URL ?? DEFAULT_R2_ASSET_URL
-  )
+  const r2Base = (process.env.NEXT_PUBLIC_R2_ASSET_URL ?? DEFAULT_R2_ASSET_URL)
     .trim()
     .toLowerCase();
   return Boolean(r2Base && cleanUrl.startsWith(r2Base));
@@ -62,7 +60,9 @@ export function isHtmlBuffer(buffer: ArrayBuffer): boolean {
   return view[i] === 60; // Ký tự '<' (0x3C)
 }
 
-export function buildResponseFromBuffer(payload: CachedBufferPayload): Response {
+export function buildResponseFromBuffer(
+  payload: CachedBufferPayload,
+): Response {
   return new Response(payload.buffer.slice(0), {
     status: 200,
     statusText: "OK",
@@ -113,11 +113,10 @@ export function installModelBrowserCache(): void {
 
   window.fetch = async (
     input: RequestInfo | URL,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<Response> => {
     const method = (
-      init?.method ||
-      (input instanceof Request ? input.method : "GET")
+      init?.method || (input instanceof Request ? input.method : "GET")
     ).toUpperCase();
 
     const url =
@@ -144,13 +143,16 @@ export function installModelBrowserCache(): void {
     if (canUseCacheStorage) {
       try {
         const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
-        const cachedRes = (await cache.match(canonicalUrl)) ?? (await cache.match(url));
+        const cachedRes =
+          (await cache.match(canonicalUrl)) ?? (await cache.match(url));
         if (cachedRes && cachedRes.ok) {
           const testBuffer = await cachedRes.clone().arrayBuffer();
           if (!isHtmlBuffer(testBuffer)) {
             const payload: CachedBufferPayload = {
               buffer: testBuffer,
-              contentType: cachedRes.headers.get("Content-Type") || "application/octet-stream",
+              contentType:
+                cachedRes.headers.get("Content-Type") ||
+                "application/octet-stream",
             };
             sessionMemoryCache.set(canonicalUrl, payload);
             return buildResponseFromBuffer(payload);
@@ -168,7 +170,8 @@ export function installModelBrowserCache(): void {
     let pending = inFlightDownloads.get(canonicalUrl);
     if (!pending) {
       pending = (async (): Promise<CachedBufferPayload> => {
-        const isCrossOrigin = /^https?:\/\//i.test(canonicalUrl) &&
+        const isCrossOrigin =
+          /^https?:\/\//i.test(canonicalUrl) &&
           typeof window !== "undefined" &&
           !canonicalUrl.startsWith(window.location.origin);
         const netRes = await nativeFetch(canonicalUrl, {
@@ -178,14 +181,16 @@ export function installModelBrowserCache(): void {
           cache: "no-store",
           mode: isCrossOrigin ? "cors" : "same-origin",
           credentials: isCrossOrigin ? "omit" : "same-origin",
-          signal: init?.signal ?? (input instanceof Request ? input.signal : undefined),
+          signal:
+            init?.signal ??
+            (input instanceof Request ? input.signal : undefined),
         });
 
         const cType = netRes.headers.get("Content-Type") || "";
         if (!netRes.ok || cType.includes("text/html")) {
           const sourceLabel = useLocalMode ? "local (public/)" : "R2";
           throw new Error(
-            `Không tải được model 3D từ ${sourceLabel} (HTTP ${netRes.status}): ${canonicalUrl}`
+            `Không tải được model 3D từ ${sourceLabel} (HTTP ${netRes.status}): ${canonicalUrl}`,
           );
         }
 
@@ -195,7 +200,7 @@ export function installModelBrowserCache(): void {
         // Kiểm tra xem dữ liệu có phải là file nhị phân hợp lệ hay trang HTML lỗi
         if (isHtmlBuffer(buffer)) {
           throw new Error(
-            `Dữ liệu nhận về từ máy chủ là trang HTML lỗi (403/404), không phải file model 3D: ${canonicalUrl}`
+            `Dữ liệu nhận về từ máy chủ là trang HTML lỗi (403/404), không phải file model 3D: ${canonicalUrl}`,
           );
         }
 
@@ -206,10 +211,7 @@ export function installModelBrowserCache(): void {
         if (canUseCacheStorage && buffer.byteLength > 0) {
           try {
             const cache = await window.caches.open(MODEL_CACHE_STORAGE_NAME);
-            await cache.put(
-              canonicalUrl,
-              buildResponseFromBuffer(payload)
-            );
+            await cache.put(canonicalUrl, buildResponseFromBuffer(payload));
           } catch {
             // Bỏ qua nếu đầy bộ nhớ cache trình duyệt
           }

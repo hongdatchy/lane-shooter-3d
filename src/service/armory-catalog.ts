@@ -33,8 +33,8 @@ export interface ArmoryWeaponSpec {
 
 export const MAX_WEAPON_LEVEL = 10;
 export const MAX_LOADOUT_SLOTS = 3;
-export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol"];
-export const DEFAULT_LOADOUT_IDS: string[] = ["pistol"];
+export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol", "ak47"];
+export const DEFAULT_LOADOUT_IDS: string[] = ["pistol", "ak47"];
 
 export function getWeaponUpgradeCost(weapon: ArmoryWeaponSpec, currentLevel: number): number {
   return weapon.upgradeBaseCost * currentLevel;
@@ -113,7 +113,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "GOLD TRACER FX",
     tracerHex: "#FE9800",
     unlockChapter: 1,
-    unlockCost: 350,
+    unlockCost: 0,
     upgradeBaseCost: 300,
     rageSkillName: "AK BULLET RAIN",
     rageSkillDescEn: "Fires 10 rounds/sec with 1.5x damage multiplier for 5 seconds.",

@@ -78,6 +78,17 @@ function formatSdkError(error: unknown, errorData?: unknown): string {
   return parts.join(": ") || "Unknown CrazyGames SDK error";
 }
 
+function getSdkErrorCode(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code?: unknown }).code ?? "");
+  }
+  return "";
+}
+
+function toFormattedError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(formatSdkError(error));
+}
+
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const parts = token.split(".");
   if (parts.length !== 3) {
@@ -222,11 +233,22 @@ export function createCrazyGamesAdapter(): PlatformAdapter {
       if (!sdk.user.isUserAccountAvailable) {
         return null;
       }
-      const user = await sdk.user.getUser();
-      if (!user) {
-        return null;
+      try {
+        const user = await sdk.user.getUser();
+        if (!user) {
+          return null;
+        }
+        return await resolveAuthenticatedPlayer(sdk, user);
+      } catch (err) {
+        const code = getSdkErrorCode(err);
+        if (
+          code === "userNotAuthenticated" ||
+          /user not authenticated|not logged in|not authenticated/i.test(formatSdkError(err))
+        ) {
+          return null;
+        }
+        throw toFormattedError(err);
       }
-      return resolveAuthenticatedPlayer(sdk, user);
     },
 
     async promptLogin(): Promise<PlatformPlayer> {
@@ -234,7 +256,15 @@ export function createCrazyGamesAdapter(): PlatformAdapter {
       if (!sdk.user.isUserAccountAvailable) {
         throw new Error("CrazyGames accounts are not available in this embed context.");
       }
-      const user = await sdk.user.showAuthPrompt();
+      let user: CrazyGamesUser | null = null;
+      try {
+        user = await sdk.user.showAuthPrompt();
+      } catch (err) {
+        if (getSdkErrorCode(err) === "userCancelled") {
+          throw new Error("CrazyGames login was cancelled.");
+        }
+        throw toFormattedError(err);
+      }
       if (!user) {
         throw new Error("CrazyGames login was cancelled.");
       }
@@ -266,18 +296,30 @@ export function createCrazyGamesAdapter(): PlatformAdapter {
 
     async getData(key: string): Promise<string | null> {
       const sdk = requireSdk();
-      const value = sdk.data.getItem(key);
-      return typeof value === "string" ? value : null;
+      try {
+        const value = sdk.data.getItem(key);
+        return typeof value === "string" ? value : null;
+      } catch (err) {
+        throw toFormattedError(err);
+      }
     },
 
     async setData(key: string, value: string): Promise<void> {
       const sdk = requireSdk();
-      sdk.data.setItem(key, value);
+      try {
+        sdk.data.setItem(key, value);
+      } catch (err) {
+        throw toFormattedError(err);
+      }
     },
 
     async removeData(key: string): Promise<void> {
       const sdk = requireSdk();
-      sdk.data.removeItem(key);
+      try {
+        sdk.data.removeItem(key);
+      } catch (err) {
+        throw toFormattedError(err);
+      }
     },
 
     requestRewardedAd(hooks?: AdLifecycleHooks): Promise<void> {

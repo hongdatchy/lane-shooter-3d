@@ -2,7 +2,15 @@ export type GameStatus = "MENU" | "PLAYING" | "PAUSED" | "GAME_OVER" | "VICTORY"
 
 export type CameraMode = "TOP_DOWN" | "THIRD_PERSON" | "FREE_ORBIT";
 
-export type EnemyKind = "NORMAL" | "ELITE" | "BOSS";
+export type EnemyKind = "NORMAL" | "ELITE" | "SKYWING" | "SHELL_BRUTE" | "BOSS";
+
+export type EnemyVisualKind =
+  | "CRAWLER"
+  | "HUSK"
+  | "SKYWING"
+  | "SHELL_BRUTE"
+  | "BOSS_STAGE1"
+  | "BOSS_STAGE2";
 
 export type WeaponModelKindDTO = "pistol" | "ak-rifle" | "machine-gun" | "cannon" | "icbm";
 
@@ -41,6 +49,14 @@ export interface IcbmStrikeDTO {
   delaySeconds: number;
 }
 
+export interface EnemySpawnEntryDTO {
+  kind: EnemyKind;
+  weight: number;
+  hp?: number;
+  speed?: number;
+  scale?: number;
+}
+
 export interface StageConfigDTO {
   stage: number;
   targetKills: number;                 // Số quái cần hạ để qua màn
@@ -55,10 +71,21 @@ export interface StageConfigDTO {
   spawnMaxInterval: number;
   maxBatchSize: number;
   isBossStage?: boolean;
+  spawnPool?: EnemySpawnEntryDTO[];
 }
 
 export interface EnemyEntity {
   active: boolean;
+  dying: boolean;
+  deathTimer: number;
+  deathDuration: number;
+  stunTimer: number;
+  acidTimer: number;
+  armorBroken: boolean;
+  shellArmorHp: number;
+  attackCooldown: number;
+  castTimer: number;
+  castFired: boolean;
   id: number;
   kind: EnemyKind;
   x: number;
@@ -74,6 +101,18 @@ export interface EnemyEntity {
   knockbackVz: number;
 }
 
+export interface EnemyProjectileEntity {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vz: number;
+  radius: number;
+  damage: number;
+  color: string;
+}
+
 export interface BulletEntity {
   active: boolean;
   x: number;
@@ -85,6 +124,111 @@ export interface BulletEntity {
   splashRadius: number;
   size: [number, number, number];
   color: string;
+  pierceRemaining: number;
+  ricochetRemaining: number;
+  lastHitEnemyId: number;
+  secondLastHitEnemyId: number;
+  fromRage: boolean;
+  homing: boolean;
+}
+
+export type RageSkillMode =
+  | "DURATION_BUFF"
+  | "DURATION_FIELD"
+  | "DURATION_SWARM"
+  | "INSTANT_AOE"
+  | "AIM_TARGET";
+
+export interface RageSkillSpecDTO {
+  id: string;
+  mode: RageSkillMode;
+  durationSeconds: number;
+  overrideRps?: number;
+  fireRateMultiplier?: number;
+  bulletCountMultiplier?: number;
+  damageMultiplier?: number;
+  bulletSpeedMultiplier?: number;
+  bulletScaleMultiplier?: number;
+  pierceCount?: number;
+  parallelStreams?: number;
+  spreadDeg?: number;
+  pelletsPerShot?: number;
+  slowRatio?: number;
+  acidMeltSeconds?: number;
+  aoeRadius?: number;
+  knockbackSpeed?: number;
+  stunSeconds?: number;
+  mineCount?: number;
+  swarmTotalCount?: number;
+  strikeCount?: number;
+  strikeKind?: "cannon" | "nuke" | "icbm";
+  falloutSeconds?: number;
+}
+
+export interface PendingRageTriggerDTO {
+  seq: number;
+  weaponId: string;
+}
+
+export interface OrbitalStrikePendingDTO {
+  seq: number;
+  kind: "cannon" | "nuke" | "icbm";
+  startX: number;
+  startZ: number;
+  targetX: number;
+  targetZ: number;
+  delaySeconds: number;
+  radius: number;
+  damage: number;
+  falloutSeconds?: number;
+}
+
+export type BuffGateId =
+  | "x2_clone"
+  | "piercing"
+  | "multishot"
+  | "ricochet"
+  | "explosive"
+  | "shield"
+  | "lightning"
+  | "cluster_bomb"
+  | "heal_hp"
+  | "magnet"
+  | "freeze_field"
+  | "turret_drop";
+
+export type BuffScopeDTO = "RUN" | "WAVE" | "CHARGES" | "INSTANT" | "TIMED";
+
+export interface BuffGateSpecDTO {
+  id: BuffGateId;
+  badgeText: string;
+  color: string;
+  scope: BuffScopeDTO;
+  durationSeconds?: number;
+  charges?: number;
+  targetHits: number;
+}
+
+export interface RightLaneGateEntityDTO {
+  slotIndex: 0 | 1;
+  buffId: BuffGateId;
+  x: number;
+  z: number;
+  hits: number;
+  targetHits: number;
+  claimed: boolean;
+}
+
+export interface ActiveBuffsStateDTO {
+  clones: number;
+  piercing: boolean;
+  multishot: boolean;
+  ricochet: boolean;
+  explosive: boolean;
+  shieldCharges: number;
+  magnetTimeLeft: number;
+  freezeTimeLeft: number;
+  turretTimeLeft: number;
 }
 
 export interface ParticleEntity {

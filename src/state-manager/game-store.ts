@@ -1,7 +1,25 @@
 import { create } from "zustand";
-import { CameraMode, GameStatus, IcbmStrikeDTO, LeaderboardEntryDTO } from "@/dto/GameDTO";
-import { weaponService } from "@/service/weapon-service";
+import {
+  ActiveBuffsStateDTO,
+  BuffGateSpecDTO,
+  CameraMode,
+  GameStatus,
+  IcbmStrikeDTO,
+  LeaderboardEntryDTO,
+  OrbitalStrikePendingDTO,
+  PendingRageTriggerDTO,
+  RightLaneGateEntityDTO,
+} from "@/dto/GameDTO";
+import { MAX_PLAYABLE_CHAPTER, weaponService } from "@/service/weapon-service";
 import { ARENA_CONFIG, ICBM_CONFIG, RAGE_CONFIG } from "@/service/game-constants";
+import { getRageSkillSpec } from "@/service/rage-catalog";
+import {
+  MAX_PLAYER_CLONES,
+  MAX_SHIELD_CHARGES,
+  createEmptyActiveBuffs,
+  generateWaveRightLaneGates,
+  getBuffGateSpec,
+} from "@/service/buff-catalog";
 import { soundService } from "@/service/sound-service";
 import { leaderboardService } from "@/service/leaderboard-service";
 import {
@@ -9,6 +27,7 @@ import {
   DEFAULT_LOADOUT_IDS,
   MAX_LOADOUT_SLOTS,
   MAX_WEAPON_LEVEL,
+  getArmoryWeaponById,
   getWeaponUpgradeCost,
 } from "@/service/armory-catalog";
 import {
@@ -30,6 +49,17 @@ const getCurrentTrans = () => getTranslation(useAppStore.getState().locale);
 export type MenuScreen = "LOBBY" | "WORLD_MAP" | "ARMORY";
 export type ArmoryTab = "UPGRADES" | "PETS" | "ARSENAL";
 
+interface PendingGuestMatch {
+  sessionId: number;
+  score: number;
+  wave: number;
+  kills: number;
+  victory: boolean;
+  earnedGold: number;
+  activeChapter: number;
+  guestSavedUpdatedAt: number | null;
+}
+
 interface GameState {
   gameStatus: GameStatus;
   menuScreen: MenuScreen;
@@ -37,6 +67,7 @@ interface GameState {
   armoryTab: ArmoryTab;
   armorySaving: boolean;
   selectedChapter: number;
+  activeChapter: number;
 
   // Platform & Account (selected via NEXT_PUBLIC_PLATFORM at build time)
   platformTarget: PlatformTarget | null;
@@ -59,6 +90,8 @@ interface GameState {
   leaderboardLoading: boolean;
   leaderboardError: string | null;
   scoreSyncError: string | null;
+  pendingGuestMatch: PendingGuestMatch | null;
+  syncedMatchSessionId: number | null;
 
   // Portal Ads state
   adLoading: boolean;
@@ -67,6 +100,7 @@ interface GameState {
 
   score: number;
   highScore: number;
+  lastGoldEarned: number;
   hp: number;
   maxHp: number;
 
@@ -77,21 +111,27 @@ interface GameState {
   stageTargetKills: number;
   kills: number;
 
-  // Active 3-Weapon Combat Loadout & Right-Lane Overdrive Buff Pedestal
+  // Active 3-Weapon Combat Loadout & Right-Lane Buff Gates (2 items per wave)
   combatLoadoutIds: string[];
   activeLoadoutSlot: number;
   overdriveLevel: number;
-  crateHits: number;
-  crateTargetHits: number;
+  rightLaneGates: RightLaneGateEntityDTO[];
+  activeBuffs: ActiveBuffsStateDTO;
   rewardBanner: string | null;
 
-  // Rage & ICBM
+  // Rage & Weapon-Specific Ultimates
   rage: number;
   rageReady: boolean;
   rageActive: boolean;
   rageTimeLeft: number;
+  rageDurationTotal: number;
+  activeRageWeaponId: string | null;
+  pendingRageTrigger: PendingRageTriggerDTO | null;
   icbmAiming: boolean;
+  aimingWeaponId: string | null;
   icbmPending: IcbmStrikeDTO | null;
+  rageStrikesPending: OrbitalStrikePendingDTO[];
+  rageStrikeBatchSeq: number;
 
   // Controls & Audio
   cameraMode: CameraMode;
@@ -129,9 +169,10 @@ interface GameActions {
   unlockArmoryWeapon: (weaponId: string) => Promise<void>;
   assignWeaponToLoadout: (weaponId: string, slotIndex?: number) => Promise<void>;
   removeWeaponFromLoadout: (weaponId: string) => Promise<void>;
+  selectActiveLoadoutWeapon: (weaponId: string) => Promise<void>;
   upgradeArmoryWeapon: (weaponId: string) => Promise<void>;
   switchCombatWeaponSlot: (slotIndex: number) => void;
-  cycleCombatWeapon: () => void;
+  cycleCombatWeapon: (dir?: 1 | -1) => void;
   selectChapter: (chapterId: number) => void;
   startGame: () => void;
   returnToMenu: () => void;
@@ -147,8 +188,9 @@ interface GameActions {
   launchIcbm: (targetX: number, targetZ: number, startX: number) => void;
   finishIcbmStrike: () => void;
   tickRage: (delta: number) => void;
+  tickBuffTimers: (delta: number) => void;
   registerEnemyKill: (points: number) => void;
-  registerCrateHit: () => { upgraded: boolean; label: string | null };
+  registerGateHit: (slotIndex: 0 | 1) => { claimed: boolean; buff: BuffGateSpecDTO | null };
   damagePlayer: (amount: number) => void;
   clearRewardBanner: () => void;
 }
@@ -171,6 +213,21 @@ function resolveActiveCombatWeapon(state: {
     DEFAULT_LOADOUT_IDS[0];
   const level = state.saveData.weaponLevels[id] ?? 1;
   return weaponService.resolveCombatWeapon(id, level);
+}
+
+// Trong các súng mang theo, ưu tiên cầm sẵn khẩu đứng sau trong danh sách ARMORY_WEAPONS (mạnh hơn)
+function pickStrongestLoadoutSlotIndex(loadoutIds: string[]): number {
+  if (loadoutIds.length <= 1) return 0;
+  let bestSlotIdx = 0;
+  let bestCatalogIdx = -1;
+  for (let i = 0; i < loadoutIds.length; i++) {
+    const catalogIdx = ARMORY_WEAPONS.findIndex((w) => w.id === loadoutIds[i]);
+    if (catalogIdx > bestCatalogIdx) {
+      bestCatalogIdx = catalogIdx;
+      bestSlotIdx = i;
+    }
+  }
+  return bestSlotIdx;
 }
 
 async function commitArmorySave(
@@ -209,62 +266,40 @@ function safeNotifyPlatform(action: (adapter: ReturnType<typeof getPlatformAdapt
   }
 }
 
-function syncPostMatchOutcome(input: {
-  player: PlatformPlayer | null;
+function applyMatchRewardToSave(
+  baseSave: PlayerSaveData,
+  match: {
+    earnedGold: number;
+    score: number;
+    kills: number;
+    victory: boolean;
+    activeChapter: number;
+  }
+): PlayerSaveData {
+  const nextUnlockedChapter =
+    match.victory && match.activeChapter >= baseSave.unlockedChapter
+      ? Math.min(10, match.activeChapter + 1)
+      : baseSave.unlockedChapter;
+
+  return {
+    ...baseSave,
+    gold: baseSave.gold + match.earnedGold,
+    bestScore: Math.max(baseSave.bestScore, match.score),
+    totalKills: baseSave.totalKills + match.kills,
+    gamesPlayed: baseSave.gamesPlayed + 1,
+    unlockedChapter: nextUnlockedChapter,
+  };
+}
+
+function submitLeaderboardMatch(input: {
+  player: PlatformPlayer;
   score: number;
   wave: number;
   kills: number;
   victory: boolean;
 }): void {
-  const state = useGameStore.getState();
-
-  // 1. Update platform/cloud save (avoid overwriting if initial load failed)
-  if (state.platformReady && !state.saveError) {
-    const nextUnlockedChapter =
-      input.victory && state.selectedChapter >= state.saveData.unlockedChapter
-        ? Math.min(10, state.selectedChapter + 1)
-        : state.saveData.unlockedChapter;
-
-    const nextSave: PlayerSaveData = {
-      ...state.saveData,
-      bestScore: Math.max(state.saveData.bestScore, input.score),
-      totalKills: state.saveData.totalKills + input.kills,
-      gamesPlayed: state.saveData.gamesPlayed + 1,
-      unlockedChapter: nextUnlockedChapter,
-    };
-
-    void playerSaveService
-      .writeSave(nextSave)
-      .then((saved) => {
-        useGameStore.setState((curr) => ({
-          saveData: saved,
-          saveError: null,
-          highScore: Math.max(
-            curr.highScore,
-            computeBestScore(curr.player, curr.leaderboard, saved)
-          ),
-        }));
-      })
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        useGameStore.setState({ saveError: message });
-      });
-  }
-
-  // 2. Leaderboard score submission: strictly requires logged-in player (Guest plays without ranking)
-  if (!input.player) {
-    useGameStore.setState({ scoreSyncError: null });
-    return;
-  }
-
   void leaderboardService
-    .syncMatchToCloud({
-      player: input.player,
-      score: input.score,
-      wave: input.wave,
-      kills: input.kills,
-      victory: input.victory,
-    })
+    .syncMatchToCloud(input)
     .then((entries) => {
       useGameStore.setState((curr) => ({
         leaderboard: entries,
@@ -282,6 +317,148 @@ function syncPostMatchOutcome(input: {
     });
 }
 
+async function hydrateAuthenticatedSession(player: PlatformPlayer): Promise<void> {
+  const loadedSave = await playerSaveService.loadSave();
+  if (loadedSave.locale) {
+    useAppStore.getState().setLocale(normalizeLocale(loadedSave.locale));
+  }
+
+  const snapshot = useGameStore.getState();
+  const pending = snapshot.pendingGuestMatch;
+  const shouldSyncPending =
+    Boolean(pending) && snapshot.syncedMatchSessionId !== pending?.sessionId;
+
+  useGameStore.setState((curr) => ({
+    player,
+    playerId: player.id,
+    playerName: player.name,
+    saveData: loadedSave,
+    saveError: null,
+    authError: null,
+    scoreSyncError: null,
+    syncedMatchSessionId:
+      shouldSyncPending && pending ? pending.sessionId : curr.syncedMatchSessionId,
+    pendingGuestMatch: null,
+    highScore: computeBestScore(player, curr.leaderboard, loadedSave),
+  }));
+
+  if (!shouldSyncPending || !pending) {
+    return;
+  }
+
+  const alreadyInLoadedSave =
+    pending.guestSavedUpdatedAt !== null &&
+    loadedSave.updatedAt === pending.guestSavedUpdatedAt;
+
+  if (!alreadyInLoadedSave) {
+    const mergedSave = applyMatchRewardToSave(loadedSave, pending);
+    try {
+      const saved = await playerSaveService.writeSave(mergedSave);
+      useGameStore.setState((curr) => ({
+        saveData: saved,
+        saveError: null,
+        highScore: Math.max(
+          curr.highScore,
+          computeBestScore(curr.player, curr.leaderboard, saved)
+        ),
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      useGameStore.setState({ saveError: msg });
+    }
+  }
+
+  submitLeaderboardMatch({
+    player,
+    score: pending.score,
+    wave: pending.wave,
+    kills: pending.kills,
+    victory: pending.victory,
+  });
+}
+
+function syncPostMatchOutcome(input: {
+  player: PlatformPlayer | null;
+  score: number;
+  wave: number;
+  kills: number;
+  victory: boolean;
+}): number {
+  const state = useGameStore.getState();
+  const earnedGold = Math.max(0, Math.round(input.score));
+  const matchSessionId = state.sessionId;
+
+  if (!input.player) {
+    useGameStore.setState({
+      pendingGuestMatch: {
+        sessionId: matchSessionId,
+        score: input.score,
+        wave: input.wave,
+        kills: input.kills,
+        victory: input.victory,
+        earnedGold,
+        activeChapter: state.activeChapter,
+        guestSavedUpdatedAt: null,
+      },
+      scoreSyncError: null,
+    });
+  } else {
+    useGameStore.setState({
+      syncedMatchSessionId: matchSessionId,
+      pendingGuestMatch: null,
+    });
+  }
+
+  // 1. Update platform/cloud save (avoid overwriting if initial load failed)
+  if (state.platformReady && !state.saveError) {
+    const nextSave = applyMatchRewardToSave(state.saveData, {
+      earnedGold,
+      score: input.score,
+      kills: input.kills,
+      victory: input.victory,
+      activeChapter: state.activeChapter,
+    });
+
+    void playerSaveService
+      .writeSave(nextSave)
+      .then((saved) => {
+        useGameStore.setState((curr) => ({
+          saveData: saved,
+          saveError: null,
+          pendingGuestMatch:
+            curr.pendingGuestMatch &&
+            curr.pendingGuestMatch.sessionId === matchSessionId
+              ? { ...curr.pendingGuestMatch, guestSavedUpdatedAt: saved.updatedAt }
+              : curr.pendingGuestMatch,
+          highScore: Math.max(
+            curr.highScore,
+            computeBestScore(curr.player, curr.leaderboard, saved)
+          ),
+        }));
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        useGameStore.setState({ saveError: message });
+      });
+  }
+
+  // 2. Leaderboard score submission: strictly requires logged-in player (Guest plays without ranking)
+  if (!input.player) {
+    useGameStore.setState({ scoreSyncError: null });
+    return earnedGold;
+  }
+
+  submitLeaderboardMatch({
+    player: input.player,
+    score: input.score,
+    wave: input.wave,
+    kills: input.kills,
+    victory: input.victory,
+  });
+
+  return earnedGold;
+}
+
 export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   gameStatus: "MENU",
   menuScreen: "LOBBY",
@@ -289,6 +466,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   armoryTab: "ARSENAL",
   armorySaving: false,
   selectedChapter: 1,
+  activeChapter: 1,
 
   platformTarget: null,
   platformCapabilities: null,
@@ -308,6 +486,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   leaderboardLoading: true,
   leaderboardError: null,
   scoreSyncError: null,
+  pendingGuestMatch: null,
+  syncedMatchSessionId: null,
 
   adLoading: false,
   adError: null,
@@ -315,6 +495,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
 
   score: 0,
   highScore: 0,
+  lastGoldEarned: 0,
   hp: INITIAL_MAX_HP,
   maxHp: INITIAL_MAX_HP,
 
@@ -325,18 +506,28 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   kills: 0,
 
   combatLoadoutIds: [...DEFAULT_LOADOUT_IDS],
-  activeLoadoutSlot: 0,
+  activeLoadoutSlot: pickStrongestLoadoutSlotIndex(DEFAULT_LOADOUT_IDS),
   overdriveLevel: 0,
-  crateHits: 0,
-  crateTargetHits: weaponService.getOverdriveTargetHits(0),
+  rightLaneGates: generateWaveRightLaneGates(1, {
+    hp: INITIAL_MAX_HP,
+    maxHp: INITIAL_MAX_HP,
+    activeBuffs: createEmptyActiveBuffs(0),
+  }),
+  activeBuffs: createEmptyActiveBuffs(0),
   rewardBanner: null,
 
   rage: 0,
   rageReady: false,
   rageActive: false,
   rageTimeLeft: 0,
+  rageDurationTotal: RAGE_CONFIG.durationSeconds,
+  activeRageWeaponId: null,
+  pendingRageTrigger: null,
   icbmAiming: false,
+  aimingWeaponId: null,
   icbmPending: null,
+  rageStrikesPending: [],
+  rageStrikeBatchSeq: 0,
 
   cameraMode: "THIRD_PERSON",
   autoFire: true,
@@ -384,21 +575,26 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         }
 
         authChangeUnsubscribe = adapter.subscribeAuthChange((nextPlayer) => {
+          if (get().authLoading) return;
           void (async () => {
             try {
-              const refreshedSave = await playerSaveService.loadSave();
-              if (refreshedSave.locale) {
-                useAppStore.getState().setLocale(normalizeLocale(refreshedSave.locale));
+              if (nextPlayer) {
+                await hydrateAuthenticatedSession(nextPlayer);
+              } else {
+                const refreshedSave = await playerSaveService.loadSave();
+                if (refreshedSave.locale) {
+                  useAppStore.getState().setLocale(normalizeLocale(refreshedSave.locale));
+                }
+                set((curr) => ({
+                  player: null,
+                  playerId: "",
+                  playerName: "",
+                  saveData: refreshedSave,
+                  saveError: null,
+                  authError: null,
+                  highScore: computeBestScore(null, curr.leaderboard, refreshedSave),
+                }));
               }
-              set((curr) => ({
-                player: nextPlayer,
-                playerId: nextPlayer?.id ?? "",
-                playerName: nextPlayer?.name ?? "",
-                saveData: refreshedSave,
-                saveError: null,
-                authError: null,
-                highScore: computeBestScore(nextPlayer, curr.leaderboard, refreshedSave),
-              }));
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
               set({
@@ -449,19 +645,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       const adapter = getPlatformAdapter();
       await adapter.init();
       const player = await adapter.promptLogin();
-      const loadedSave = await playerSaveService.loadSave();
-      if (loadedSave.locale) {
-        useAppStore.getState().setLocale(normalizeLocale(loadedSave.locale));
-      }
-      set((curr) => ({
-        player,
-        playerId: player.id,
-        playerName: player.name,
-        saveData: loadedSave,
-        saveError: null,
-        authError: null,
-        highScore: computeBestScore(player, curr.leaderboard, loadedSave),
-      }));
+      await hydrateAuthenticatedSession(player);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ authError: message });
@@ -575,7 +759,10 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   openWorldMap: () =>
     set((state) => ({
       menuScreen: "WORLD_MAP",
-      selectedChapter: Math.min(10, Math.max(1, state.saveData.unlockedChapter)),
+      selectedChapter: Math.min(
+        MAX_PLAYABLE_CHAPTER,
+        Math.max(1, state.saveData.unlockedChapter)
+      ),
     })),
 
   openLobby: () => set({ menuScreen: "LOBBY" }),
@@ -655,7 +842,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
 
     const nextSave: PlayerSaveData = {
       ...state.saveData,
-      equippedWeaponId: current[0],
+      equippedWeaponId: current.includes(state.saveData.equippedWeaponId)
+        ? state.saveData.equippedWeaponId
+        : current[0],
       equippedLoadoutIds: current,
     };
     await commitArmorySave(nextSave, set);
@@ -670,8 +859,23 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextLoadout = current.filter((id) => id !== weaponId);
     const nextSave: PlayerSaveData = {
       ...state.saveData,
-      equippedWeaponId: nextLoadout[0],
+      equippedWeaponId: nextLoadout.includes(state.saveData.equippedWeaponId)
+        ? state.saveData.equippedWeaponId
+        : nextLoadout[0],
       equippedLoadoutIds: nextLoadout,
+    };
+    await commitArmorySave(nextSave, set);
+  },
+
+  selectActiveLoadoutWeapon: async (weaponId) => {
+    const state = get();
+    if (!state.platformReady || state.saveError || state.armorySaving) return;
+    if (!state.saveData.equippedLoadoutIds.includes(weaponId)) return;
+    if (state.saveData.equippedWeaponId === weaponId) return;
+
+    const nextSave: PlayerSaveData = {
+      ...state.saveData,
+      equippedWeaponId: weaponId,
     };
     await commitArmorySave(nextSave, set);
   },
@@ -712,35 +916,64 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     soundService.unlock();
     safeNotifyPlatform((adapter) => adapter.notifyGameplayStart());
     set((state) => {
+      const chapterId = Math.min(
+        MAX_PLAYABLE_CHAPTER,
+        Math.max(1, state.selectedChapter)
+      );
+      const maxWaves = weaponService.getTotalStages(chapterId);
       const best = computeBestScore(state.player, state.leaderboard, state.saveData);
       const loadout =
         state.saveData.equippedLoadoutIds.length > 0
           ? [...state.saveData.equippedLoadoutIds]
           : [state.saveData.equippedWeaponId || DEFAULT_LOADOUT_IDS[0]];
+      const bestSlotIdx = pickStrongestLoadoutSlotIndex(loadout);
+      const startingClones = state.rewardedAdClaimed ? 1 : 0;
+      const initialBuffs = createEmptyActiveBuffs(startingClones);
+      const trans = getCurrentTrans();
       return {
         gameStatus: "PLAYING",
         score: 0,
         highScore: best,
+        lastGoldEarned: 0,
         scoreSyncError: null,
+        pendingGuestMatch: null,
+        syncedMatchSessionId: null,
         hp: INITIAL_MAX_HP,
         maxHp: INITIAL_MAX_HP,
+        activeChapter: chapterId,
         wave: 1,
-        maxWaves: TOTAL_STAGES,
+        maxWaves,
         stageKills: 0,
-        stageTargetKills: weaponService.getStageConfig(1).targetKills,
+        stageTargetKills: weaponService.getStageConfig(1, chapterId).targetKills,
         kills: 0,
         combatLoadoutIds: loadout,
-        activeLoadoutSlot: 0,
+        activeLoadoutSlot: bestSlotIdx,
         overdriveLevel: 0,
-        crateHits: 0,
-        crateTargetHits: weaponService.getOverdriveTargetHits(0),
-        rewardBanner: getCurrentTrans().banners.stage1Start,
+        rightLaneGates: generateWaveRightLaneGates(1, {
+          hp: INITIAL_MAX_HP,
+          maxHp: INITIAL_MAX_HP,
+          activeBuffs: initialBuffs,
+        }),
+        activeBuffs: initialBuffs,
+        rewardBanner:
+          chapterId === 1
+            ? trans.banners.stage1Start
+            : formatText(trans.banners.chapterWaveStart, {
+                ch: chapterId,
+                wave: 1,
+                max: maxWaves,
+              }),
         rage: 0,
         rageReady: false,
         rageActive: false,
         rageTimeLeft: 0,
+        rageDurationTotal: RAGE_CONFIG.durationSeconds,
+        activeRageWeaponId: null,
+        pendingRageTrigger: null,
         icbmAiming: false,
+        aimingWeaponId: null,
         icbmPending: null,
+        rageStrikesPending: [],
         rewardedAdClaimed: false,
         sessionId: state.sessionId + 1,
       };
@@ -770,10 +1003,11 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     });
   },
 
-  cycleCombatWeapon: () => {
+  cycleCombatWeapon: (dir = 1) => {
     const state = get();
-    if (state.combatLoadoutIds.length <= 1) return;
-    const nextSlot = (state.activeLoadoutSlot + 1) % state.combatLoadoutIds.length;
+    const len = state.combatLoadoutIds.length;
+    if (len <= 1) return;
+    const nextSlot = (state.activeLoadoutSlot + dir + len) % len;
     get().switchCombatWeaponSlot(nextSlot);
   },
 
@@ -797,6 +1031,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       rageTimeLeft: 0,
       icbmAiming: false,
       icbmPending: null,
+      activeBuffs: createEmptyActiveBuffs(0),
       rewardBanner: null,
     });
   },
@@ -853,6 +1088,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       state.rageReady ||
       state.icbmAiming ||
       state.icbmPending !== null ||
+      state.rageStrikesPending.length > 0 ||
       amount <= 0
     ) {
       return;
@@ -860,15 +1096,20 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextRage = Math.min(RAGE_CONFIG.maxRage, state.rage + amount);
     if (nextRage >= RAGE_CONFIG.maxRage) {
       const weapon = resolveActiveCombatWeapon(state);
+      const spec = getRageSkillSpec(weapon.id);
+      const armory = getArmoryWeaponById(weapon.id);
+      const skillName = armory?.rageSkillName ?? weapon.name;
       const trans = getCurrentTrans();
       soundService.play("rageReady");
       set({
         rage: RAGE_CONFIG.maxRage,
         rageReady: true,
         rewardBanner:
-          weapon.id === "icbm"
-            ? trans.banners.rageReadyIcbm
-            : trans.banners.rageReadyNormal,
+          spec.mode === "AIM_TARGET"
+            ? weapon.id === "icbm"
+              ? trans.banners.rageReadyIcbm
+              : formatText(trans.banners.rageReadySkillAim, { skill: skillName })
+            : formatText(trans.banners.rageReadySkill, { skill: skillName }),
       });
       return;
     }
@@ -881,7 +1122,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       state.gameStatus !== "PLAYING" ||
       state.rageActive ||
       state.icbmAiming ||
-      state.icbmPending !== null
+      state.icbmPending !== null ||
+      state.rageStrikesPending.length > 0
     ) {
       return;
     }
@@ -892,13 +1134,41 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     }
     soundService.unlock();
     const weapon = resolveActiveCombatWeapon(state);
+    const armory = getArmoryWeaponById(weapon.id);
+    const spec = getRageSkillSpec(weapon.id);
     const trans = getCurrentTrans();
-    if (weapon.id === "icbm") {
+    const skillName = armory?.rageSkillName ?? weapon.name;
+    const isVi = normalizeLocale(useAppStore.getState().locale) === "vi";
+    const skillDesc = armory ? (isVi ? armory.rageSkillDescVi : armory.rageSkillDescEn) : "";
+
+    if (spec.mode === "AIM_TARGET") {
       soundService.play("rageReady");
       set({
         rageReady: false,
         icbmAiming: true,
-        rewardBanner: trans.banners.icbmAiming,
+        aimingWeaponId: weapon.id,
+        rewardBanner:
+          weapon.id === "icbm"
+            ? trans.banners.icbmAiming
+            : formatText(trans.banners.rageAimingSkill, { skill: skillName }),
+      });
+      return;
+    }
+
+    if (spec.mode === "INSTANT_AOE") {
+      soundService.play("rageActivate");
+      const nextSeq = (state.pendingRageTrigger?.seq ?? 0) + 1;
+      set({
+        rage: 0,
+        rageReady: false,
+        rageActive: false,
+        rageTimeLeft: 0,
+        activeRageWeaponId: null,
+        pendingRageTrigger: { seq: nextSeq, weaponId: weapon.id },
+        rewardBanner: formatText(trans.banners.rageSkillActivatedInstant, {
+          skill: skillName,
+          desc: skillDesc,
+        }),
       });
       return;
     }
@@ -908,11 +1178,13 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       rage: RAGE_CONFIG.maxRage,
       rageReady: false,
       rageActive: true,
-      rageTimeLeft: RAGE_CONFIG.durationSeconds,
-      rewardBanner: formatText(trans.banners.rageActivated, {
-        rate: RAGE_CONFIG.fireRateMultiplier,
-        count: RAGE_CONFIG.bulletCountMultiplier,
-        sec: RAGE_CONFIG.durationSeconds,
+      rageTimeLeft: spec.durationSeconds,
+      rageDurationTotal: spec.durationSeconds,
+      activeRageWeaponId: weapon.id,
+      rewardBanner: formatText(trans.banners.rageSkillActivatedTimed, {
+        skill: skillName,
+        sec: spec.durationSeconds,
+        desc: skillDesc,
       }),
     });
   },
@@ -922,19 +1194,99 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     if (state.gameStatus !== "PLAYING" || !state.icbmAiming) {
       return;
     }
-    soundService.play("icbmLaunch");
-    set({
-      icbmAiming: false,
-      icbmPending: {
+    const weaponId = state.aimingWeaponId ?? resolveActiveCombatWeapon(state).id;
+    const weapon = weaponService.resolveCombatWeapon(
+      weaponId,
+      state.saveData.weaponLevels[weaponId] ?? 1
+    );
+    const armory = getArmoryWeaponById(weaponId);
+    const spec = getRageSkillSpec(weaponId);
+    const effectiveDamage = weaponService.getEffectiveDamage(weapon, state.overdriveLevel);
+    const skillName = armory?.rageSkillName ?? weapon.name;
+    const baseSeq = state.rageStrikeBatchSeq + 1;
+
+    let strikes: OrbitalStrikePendingDTO[] = [];
+    if (weaponId === "cannon") {
+      const offsets: Array<[number, number, number]> = [
+        [0, 0, 0.45],
+        [-2.2, -3.4, 1.05],
+        [2.2, -6.8, 1.65],
+      ];
+      strikes = offsets.map(([ox, oz, delay], idx) => ({
+        seq: baseSeq + idx,
+        kind: "cannon",
         startX,
         startZ: ARENA_CONFIG.playerZ,
-        targetX,
-        targetZ,
+        targetX: Math.max(
+          ARENA_CONFIG.leftLaneMinX + 1.2,
+          Math.min(ARENA_CONFIG.dividerX - 1.0, targetX + ox)
+        ),
+        targetZ: Math.max(-34, Math.min(8, targetZ + oz)),
+        delaySeconds: delay,
+        radius: spec.aoeRadius ?? 6,
+        damage: Math.max(90, Math.round(effectiveDamage * 6.5)),
+      }));
+    } else if (weaponId === "nuke_launcher") {
+      strikes = [
+        {
+          seq: baseSeq,
+          kind: "nuke",
+          startX,
+          startZ: ARENA_CONFIG.playerZ,
+          targetX,
+          targetZ,
+          delaySeconds: 1.0,
+          radius: spec.aoeRadius ?? 12,
+          damage: Math.max(400, Math.round(effectiveDamage * 14)),
+          falloutSeconds: spec.falloutSeconds ?? 10,
+        },
+      ];
+    } else {
+      const icbmOffsets: Array<[number, number]> = [
+        [0, 0],
+        [-3.4, -4.5],
+        [3.4, -4.5],
+      ];
+      strikes = icbmOffsets.map(([ox, oz], idx) => ({
+        seq: baseSeq + idx,
+        kind: "icbm",
+        startX,
+        startZ: ARENA_CONFIG.playerZ,
+        targetX: Math.max(
+          -ARENA_CONFIG.width / 2 + 1.5,
+          Math.min(ARENA_CONFIG.width / 2 - 1.5, targetX + ox)
+        ),
+        targetZ: Math.max(-34, Math.min(8, targetZ + oz)),
         delaySeconds: ICBM_CONFIG.impactDelaySeconds,
+        radius: spec.aoeRadius ?? ICBM_CONFIG.explosionRadius,
+        damage: ICBM_CONFIG.missileDamage,
+      }));
+    }
+
+    soundService.play("icbmLaunch");
+    const primary = strikes[0];
+    const maxDelay = Math.max(...strikes.map((s) => s.delaySeconds));
+    set({
+      rage: 0,
+      rageReady: false,
+      icbmAiming: false,
+      aimingWeaponId: null,
+      icbmPending: {
+        startX: primary.startX,
+        startZ: primary.startZ,
+        targetX: primary.targetX,
+        targetZ: primary.targetZ,
+        delaySeconds: maxDelay,
       },
-      rewardBanner: formatText(getCurrentTrans().banners.icbmLaunched, {
-        sec: ICBM_CONFIG.impactDelaySeconds,
-      }),
+      rageStrikesPending: strikes,
+      rageStrikeBatchSeq: baseSeq + strikes.length,
+      rewardBanner:
+        weaponId === "icbm"
+          ? formatText(getCurrentTrans().banners.icbmLaunched, { sec: maxDelay })
+          : formatText(getCurrentTrans().banners.rageSkillLaunched, {
+              skill: skillName,
+              sec: maxDelay,
+            }),
     });
   },
 
@@ -942,10 +1294,13 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     set({
       icbmPending: null,
       icbmAiming: false,
+      aimingWeaponId: null,
+      rageStrikesPending: [],
       rage: 0,
       rageReady: false,
       rageActive: false,
       rageTimeLeft: 0,
+      activeRageWeaponId: null,
     }),
 
   tickRage: (delta) =>
@@ -959,12 +1314,35 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           rageActive: false,
           rageReady: false,
           rageTimeLeft: 0,
+          activeRageWeaponId: null,
           rage: 0,
         };
       }
+      const totalDur = Math.max(0.1, state.rageDurationTotal || RAGE_CONFIG.durationSeconds);
       return {
         rageTimeLeft: nextTime,
-        rage: (nextTime / RAGE_CONFIG.durationSeconds) * RAGE_CONFIG.maxRage,
+        rage: (nextTime / totalDur) * RAGE_CONFIG.maxRage,
+      };
+    }),
+
+  tickBuffTimers: (delta) =>
+    set((state) => {
+      if (state.gameStatus !== "PLAYING") return {};
+      const curr = state.activeBuffs;
+      if (
+        curr.magnetTimeLeft <= 0 &&
+        curr.freezeTimeLeft <= 0 &&
+        curr.turretTimeLeft <= 0
+      ) {
+        return {};
+      }
+      return {
+        activeBuffs: {
+          ...curr,
+          magnetTimeLeft: Math.max(0, curr.magnetTimeLeft - delta),
+          freezeTimeLeft: Math.max(0, curr.freezeTimeLeft - delta),
+          turretTimeLeft: Math.max(0, curr.turretTimeLeft - delta),
+        },
       };
     }),
 
@@ -972,8 +1350,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const state = get();
     if (state.gameStatus !== "PLAYING") return;
 
+    const scoreMultiplier = state.activeBuffs.magnetTimeLeft > 0 ? 1.5 : 1;
     const nextKills = state.kills + 1;
-    const nextScore = state.score + points;
+    const nextScore = state.score + Math.round(points * scoreMultiplier);
     const nextHighScore = Math.max(state.highScore, nextScore);
     const nextStageKills = state.stageKills + 1;
 
@@ -994,7 +1373,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         adapter.notifyHappyTime();
       });
       const finalScore = nextScore + 1000;
-      syncPostMatchOutcome({
+      const earnedGold = syncPostMatchOutcome({
         player: state.player,
         score: finalScore,
         wave: state.wave,
@@ -1005,13 +1384,19 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         kills: nextKills,
         stageKills: state.stageTargetKills,
         score: finalScore,
+        lastGoldEarned: earnedGold,
         highScore: Math.max(nextHighScore, finalScore),
         gameStatus: "VICTORY",
+        rage: 0,
         rageReady: false,
         rageActive: false,
         rageTimeLeft: 0,
+        activeRageWeaponId: null,
+        pendingRageTrigger: null,
         icbmAiming: false,
+        aimingWeaponId: null,
         icbmPending: null,
+        rageStrikesPending: [],
         rewardBanner: formatText(getCurrentTrans().banners.victory, {
           max: state.maxWaves,
         }),
@@ -1020,7 +1405,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     }
 
     const nextWave = state.wave + 1;
-    const nextStageCfg = weaponService.getStageConfig(nextWave);
+    const nextStageCfg = weaponService.getStageConfig(nextWave, state.activeChapter);
     const trans = getCurrentTrans();
     soundService.play(nextStageCfg.isBossStage ? "bossWarning" : "stageClear");
     const bannerText = nextStageCfg.isBossStage
@@ -1030,6 +1415,15 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         })
       : formatText(trans.banners.stageClear, { wave: nextWave });
 
+    // Hết wave: xóa các buff hiệu lực theo Wave, giữ lại buff theo Run/Timed/Shield và sinh 2 Item mới
+    const carriedBuffs: ActiveBuffsStateDTO = {
+      ...state.activeBuffs,
+      piercing: false,
+      multishot: false,
+      ricochet: false,
+      explosive: false,
+    };
+
     set({
       kills: nextKills,
       wave: nextWave,
@@ -1037,53 +1431,137 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       stageTargetKills: nextStageCfg.targetKills,
       score: nextScore + 100,
       highScore: Math.max(nextHighScore, nextScore + 100),
+      activeBuffs: carriedBuffs,
+      rightLaneGates: generateWaveRightLaneGates(nextWave, {
+        hp: state.hp,
+        maxHp: state.maxHp,
+        activeBuffs: carriedBuffs,
+      }),
       rewardBanner: bannerText,
     });
   },
 
-  registerCrateHit: () => {
+  registerGateHit: (slotIndex) => {
     const state = get();
     if (state.gameStatus !== "PLAYING") {
-      return { upgraded: false, label: null };
+      return { claimed: false, buff: null };
+    }
+    const targetGate = state.rightLaneGates.find((g) => g.slotIndex === slotIndex);
+    if (!targetGate || targetGate.claimed) {
+      return { claimed: false, buff: null };
     }
 
-    const nextHits = state.crateHits + 1;
-    if (nextHits < state.crateTargetHits) {
-      set({ crateHits: nextHits });
-      return { upgraded: false, label: null };
+    const nextHits = targetGate.hits + 1;
+    if (nextHits < targetGate.targetHits) {
+      set({
+        rightLaneGates: state.rightLaneGates.map((g) =>
+          g.slotIndex === slotIndex ? { ...g, hits: nextHits } : g
+        ),
+      });
+      return { claimed: false, buff: null };
     }
 
-    const nextOverdrive = state.overdriveLevel + 1;
-    const nextTarget = weaponService.getOverdriveTargetHits(nextOverdrive);
+    const spec = getBuffGateSpec(targetGate.buffId);
+    const nextBuffs: ActiveBuffsStateDTO = { ...state.activeBuffs };
+    let nextHp = state.hp;
+    let bonusScore = 100;
+
+    switch (spec.id) {
+      case "x2_clone":
+        nextBuffs.clones = Math.min(MAX_PLAYER_CLONES, nextBuffs.clones + 1);
+        break;
+      case "piercing":
+        nextBuffs.piercing = true;
+        break;
+      case "multishot":
+        nextBuffs.multishot = true;
+        break;
+      case "ricochet":
+        nextBuffs.ricochet = true;
+        break;
+      case "explosive":
+        nextBuffs.explosive = true;
+        break;
+      case "shield":
+        nextBuffs.shieldCharges = Math.min(
+          MAX_SHIELD_CHARGES,
+          nextBuffs.shieldCharges + (spec.charges ?? 3)
+        );
+        break;
+      case "heal_hp":
+        if (nextHp < state.maxHp) {
+          nextHp = Math.min(state.maxHp, nextHp + 1);
+        } else {
+          bonusScore += 150;
+        }
+        break;
+      case "magnet":
+        nextBuffs.magnetTimeLeft = Math.max(
+          nextBuffs.magnetTimeLeft,
+          spec.durationSeconds ?? 10
+        );
+        break;
+      case "freeze_field":
+        nextBuffs.freezeTimeLeft = Math.max(
+          nextBuffs.freezeTimeLeft,
+          spec.durationSeconds ?? 5
+        );
+        break;
+      case "turret_drop":
+        nextBuffs.turretTimeLeft = Math.max(
+          nextBuffs.turretTimeLeft,
+          spec.durationSeconds ?? 10
+        );
+        break;
+      case "lightning":
+      case "cluster_bomb":
+        break;
+    }
+
     const trans = getCurrentTrans();
-    const rewardLabel = formatText(trans.banners.overdriveBuffActivated, {
-      level: nextOverdrive,
-      dmgPct: nextOverdrive * 25,
-      rofPct: nextOverdrive * 15,
+    const buffDesc = trans.buffs.items[spec.id];
+    const banner = formatText(trans.buffs.activatedBanner, {
+      badge: spec.badgeText,
+      desc: buffDesc,
     });
-    const nextScore = state.score + 150;
+    const nextScore = state.score + bonusScore;
 
     soundService.play("upgradeWeapon");
     set({
-      overdriveLevel: nextOverdrive,
-      crateHits: 0,
-      crateTargetHits: nextTarget,
+      hp: nextHp,
       score: nextScore,
       highScore: Math.max(state.highScore, nextScore),
-      rewardBanner: rewardLabel,
+      activeBuffs: nextBuffs,
+      rightLaneGates: state.rightLaneGates.map((g) =>
+        g.slotIndex === slotIndex ? { ...g, hits: g.targetHits, claimed: true } : g
+      ),
+      rewardBanner: banner,
     });
 
-    return { upgraded: true, label: rewardLabel };
+    return { claimed: true, buff: spec };
   },
 
   damagePlayer: (amount) => {
     const state = get();
     if (state.gameStatus !== "PLAYING") return;
+
+    if (state.activeBuffs.shieldCharges > 0) {
+      const nextCharges = state.activeBuffs.shieldCharges - 1;
+      soundService.play("hitCrate");
+      set({
+        activeBuffs: { ...state.activeBuffs, shieldCharges: nextCharges },
+        rewardBanner: formatText(getCurrentTrans().buffs.shieldBlockedBanner, {
+          charges: nextCharges,
+        }),
+      });
+      return;
+    }
+
     const nextHp = Math.max(0, state.hp - amount);
     soundService.play(nextHp <= 0 ? "gameOver" : "playerHit");
     if (nextHp <= 0) {
       safeNotifyPlatform((adapter) => adapter.notifyGameplayStop());
-      syncPostMatchOutcome({
+      const earnedGold = syncPostMatchOutcome({
         player: state.player,
         score: state.score,
         wave: state.wave,
@@ -1092,12 +1570,18 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       });
       set({
         hp: 0,
+        lastGoldEarned: earnedGold,
         gameStatus: "GAME_OVER",
+        rage: 0,
         rageReady: false,
         rageActive: false,
         rageTimeLeft: 0,
+        activeRageWeaponId: null,
+        pendingRageTrigger: null,
         icbmAiming: false,
+        aimingWeaponId: null,
         icbmPending: null,
+        rageStrikesPending: [],
       });
       return;
     }

@@ -184,7 +184,7 @@
 
 ### BOSS 1: **IRON WARDEN** *(Chapter 1 — Khu Thép)*
 *Mech robot 2 chân, cầm khiên + súng laser.*
-- **HP:** 2,600
+- **HP:** 260
 - **Phase 1 (100%→50%):**
   - `Laser Sweep` — Vạch đỏ ngang 1.5s trước → Bắn tia laser quét toàn bộ làn trái. Nhảy sang làn phải để tránh.
   - `Shield Bash` — Lao lên 1 bước, sóng xung kích hình bán nguyệt bán kính 4m.

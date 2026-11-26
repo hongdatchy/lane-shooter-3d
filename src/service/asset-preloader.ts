@@ -3,14 +3,15 @@ import { isLocalAssetMode, withAssetBase } from "@/lib/utils";
 import { isModelCached } from "@/service/model-cache";
 import { useGameStore } from "@/state-manager/game-store";
 
-// Thứ tự tải: 3 model Cửa 1 (.glb: Quái 1, Quái 2, Boss 1) và 3 model Mixamo nhân vật (.fbx).
+// Thứ tự tải: các model Quái (enemies/), Boss theo màn (bosses/stage1/, bosses/stage2/) và model nhân vật (.glb).
 export const PRELOAD_MODEL_FILES = [
-  "models/classic/stage1/crawler_walk.glb",
-  "models/classic/stage1/husk_rigged Walking.glb",
-  "models/classic/stage1/enemy-boss.glb",
-  "models/player-idle.fbx",
-  "models/player-left.fbx",
-  "models/player-right.fbx",
+  "models/enemies/crawler-walk-death-texture.glb",
+  "models/enemies/husk-walk-death-poison-texture.glb",
+  "models/enemies/skywing-v2.glb",
+  "models/enemies/shell_brute.glb",
+  "models/bosses/stage1/iron-warden-mechanical.glb",
+  "models/bosses/stage2/nano-hydra-base-v3.glb",
+  "models/linh-cyber-v3.glb",
 ];
 
 let isPreloading = false;

@@ -38,7 +38,7 @@ export const CHAPTER_CATALOG: ChapterConfig[] = [
     hostiles: ["CRAWLER (SWARM)", "HUSK (TOXIN)", "SHELL BRUTE", "SKYWING"],
     boss: {
       name: "IRON WARDEN",
-      hp: 2600,
+      hp: 260,
       description: "Armored bipedal juggernaut wielding a heavy shield and sweeping lane laser.",
     },
     weapons: [
@@ -53,15 +53,15 @@ export const CHAPTER_CATALOG: ChapterConfig[] = [
     title: "BIO LAB OMEGA",
     biome: "SUBTERRANEAN GENE VAULT",
     hazardLevel: 4,
-    waves: 6,
+    waves: 5,
     mapPos: { xPct: 24, yPct: 52 },
     themeGradient: "from-[#0a2a24] via-[#0f362d] to-[#091518]",
     accentHex: "#10B981",
     icon: "bio",
-    hostiles: ["DASHER (SWARM)", "BLOATER (ACID)", "PARASITE", "REGEN BEAST"],
+    hostiles: ["CRAWLER (SWARM)", "HUSK (TOXIN)", "SKYWING (ZIGZAG)", "SHELL BRUTE (ARMOR)"],
     boss: {
       name: "NANO HYDRA",
-      hp: 8000,
+      hp: 1200,
       description: "Three-headed bio-mech serpent with corrosive lane sweeps and drone spawns.",
     },
     weapons: [

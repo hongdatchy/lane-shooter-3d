@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { CHAPTER_CATALOG, ChapterConfig } from "@/service/chapter-catalog";
 import { MAX_LOADOUT_SLOTS, getArmoryWeaponById } from "@/service/armory-catalog";
+import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import { useGameStore } from "@/state-manager/game-store";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
@@ -70,6 +71,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
   const selectedChapterId = useGameStore((s) => s.selectedChapter);
   const saveData = useGameStore((s) => s.saveData);
   const selectChapter = useGameStore((s) => s.selectChapter);
+  const selectActiveLoadoutWeapon = useGameStore((s) => s.selectActiveLoadoutWeapon);
   const openLobby = useGameStore((s) => s.openLobby);
   const openArmory = useGameStore((s) => s.openArmory);
 
@@ -88,8 +90,9 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
   const selectedChapter =
     CHAPTER_CATALOG.find((ch) => ch.id === selectedChapterId) ?? CHAPTER_CATALOG[0];
   const isSelectedLocked = selectedChapter.id > unlockedChapter;
+  const isChapterBuilt = selectedChapter.id <= MAX_PLAYABLE_CHAPTER;
   const canLaunchCombat =
-    !isSelectedLocked && assetsReady && !assetsError && platformReady && !platformError;
+    !isSelectedLocked && isChapterBuilt && assetsReady && !assetsError && platformReady && !platformError;
 
   const handleLaunchClick = useCallback(() => {
     if (!canLaunchCombat) return;
@@ -269,8 +272,10 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
 
               {CHAPTER_CATALOG.slice(0, -1).map((fromCh, idx) => {
                 const toCh = CHAPTER_CATALOG[idx + 1];
-                const isUnlockedRoute = toCh.id <= unlockedChapter;
-                const isFrontierRoute = fromCh.id <= unlockedChapter && toCh.id === unlockedChapter + 1;
+                const isBuiltRoute = toCh.id <= MAX_PLAYABLE_CHAPTER;
+                const isUnlockedRoute = isBuiltRoute && toCh.id <= unlockedChapter;
+                const isFrontierRoute =
+                  isBuiltRoute && fromCh.id <= unlockedChapter && toCh.id === unlockedChapter + 1;
 
                 return (
                   <line
@@ -294,11 +299,12 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
               })}
             </svg>
 
-            {/* 10 Chapter Nodes */}
+            {/* 10 Chapter Nodes (Stage >= 3: Coming Soon) */}
             {CHAPTER_CATALOG.map((ch) => {
-              const isCleared = ch.id < unlockedChapter;
-              const isUnlockedActive = ch.id === unlockedChapter;
-              const isLocked = ch.id > unlockedChapter;
+              const isComingSoon = ch.id > MAX_PLAYABLE_CHAPTER;
+              const isCleared = !isComingSoon && ch.id < unlockedChapter;
+              const isUnlockedActive = !isComingSoon && ch.id === unlockedChapter;
+              const isLocked = !isComingSoon && ch.id > unlockedChapter;
               const isSelected = ch.id === selectedChapter.id;
               const isApex = ch.id === 10;
 
@@ -316,14 +322,14 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                       ? "z-30 scale-105"
                       : isCleared
                         ? "z-20 hover:scale-110"
-                        : isLocked
-                          ? "z-10 opacity-50 hover:opacity-85"
+                        : isComingSoon || isLocked
+                          ? "z-10 opacity-45 hover:opacity-80"
                           : "z-20 hover:scale-110"
                   }`}
                 >
                   <div className="relative flex flex-col items-center">
-                    {/* Pulse aura for selected unlocked node */}
-                    {isSelected && !isLocked && (
+                    {/* Pulse aura for selected playable unlocked node */}
+                    {isSelected && !isLocked && !isComingSoon && (
                       <>
                         <span className="absolute w-24 h-24 -top-3 rounded-full bg-[#00F0FF]/20 animate-ping pointer-events-none" />
                         <span className="absolute w-20 h-20 -top-1 rounded-full bg-[#00F0FF]/30 blur-md pointer-events-none" />
@@ -342,7 +348,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                               : "w-12 h-12 md:w-14 md:h-14 bg-[#191B23]"
                       }`}
                       style={
-                        isSelected && !isLocked
+                        isSelected && !isLocked && !isComingSoon
                           ? { boxShadow: "0 0 36px rgba(0, 240, 255, 0.55)" }
                           : isCleared
                             ? { boxShadow: "0 0 20px rgba(0, 240, 255, 0.2)" }
@@ -354,7 +360,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                       <ChapterNodeIcon
                         icon={ch.icon}
                         className={`${
-                          isSelected
+                          isSelected && !isComingSoon
                             ? "w-8 h-8 text-[#00F0FF]"
                             : isCleared
                               ? "w-7 h-7 text-[#00DBE9]"
@@ -371,13 +377,19 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                         </span>
                       )}
 
-                      {(isUnlockedActive || (isSelected && !isLocked)) && (
+                      {(isUnlockedActive || (isSelected && !isLocked && !isComingSoon)) && (
                         <span className="absolute -top-2.5 px-2 py-0.5 rounded-full bg-[#FE9800] text-[#2C1600] font-mono text-[9px] uppercase font-bold tracking-wider shadow-md whitespace-nowrap">
                           {trans.worldMap.inCombatBadge}
                         </span>
                       )}
 
-                      {isLocked && (
+                      {isComingSoon && (
+                        <span className="absolute -top-2.5 px-1.5 py-0.5 rounded-full bg-[#272A32] border border-[#FE9800]/50 text-[#FE9800] font-mono text-[8px] uppercase font-bold tracking-wider whitespace-nowrap">
+                          {trans.worldMap.comingSoonBtn}
+                        </span>
+                      )}
+
+                      {(isLocked || isComingSoon) && (
                         <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1D1F27] border border-[#3B494B] flex items-center justify-center text-[#849495]">
                           <Lock className="w-3 h-3" />
                         </span>
@@ -394,16 +406,16 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                     >
                       <span
                         className={`font-mono text-[10px] tracking-wider uppercase block font-bold ${
-                          isSelected
+                          isSelected && !isComingSoon
                             ? "text-[#00F0FF]"
                             : isCleared
                               ? "text-[#00DBE9]"
-                              : isApex
-                                ? "text-[#FFB4AB]"
+                              : isComingSoon
+                                ? "text-[#FE9800]/80"
                                 : "text-[#849495]"
                         }`}
                       >
-                        {isSelected
+                        {isSelected && !isComingSoon
                           ? formatText(trans.worldMap.activeTag, {
                               ch: String(ch.id).padStart(2, "0"),
                             })
@@ -411,14 +423,16 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                       </span>
                       <span
                         className={`font-['Space_Grotesk'] text-[11px] uppercase font-bold whitespace-nowrap ${
-                          isSelected
-                            ? "text-[#DBFCFF]"
-                            : isCleared
-                              ? "text-[#E1E2EC]"
-                              : "text-[#B9CACB]"
+                          isComingSoon
+                            ? "text-[#849495]"
+                            : isSelected
+                              ? "text-[#DBFCFF]"
+                              : isCleared
+                                ? "text-[#E1E2EC]"
+                                : "text-[#B9CACB]"
                         }`}
                       >
-                        {ch.title}
+                        {isComingSoon ? trans.worldMap.comingSoonBtn : ch.title}
                       </span>
 
                       {isCleared && (
@@ -429,7 +443,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                         </div>
                       )}
 
-                      {isSelected && (
+                      {isSelected && !isComingSoon && (
                         <span className="font-mono text-[9px] text-[#FFDCBD] block mt-0.5">
                           {formatText(trans.worldMap.wavesMeta, { waves: ch.waves })}
                         </span>
@@ -483,127 +497,140 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
               </div>
             </div>
 
-            {/* Chapter Thematic Hologram Card */}
-            <div
-              className={`relative w-full h-32 rounded-xl overflow-hidden shadow-inner border border-[#3B494B]/40 bg-gradient-to-br ${selectedChapter.themeGradient} shrink-0`}
-            >
-              <div
-                className="absolute inset-0 opacity-20"
-                style={{
-                  backgroundSize: "20px 20px",
-                  backgroundImage:
-                    "linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px)",
-                }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center opacity-25">
-                <ChapterNodeIcon icon={selectedChapter.icon} className="w-20 h-20 text-white" />
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-transparent to-transparent" />
-              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between font-mono text-[10px]">
-                <span className="px-2 py-0.5 rounded bg-[#0B0E15]/85 text-[#7DF4FF]">
-                  {selectedChapter.biome}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-[#FE9800]/90 text-[#2C1600] font-bold">
-                  {formatText(trans.worldMap.hazardLabel, {
-                    lv: selectedChapter.hazardLevel,
-                  })}
+            {!isChapterBuilt ? (
+              <div className="flex-1 flex flex-col items-center justify-center rounded-xl bg-[#131722] border border-[#272A32] p-6 text-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-[#FE9800]/10 border border-[#FE9800]/35 flex items-center justify-center text-[#FE9800]">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full bg-[#FE9800]/15 border border-[#FE9800]/45 font-mono text-xs font-bold tracking-widest text-[#FE9800] uppercase">
+                  {trans.worldMap.comingSoonBtn}
                 </span>
               </div>
-            </div>
-
-            {/* Encounter Hostiles */}
-            <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32]">
-              <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider font-bold">
-                {trans.worldMap.encounterHostiles}
-              </span>
-              <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
-                {selectedChapter.hostiles.map((hostile, idx) => (
+            ) : (
+              <>
+                {/* Chapter Thematic Hologram Card */}
+                <div
+                  className={`relative w-full h-32 rounded-xl overflow-hidden shadow-inner border border-[#3B494B]/40 bg-gradient-to-br ${selectedChapter.themeGradient} shrink-0`}
+                >
                   <div
-                    key={hostile}
-                    className="flex items-center gap-1.5 p-1.5 rounded bg-[#272A32] text-[#E1E2EC]"
-                  >
-                    {idx === 0 ? (
-                      <Zap className="w-3.5 h-3.5 text-[#FFB4AB] shrink-0" />
-                    ) : idx === 1 ? (
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#FFC080] shrink-0" />
-                    ) : idx === 2 ? (
-                      <Bug className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
-                    ) : (
-                      <Shield className="w-3.5 h-3.5 text-[#FFB2BD] shrink-0" />
-                    )}
-                    <span className="truncate">{hostile}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Sector Boss Card */}
-            <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32] shadow-md">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[#FFB4AB]">
-                  <Skull className="w-4 h-4" />
-                  <span className="font-mono text-[11px] uppercase font-bold tracking-wider">
-                    {trans.worldMap.sectorBoss}
-                  </span>
-                </div>
-                <span className="font-mono text-[11px] text-[#FFB4AB] font-extrabold">
-                  HP {selectedChapter.boss.hp.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-12 h-12 rounded-lg bg-[#93000A]/30 border border-[#FFB4AB]/30 flex items-center justify-center shrink-0 text-[#FFB4AB]">
-                  <Skull className="w-6 h-6" />
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="font-['Space_Grotesk'] text-sm text-[#DBFCFF] font-bold truncate">
-                    {selectedChapter.boss.name}
-                  </span>
-                  <span className="text-[11px] text-[#B9CACB] leading-snug line-clamp-2">
-                    {selectedChapter.boss.description}
-                  </span>
-                </div>
-              </div>
-              {/* Segmented Boss HP Bar */}
-              <div className="w-full flex gap-1 mt-0.5">
-                {Array.from({ length: 6 }).map((_, segIdx) => (
-                  <div
-                    key={segIdx}
-                    className={`h-2 flex-1 rounded-sm ${
-                      segIdx < filledBossSegments
-                        ? "bg-[#FFB4AB] shadow-[0_0_8px_rgba(255,180,171,0.45)]"
-                        : "bg-[#272A32]"
-                    }`}
+                    className="absolute inset-0 opacity-20"
+                    style={{
+                      backgroundSize: "20px 20px",
+                      backgroundImage:
+                        "linear-gradient(to right, rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.12) 1px, transparent 1px)",
+                    }}
                   />
-                ))}
-              </div>
-            </div>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-25">
+                    <ChapterNodeIcon icon={selectedChapter.icon} className="w-20 h-20 text-white" />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-transparent to-transparent" />
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between font-mono text-[10px]">
+                    <span className="px-2 py-0.5 rounded bg-[#0B0E15]/85 text-[#7DF4FF]">
+                      {selectedChapter.biome}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-[#FE9800]/90 text-[#2C1600] font-bold">
+                      {formatText(trans.worldMap.hazardLabel, {
+                        lv: selectedChapter.hazardLevel,
+                      })}
+                    </span>
+                  </div>
+                </div>
 
-            {/* Sector Weapon Rewards */}
-            <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32]">
-              <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider font-bold">
-                {trans.worldMap.weaponUnlocks}
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {selectedChapter.weapons.map((w, idx) => (
-                  <div
-                    key={w.name}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-[#272A32]"
-                  >
-                    <Swords
-                      className={`w-4 h-4 shrink-0 ${
-                        idx === 0 ? "text-[#00F0FF]" : "text-[#FFB2BD]"
-                      }`}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-mono text-[10px] text-[#DBFCFF] font-bold uppercase truncate">
-                        {w.name}
+                {/* Encounter Hostiles */}
+                <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32]">
+                  <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider font-bold">
+                    {trans.worldMap.encounterHostiles}
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+                    {selectedChapter.hostiles.map((hostile, idx) => (
+                      <div
+                        key={hostile}
+                        className="flex items-center gap-1.5 p-1.5 rounded bg-[#272A32] text-[#E1E2EC]"
+                      >
+                        {idx === 0 ? (
+                          <Zap className="w-3.5 h-3.5 text-[#FFB4AB] shrink-0" />
+                        ) : idx === 1 ? (
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#FFC080] shrink-0" />
+                        ) : idx === 2 ? (
+                          <Bug className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+                        ) : (
+                          <Shield className="w-3.5 h-3.5 text-[#FFB2BD] shrink-0" />
+                        )}
+                        <span className="truncate">{hostile}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sector Boss Card */}
+                <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32] shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[#FFB4AB]">
+                      <Skull className="w-4 h-4" />
+                      <span className="font-mono text-[11px] uppercase font-bold tracking-wider">
+                        {trans.worldMap.sectorBoss}
                       </span>
-                      <span className="font-mono text-[9px] text-[#00DBE9]">{w.tag}</span>
+                    </div>
+                    <span className="font-mono text-[11px] text-[#FFB4AB] font-extrabold">
+                      HP {selectedChapter.boss.hp.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-lg bg-[#93000A]/30 border border-[#FFB4AB]/30 flex items-center justify-center shrink-0 text-[#FFB4AB]">
+                      <Skull className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-['Space_Grotesk'] text-sm text-[#DBFCFF] font-bold truncate">
+                        {selectedChapter.boss.name}
+                      </span>
+                      <span className="text-[11px] text-[#B9CACB] leading-snug line-clamp-2">
+                        {selectedChapter.boss.description}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                  {/* Segmented Boss HP Bar */}
+                  <div className="w-full flex gap-1 mt-0.5">
+                    {Array.from({ length: 6 }).map((_, segIdx) => (
+                      <div
+                        key={segIdx}
+                        className={`h-2 flex-1 rounded-sm ${
+                          segIdx < filledBossSegments
+                            ? "bg-[#FFB4AB] shadow-[0_0_8px_rgba(255,180,171,0.45)]"
+                            : "bg-[#272A32]"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sector Weapon Rewards */}
+                <div className="bg-[#1D1F27] p-2.5 rounded-xl flex flex-col gap-2 border border-[#272A32]">
+                  <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider font-bold">
+                    {trans.worldMap.weaponUnlocks}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedChapter.weapons.map((w, idx) => (
+                      <div
+                        key={w.name}
+                        className="flex items-center gap-2 p-2 rounded-lg bg-[#272A32]"
+                      >
+                        <Swords
+                          className={`w-4 h-4 shrink-0 ${
+                            idx === 0 ? "text-[#00F0FF]" : "text-[#FFB2BD]"
+                          }`}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-mono text-[10px] text-[#DBFCFF] font-bold uppercase truncate">
+                            {w.name}
+                          </span>
+                          <span className="font-mono text-[9px] text-[#00DBE9]">{w.tag}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Pinned Bottom Deploy Combat CTA */}
@@ -649,7 +676,12 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                   : "bg-[#272A32] text-[#849495] cursor-not-allowed"
               }`}
             >
-              {isSelectedLocked ? (
+              {!isChapterBuilt ? (
+                <>
+                  <Lock className="w-5 h-5" />
+                  <span>{trans.worldMap.comingSoonBtn}</span>
+                </>
+              ) : isSelectedLocked ? (
                 <>
                   <Lock className="w-5 h-5" />
                   <span>{trans.worldMap.chapterLockedBtn}</span>
@@ -668,12 +700,14 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
               <span>{trans.worldMap.keyboardHint}</span>
               <span
                 className={`font-bold ${
-                  isSelectedLocked ? "text-[#FE9800]" : "text-[#00F0FF]"
+                  !isChapterBuilt || isSelectedLocked ? "text-[#FE9800]" : "text-[#00F0FF]"
                 }`}
               >
-                {isSelectedLocked
-                  ? formatText(trans.worldMap.lockedHint, { prev: selectedChapter.id - 1 })
-                  : trans.worldMap.readyToLaunch}
+                {!isChapterBuilt
+                  ? trans.worldMap.comingSoonBtn
+                  : isSelectedLocked
+                    ? formatText(trans.worldMap.lockedHint, { prev: selectedChapter.id - 1 })
+                    : trans.worldMap.readyToLaunch}
               </span>
             </div>
           </div>
@@ -699,6 +733,9 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
               const slotLevel = slotWeapon
                 ? Math.max(1, saveData.weaponLevels[slotWeapon.id] ?? 1)
                 : 1;
+              const isSelectedStarter = Boolean(
+                slotWeapon && saveData.equippedWeaponId === slotWeapon.id
+              );
               const slotLabels = [
                 trans.worldMap.slot1Label,
                 trans.worldMap.slot2Label,
@@ -706,10 +743,20 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
               ];
 
               return (
-                <div
+                <button
                   key={slotIdx}
-                  className={`flex items-center gap-2 bg-[#272A32] px-2.5 py-1.5 rounded-lg ${
-                    slotIdx === 2 ? "hidden md:flex" : slotIdx === 1 ? "hidden sm:flex" : "flex"
+                  type="button"
+                  onClick={() => {
+                    if (slotWeapon) {
+                      void selectActiveLoadoutWeapon(slotWeapon.id);
+                    } else {
+                      openArmory("ARSENAL");
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
+                    isSelectedStarter
+                      ? "bg-[#00F0FF]/15 border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.22)]"
+                      : "bg-[#272A32] border-transparent hover:border-[#3B494B]"
                   }`}
                 >
                   <div
@@ -723,11 +770,11 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                       <Swords className="w-4 h-4" />
                     )}
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col text-left">
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`px-1 rounded font-mono text-[9px] font-bold ${
-                          slotIdx === 0
+                          isSelectedStarter || slotIdx === 0
                             ? "bg-[#00F0FF]/20 text-[#00F0FF]"
                             : "bg-[#FFC080]/20 text-[#FFC080]"
                         }`}
@@ -744,7 +791,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                         : `CH.${unlockedChapter}`}
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
