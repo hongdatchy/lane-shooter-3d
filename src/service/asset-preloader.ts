@@ -3,14 +3,17 @@ import { isLocalAssetMode, withAssetBase } from "@/lib/utils";
 import { isModelCached } from "@/service/model-cache";
 import { useGameStore } from "@/state-manager/game-store";
 
-// Thứ tự tải: các model Quái (enemies/), Boss theo màn (bosses/stage1/, bosses/stage2/) và model nhân vật (.glb).
+// Thứ tự tải: các model Quái (enemies/), Boss theo màn (bosses/stage1/, bosses/stage2/, bosses/stage3/) và model nhân vật (.glb).
 export const PRELOAD_MODEL_FILES = [
   "models/enemies/crawler-walk-death-texture.glb",
   "models/enemies/husk-walk-death-poison-texture.glb",
   "models/enemies/skywing-v2.glb",
   "models/enemies/shell_brute.glb",
+  "models/enemies/dasher.glb",
+  "models/enemies/bloater.glb",
   "models/bosses/stage1/iron-warden-mechanical.glb",
   "models/bosses/stage2/nano-hydra-base-v3.glb",
+  "models/bosses/stage3/chien-binh-thoi-gian-v2.glb",
   "models/linh-cyber-v3.glb",
 ];
 

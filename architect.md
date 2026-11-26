@@ -4,6 +4,22 @@
 
 ---
 
+## 0. MÔ TẢ GAME (GAME DESCRIPTION & LISTING)
+
+### Tiếng Việt — Ngắn gọn (1–2 câu / Tagline)
+> **LANE SHOOTER 3D** là game bắn súng arcade 3D tốc độ cao theo cơ chế **2 làn đường** bối cảnh sci-fi tương lai: vừa thủ làn trái trước các đợt quái vật và Boss khổng lồ, vừa đảo sang làn phải bắn Cổng Buff để bứt phá hỏa lực. Trang bị bộ 3 súng chuyển đổi linh hoạt giữa **20 loại vũ khí** và kích hoạt kỹ năng Cuồng Nộ (**Rage**) để quét sạch chiến trường!
+
+### Tiếng Việt — Đầy đủ (Trang giới thiệu)
+> Bước vào **LANE SHOOTER 3D**, tựa game bắn súng arcade 3D nhịp độ cao nơi phản xạ và tính toán làn đường quyết định tất cả. Ở **làn trái**, bạn phải cản bước từng đợt quái vật — từ bầy **Crawler**, **Husk** phun độc, **Skywing** bay zigzag, **Shell Brute** giáp cứng tới **Dasher** bứt tốc và **Bloater** cảm tử phát nổ — trước khi đối đầu các Boss khổng lồ cuối chương như **Iron Warden**, **Nano Hydra** và **Chrono Warrior**. Trong lúc giao tranh, hãy tranh thủ đảo sang **làn phải** để bắn vỡ **Cổng Buff** (nhân bản x2 Clone, đạn xuyên, đa tia, đạn nổ, khiên, sét, vùng băng, tháp pháo Turret...) và nạp **Overdrive** tăng sát thương. Mang theo tối đa **3 khẩu súng** từ kho **20 vũ khí** (từ Pistol, AK Hyperion tới Nuke Launcher và ICBM), nâng cấp sức mạnh, tung chiêu **Rage** đặc trưng của từng súng và leo **Bảng Xếp Hạng** toàn cầu!
+
+### English — Short Description (CrazyGames Listing)
+> **LANE SHOOTER 3D** is a fast-paced sci-fi 2-lane arcade shooter where you defend the left lane against relentless monster waves and giant bosses while shooting right-lane Buff Gates to supercharge your firepower. Build a 3-gun loadout from 20 futuristic weapons, unleash unique Rage skills, and climb the global leaderboard!
+
+### English — Full Description (CrazyGames Listing)
+> Dive into **LANE SHOOTER 3D**, an intense 3D dual-lane arcade shooter. Hold the **left lane** against swarms of Crawlers, poison-spitting Husks, zigzagging Skywings, armored Shell Brutes, sprinting Dashers, and volatile Bloaters before facing massive chapter bosses like **Iron Warden**, **Nano Hydra**, and **Chrono Warrior**. Time your lane switches to the **right lane** to break tactical **Buff Gates** (x2 Clone, Piercing, Multishot, Ricochet, Explosive, Shield, Lightning, Freeze Field, Turret Drop, and more) and stack **Overdrive** bonuses mid-fight. Carry up to **3 weapons** into battle—swapping on the fly with `[1][2][3]` or `[Q]`—upgrade from an arsenal of **20 weapons**, and trigger each gun's signature **Rage** ultimate (`[R]`) to dominate the leaderboard.
+
+---
+
 ## 1. CẤU TRÚC TỔNG THỂ GAME
 
 ### Thể loại
@@ -202,13 +218,12 @@
 
 ---
 
-### BOSS 3: **CRYSTAL COLOSSUS** *(Chapter 3 — Đồng Băng)*
-*Người khổng lồ pha lê, trong suốt, ánh sáng khúc xạ bên trong.*
-- **HP:** 15,000
-- **Cơ chế:** Miễn nhiễm 100% với đạn Splash/nổ lan. Chỉ chịu sát thương từ đạn đơn thẳng (Rail Gun, Pistol, AK, Plasma).
-- **Skill 1 — Crystal Wall:** Mọc tường pha lê chắn ngang màn. Bắn vỡ tường (HP 400 mỗi mảng) trước mới bắn được Boss.
-- **Skill 2 — Shard Storm:** Phóng 12 mảnh pha lê tỏa 360° ngẫu nhiên — né bằng cách đọc hướng bay.
-- **Phase 2 (50% HP):** Thân thể nứt ra, lộ lõi đỏ — lõi đỏ chịu x2 sát thương. Nhắm vào lõi đỏ.
+### BOSS 3: **CHRONO WARRIOR** *(Chapter 3 — Crystal Tundra / Chiến Binh Thời Gian)*
+*Chiến binh thời gian mặc giáp năng lượng, mang Lưỡi Hái Chrono (`ChronoScythe`) & Vòng Halo 12 khắc quay sau lưng (`bosses/stage3/chien-binh-thoi-gian-v2.glb`).*
+- **HP:** 2,800 *(scale cân bằng theo tiến trình Stage 1→3)*
+- **Cơ chế:** Chuyển động nhịp độ cao kết hợp tung cầu năng lượng thời gian theo chuỗi (`Boss_03_Attack`) — người chơi phải liên tục đổi làn né 3 luồng đạn năng lượng tím-xanh. Khi bị tiêu diệt kích hoạt vụ nổ Lõi Hố Đen (`Boss_03_Death`).
+- **Skill 1 — Chrono Orb Volley:** Tụ năng lượng từ `ChronoScythe` và phóng 3 quả cầu năng lượng thời gian (`#a855f7`) hướng về phía người chơi.
+- **Skill 2 — Singularity Collapse (Khi chết):** Bùng nổ lõi Hố Đen (`BlackHole_Core` + `BlackHole_Rim`) toàn phần trước khi tan biến.
 
 ---
 
@@ -309,20 +324,20 @@
 
 ## 7. CẤU TRÚC CHI TIẾT 10 CHAPTER
 
-### Bối cảnh & Quái xuất hiện
+### Bối cảnh & Quái xuất hiện *(Quy tắc: 10 Chapter · 20 Quái → mỗi Chapter gồm 2 quái mới theo thứ tự + 1 quái từ màn trước)*
 
-| Chapter | Tên | Bối cảnh | Số Wave | Quái Nổi Bật | Boss Cuối |
+| Chapter | Tên | Bối cảnh | Số Wave | Quái Nổi Bật (2 mới + 1 màn trước) | Boss Cuối |
 |---|---|---|---|---|---|
-| 1 | **Iron District** | Thành phố hoang tàn, bầu trời ô nhiễm đỏ | 4 | Crawler, Husk | IRON WARDEN |
-| 2 | **Bio Lab Omega** | Phòng thí nghiệm sinh hóa dưới lòng đất | 6 | Dasher, Bloater, Regen Beast, Parasite | NANO HYDRA |
-| 3 | **Crystal Tundra** | Hành tinh băng giá, tường pha lê | 7 | Wraith, Cryo Leech, Shell Brute + Force Bubble | CRYSTAL COLOSSUS |
-| 4 | **Hive Core** | Tổ hữu cơ khổng lồ | 7 | Swarm Queen, Brood Carrier, Splitter | SWARM MOTHER |
-| 5 | **Orbital Fortress** | Trạm vũ trụ, nhìn thấy Trái Đất từ ngoài | 8 | Skywing, Disruptor, Healer Symbiont | OMEGA PRIME |
-| 6 | **Mirror Dimension** | Chiều không gian phản chiếu, mọi thứ đảo ngược | 8 | Wraith, Dasher, Void Hulk | SHADOW ARCHITECT |
-| 7 | **Magma Core** | Lòng núi lửa, dung nham chảy | 8 | Spitter, Siege Worm, Behemoth | VOLCANIC TITAN |
-| 8 | **Time Rift** | Vết nứt không-thời gian, cảnh vật lặp lại | 9 | Healer Symbiont, Brood Carrier, Regen Beast + Force Bubble | CHRONO KEEPER |
-| 9 | **Deep Space** | Hố đen, không gian hoàn toàn tối | 9 | Spitter, Siege Worm, Void Hulk | VOID LEVIATHAN |
-| 10 | **Genesis Core** | Lõi năng lượng vũ trụ — Trận chiến cuối cùng | 10 | Tất cả 20 loại quái, xuất hiện ngẫu nhiên | GENESIS CORE |
+| 1 | **Iron District** | Thành phố hoang tàn, bầu trời ô nhiễm đỏ | 4 | #1 Crawler, #2 Husk | IRON WARDEN |
+| 2 | **Bio Lab Omega** | Phòng thí nghiệm sinh hóa dưới lòng đất | 5 | #3 Skywing, #4 Shell Brute + Crawler/Husk (CH.1) | NANO HYDRA |
+| 3 | **Crystal Tundra** | Hành tinh băng giá, vùng dị thường thời gian | 5 | #5 Dasher, #6 Bloater + #4 Shell Brute (CH.2) | CHRONO WARRIOR |
+| 4 | **Hive Core** | Tổ hữu cơ khổng lồ | 7 | #7 Wraith, #8 Regen Beast + #6 Bloater (CH.3) | SWARM MOTHER |
+| 5 | **Orbital Fortress** | Trạm vũ trụ, nhìn thấy Trái Đất từ ngoài | 8 | #9 Splitter, #10 Parasite + #8 Regen Beast (CH.4) | OMEGA PRIME |
+| 6 | **Mirror Dimension** | Chiều không gian phản chiếu, mọi thứ đảo ngược | 8 | #11 Spitter, #12 Healer Symbiont + #10 Parasite (CH.5) | SHADOW ARCHITECT |
+| 7 | **Magma Core** | Lòng núi lửa, dung nham chảy | 8 | #13 Brood Carrier, #14 Force Bubble + #12 Healer Symbiont (CH.6) | VOLCANIC TITAN |
+| 8 | **Time Rift** | Vết nứt không-thời gian, cảnh vật lặp lại | 9 | #15 Disruptor, #16 Behemoth + #14 Force Bubble (CH.7) | CHRONO KEEPER |
+| 9 | **Deep Space** | Hố đen, không gian hoàn toàn tối | 9 | #17 Cryo Leech, #18 Swarm Queen + #16 Behemoth (CH.8) | VOID LEVIATHAN |
+| 10 | **Genesis Core** | Lõi năng lượng vũ trụ — Trận chiến cuối cùng | 10 | #19 Siege Worm, #20 Void Hulk + #18 Swarm Queen (CH.9) & Tổng hợp | GENESIS CORE |
 
 ---
 

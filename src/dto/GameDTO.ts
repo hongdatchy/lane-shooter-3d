@@ -2,15 +2,25 @@ export type GameStatus = "MENU" | "PLAYING" | "PAUSED" | "GAME_OVER" | "VICTORY"
 
 export type CameraMode = "TOP_DOWN" | "THIRD_PERSON" | "FREE_ORBIT";
 
-export type EnemyKind = "NORMAL" | "ELITE" | "SKYWING" | "SHELL_BRUTE" | "BOSS";
+export type EnemyKind =
+  | "NORMAL"
+  | "ELITE"
+  | "SKYWING"
+  | "SHELL_BRUTE"
+  | "DASHER"
+  | "BLOATER"
+  | "BOSS";
 
 export type EnemyVisualKind =
   | "CRAWLER"
   | "HUSK"
   | "SKYWING"
   | "SHELL_BRUTE"
+  | "DASHER"
+  | "BLOATER"
   | "BOSS_STAGE1"
-  | "BOSS_STAGE2";
+  | "BOSS_STAGE2"
+  | "BOSS_STAGE3";
 
 export type WeaponModelKindDTO = "pistol" | "ak-rifle" | "machine-gun" | "cannon" | "icbm";
 
@@ -83,6 +93,7 @@ export interface EnemyEntity {
   acidTimer: number;
   armorBroken: boolean;
   shellArmorHp: number;
+  enraged: boolean;
   attackCooldown: number;
   castTimer: number;
   castFired: boolean;

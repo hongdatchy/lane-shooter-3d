@@ -41,6 +41,35 @@ interface ChapterPoolSlots {
 }
 
 function getChapterPoolSlots(chapterId: number): ChapterPoolSlots {
+  if (chapterId === 3) {
+    return {
+      getSlotKind(idx: number): EnemyKind {
+        if (idx >= BOSS_POOL_START) return "BOSS";
+        if (idx >= 32) return "BLOATER";
+        if (idx >= 16) return "DASHER";
+        return "SHELL_BRUTE";
+      },
+      getVisualKind(idx: number): EnemyVisualKind {
+        if (idx >= BOSS_POOL_START) return "BOSS_STAGE3";
+        if (idx >= 32) return "BLOATER";
+        if (idx >= 16) return "DASHER";
+        return "SHELL_BRUTE";
+      },
+      getRange(kind: EnemyKind): readonly [number, number] {
+        switch (kind) {
+          case "BOSS":
+            return [BOSS_POOL_START, BOSS_POOL_END];
+          case "BLOATER":
+            return [32, 48];
+          case "DASHER":
+            return [16, 32];
+          default:
+            return [0, 16];
+        }
+      },
+    };
+  }
+
   if (chapterId === 2) {
     return {
       getSlotKind(idx: number): EnemyKind {
@@ -107,6 +136,7 @@ const STRIKE_INDICES = [0, 1, 2];
 const FALLOUT_INDICES = [0, 1, 2];
 const POISON_CAST_DURATION = 0.9;
 const BOSS1_SHOOT_DURATION = 1.8;
+const BOSS3_SHOOT_DURATION = 3.2;
 const POISON_INTERVAL_MIN = 2.8;
 const POISON_INTERVAL_MAX = 3.6;
 const POISON_PROJECTILE_SPEED = 11.5;
@@ -116,6 +146,8 @@ const ENEMY_DEATH_DURATION: Record<EnemyKind, number> = {
   ELITE: 1.4,
   SKYWING: 1.5,
   SHELL_BRUTE: 1.5,
+  DASHER: 1.75,
+  BLOATER: 1.5,
   BOSS: 2.5,
 };
 
@@ -244,6 +276,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       acidTimer: 0,
       armorBroken: false,
       shellArmorHp: 0,
+      enraged: false,
       attackCooldown: 3.0,
       castTimer: 0,
       castFired: false,
@@ -377,6 +410,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       enemy.acidTimer = 0;
       enemy.armorBroken = false;
       enemy.shellArmorHp = 0;
+      enemy.enraged = false;
       enemy.castTimer = 0;
       enemy.castFired = false;
       enemyUnitRefs.current[idx]?.setMode("IDLE");
@@ -504,9 +538,10 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     poolIndex: number,
     enemy: EnemyEntity,
     options: { grantRage: boolean; particleCount?: number }
-  ) => {
+  ): void => {
     if (enemy.dying) return;
     const isBoss = enemy.kind === "BOSS";
+    const isBloater = enemy.kind === "BLOATER";
     const duration = ENEMY_DEATH_DURATION[enemy.kind];
     enemy.hp = 0;
     enemy.dying = true;
@@ -521,28 +556,33 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       ? "#facc15"
       : enemy.kind === "ELITE"
         ? "#c084fc"
-        : enemy.kind === "SKYWING"
+        : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
           ? "#38bdf8"
           : enemy.kind === "SHELL_BRUTE"
             ? "#fb923c"
-            : "#fb7185";
+            : isBloater
+              ? "#f97316"
+              : "#fb7185";
     const defaultParticles = isBoss
       ? 48
-      : enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE"
-        ? 16
-        : 14;
+      : isBloater
+        ? 28
+        : enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE"
+          ? 16
+          : 14;
     spawnParticles(
       enemy.x,
       enemy.kind === "SKYWING" ? 1.2 : 0.85 * enemy.scale,
       enemy.z,
       deathColor,
       options.particleCount ?? defaultParticles,
-      isBoss ? 2.0 : 1.3
+      isBoss ? 2.0 : isBloater ? 1.65 : 1.3
     );
-    soundService.play(isBoss ? "killBoss" : "killEnemy");
+    soundService.play(isBoss ? "killBoss" : isBloater ? "cannonExplosion" : "killEnemy");
 
     if (options.grantRage && !isBoss) {
-      const isHeavyKind = enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE";
+      const isHeavyKind =
+        enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE" || isBloater;
       const killGain = isHeavyKind
         ? RAGE_CONFIG.gainPerEliteKill
         : RAGE_CONFIG.gainPerNormalKill;
@@ -551,15 +591,42 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
     const activeCh = useGameStore.getState().activeChapter;
     const scorePts = isBoss
-      ? activeCh === 2
-        ? 900
-        : 500
+      ? activeCh === 3
+        ? 1400
+        : activeCh === 2
+          ? 900
+          : 500
       : enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE"
         ? 30
-        : enemy.kind === "SKYWING"
-          ? 15
-          : 10;
+        : isBloater
+          ? 20
+          : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
+            ? 15
+            : 10;
     useGameStore.getState().registerEnemyKill(scorePts);
+
+    // Quái #6 (Bloater): Khi chết phát nổ bán kính 2m gây sát thương xung quanh & người chơi nếu đứng sát
+    if (isBloater) {
+      const blastRadius = 2.0;
+      const blastSq = blastRadius * blastRadius;
+      runtimeRef.current.screenShake = Math.max(runtimeRef.current.screenShake, 0.25);
+      const enemies = enemiesPoolRef.current;
+      for (let m = 0; m < enemies.length; m++) {
+        if (m === poolIndex) continue;
+        const other = enemies[m];
+        if (!other.active || other.dying) continue;
+        const dx = other.x - enemy.x;
+        const dz = other.z - enemy.z;
+        if (dx * dx + dz * dz <= blastSq) {
+          applyEnemyDamage(m, other, 10, false, 8);
+        }
+      }
+      const pdx = runtimeRef.current.playerX - enemy.x;
+      const pdz = ARENA_CONFIG.playerZ - enemy.z;
+      if (pdx * pdx + pdz * pdz <= blastSq) {
+        useGameStore.getState().damagePlayer(1);
+      }
+    }
   };
 
   // Gây sát thương có tính mai giáp (Shell Brute giảm 60% trước khi vỡ mai) & giảm giáp EMP Tesla
@@ -569,7 +636,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     rawDamage: number,
     grantRage: boolean,
     particleCount?: number
-  ) => {
+  ): void => {
     if (!enemy.active || enemy.dying) return;
     if (enemy.kind === "SHELL_BRUTE" && enemy.shellArmorHp > 0 && !enemy.armorBroken) {
       enemy.hp -= rawDamage * 0.4;
@@ -612,7 +679,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         e.acidTimer = 0;
         e.armorBroken = false;
         e.shellArmorHp = 0;
-        e.attackCooldown = store.activeChapter === 2 ? 2.6 : 0.65;
+        e.enraged = false;
+        e.attackCooldown =
+          store.activeChapter === 3 ? 1.6 : store.activeChapter === 2 ? 2.6 : 0.65;
         e.castTimer = 0;
         e.castFired = false;
         e.id = enemyIdSeqRef.current++;
@@ -692,6 +761,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       e.armorBroken = false;
       e.shellArmorHp =
         chosenKind === "SHELL_BRUTE" ? Math.min(20, Math.round(scaledHp * 0.55)) : 0;
+      e.enraged = false;
       e.attackCooldown = chosenKind === "ELITE" ? 1.5 + Math.random() * 1.4 : 999;
       e.castTimer = 0;
       e.castFired = false;
@@ -952,7 +1022,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             const dx = e.x - centerX;
             const dz = e.z - centerZ;
             if (dx * dx + dz * dz <= radiusSq) {
-              const dmg = e.kind === "NORMAL" ? normDmg : bossDmg;
+              const dmg = e.kind !== "BOSS" ? normDmg : bossDmg;
               applyEnemyDamage(k, e, dmg, false, 16);
             }
           }
@@ -1823,11 +1893,21 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               Math.random() * (POISON_INTERVAL_MAX - POISON_INTERVAL_MIN);
           }
         } else {
+          if (e.kind === "DASHER" && !e.enraged && e.hp <= e.maxHp * 0.2) {
+            e.enraged = true;
+            e.speed *= 2.0;
+            enemyUnitRefs.current[i]?.setMode("RUN");
+            spawnParticles(e.x, 0.9 * e.scale, e.z, "#38bdf8", 10, 1.2);
+          }
+
           e.z += e.speed * freezeFactor * delta;
 
-          if (e.kind === "SKYWING") {
+          if (e.kind === "SKYWING" || e.kind === "DASHER") {
+            const weaveFreq = e.kind === "DASHER" ? 4.2 : 3.1;
+            const weaveAmp =
+              e.kind === "DASHER" ? (e.enraged ? 4.2 : 3.1) : 2.4;
             const weaveVx =
-              Math.sin(state.clock.elapsedTime * 3.1 + e.phase) * 2.4 * freezeFactor;
+              Math.sin(state.clock.elapsedTime * weaveFreq + e.phase) * weaveAmp * freezeFactor;
             e.x = THREE.MathUtils.clamp(
               e.x + weaveVx * delta,
               ARENA_CONFIG.leftLaneMinX + 0.65,
@@ -1917,6 +1997,49 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
                 );
               }
             }
+          } else if (e.kind === "BOSS" && store.activeChapter === 3) {
+            // Boss 3 (Chrono Warrior): vung Lưỡi Hái Chrono & phóng 3 cầu năng lượng thời gian (clip Boss_03_Attack)
+            if (e.castTimer > 0) {
+              e.castTimer = Math.max(0, e.castTimer - delta * freezeFactor);
+              if (!e.castFired && e.castTimer <= BOSS3_SHOOT_DURATION * 0.36) {
+                e.castFired = true;
+                const muzzleX = e.x - 0.55;
+                const muzzleY = 2.05;
+                const muzzleZ = e.z + 1.15;
+                spawnParticles(muzzleX, muzzleY, muzzleZ, "#a855f7", 18, 1.25);
+                soundService.play("shootCannon");
+                for (const offsetX of [-0.95, 0, 0.95]) {
+                  spawnEnemyProjectile(
+                    muzzleX + offsetX * 0.4,
+                    muzzleY,
+                    muzzleZ,
+                    THREE.MathUtils.clamp(
+                      runtimeRef.current.playerX + offsetX,
+                      ARENA_CONFIG.playerMinX,
+                      ARENA_CONFIG.playerMaxX
+                    ),
+                    ARENA_CONFIG.playerZ,
+                    POISON_PROJECTILE_SPEED * 1.05 * freezeFactor,
+                    "#a855f7"
+                  );
+                }
+              }
+              if (e.castTimer <= 0) {
+                enemyUnitRefs.current[i]?.setMode("WALK");
+                e.attackCooldown = 2.0 + Math.random() * 0.7;
+              }
+            } else if (
+              e.z > ARENA_CONFIG.spawnZ + 0.8 &&
+              e.z < ARENA_CONFIG.defenseLineZ - 4.0
+            ) {
+              e.attackCooldown -= delta * freezeFactor;
+              if (e.attackCooldown <= 0) {
+                e.castTimer = BOSS3_SHOOT_DURATION;
+                e.castFired = false;
+                enemyUnitRefs.current[i]?.setMode("ATTACK", BOSS3_SHOOT_DURATION);
+                spawnParticles(e.x - 0.55, 2.05, e.z + 1.0, "#38bdf8", 10, 0.8);
+              }
+            }
           }
         }
         if (Math.abs(e.knockbackVx) > 0.01 || Math.abs(e.knockbackVz) > 0.01) {
@@ -1970,17 +2093,28 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             break;
           }
         } else if (e.z >= ARENA_CONFIG.defenseLineZ) {
+          const isBloaterHit = e.kind === "BLOATER";
           e.active = false;
           e.dying = false;
           e.castTimer = 0;
           enemyUnitRefs.current[i]?.setMode("IDLE");
-          runtimeRef.current.screenShake = 0.45;
-          spawnParticles(e.x, 0.8, ARENA_CONFIG.defenseLineZ, "#ef4444", 20, 1.4);
+          runtimeRef.current.screenShake = isBloaterHit ? 0.6 : 0.45;
+          spawnParticles(
+            e.x,
+            0.8,
+            ARENA_CONFIG.defenseLineZ,
+            isBloaterHit ? "#f97316" : "#ef4444",
+            isBloaterHit ? 30 : 20,
+            isBloaterHit ? 1.7 : 1.4
+          );
+          if (isBloaterHit) {
+            soundService.play("cannonExplosion");
+          }
           useGameStore.getState().damagePlayer(1);
         }
       }
 
-      // Cập nhật đạn độc của Quái 2 bay về phía người chơi (né bằng A/D sang làn khác)
+      // Cập nhật đạn của Quái / Boss bay về phía người chơi (né bằng A/D sang làn khác)
       const projectiles = enemyProjectilesPoolRef.current;
       for (let i = 0; i < projectiles.length; i++) {
         const proj = projectiles[i];
@@ -1998,7 +2132,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         const hitDist = 0.65 + proj.radius;
         if (pdx * pdx + pdz * pdz <= hitDist * hitDist) {
           proj.active = false;
-          spawnParticles(proj.x, 1.0, proj.z, "#84cc16", 16, 1.3);
+          spawnParticles(proj.x, 1.0, proj.z, proj.color, 16, 1.3);
           runtimeRef.current.screenShake = Math.max(runtimeRef.current.screenShake, 0.35);
           useGameStore.getState().damagePlayer(proj.damage);
           continue;

@@ -10,7 +10,7 @@ export interface ChapterConfig {
   themeGradient: string;
   accentHex: string;
   icon: "city" | "bio" | "ice" | "hive" | "orbit" | "mirror" | "magma" | "time" | "void" | "apex";
-  hostiles: [string, string, string, string];
+  hostiles: string[];
   boss: {
     name: string;
     hp: number;
@@ -76,16 +76,16 @@ export const CHAPTER_CATALOG: ChapterConfig[] = [
     title: "CRYSTAL TUNDRA",
     biome: "FROZEN PRISM WASTELAND",
     hazardLevel: 5,
-    waves: 7,
+    waves: 5,
     mapPos: { xPct: 36, yPct: 34 },
     themeGradient: "from-[#0c2640] via-[#133859] to-[#0a1424]",
     accentHex: "#7DF4FF",
     icon: "ice",
-    hostiles: ["WRAITH (STEALTH)", "CRYO LEECH", "SHELL BRUTE", "FORCE BUBBLE"],
+    hostiles: ["DASHER (#05 · SPRINT)", "BLOATER (#06 · EXPLODE)", "SHELL BRUTE (#04 · ARMOR)"],
     boss: {
-      name: "CRYSTAL COLOSSUS",
-      hp: 15000,
-      description: "Splash-immune crystal titan projecting prism walls and 360° shard storms.",
+      name: "CHRONO WARRIOR",
+      hp: 2800,
+      description: "Time-forged scythe warrior with a 12-halo core; launches temporal energy orbs across lanes.",
     },
     weapons: [
       { name: "MINIGUN", tag: "CH.3 · RAPID" },

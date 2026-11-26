@@ -229,11 +229,102 @@ export const STAGE_CATALOG_CH2: StageConfigDTO[] = [
   },
 ];
 
-export const MAX_PLAYABLE_CHAPTER = 2;
+// Cấu hình Cửa 3 (5 Wave): Quy tắc 2 quái mới (#5 Dasher, #6 Bloater) + 1 quái màn trước (#4 Shell Brute) -> Boss 3 (Chrono Warrior)
+export const STAGE_CATALOG_CH3: StageConfigDTO[] = [
+  {
+    stage: 1,
+    targetKills: 22,
+    normalSpeed: 6.8,
+    eliteSpeed: 2.2,
+    normalHp: 18,
+    eliteHp: 38,
+    normalScale: 1.15,
+    eliteScale: 1.45,
+    eliteChance: 0,
+    spawnMinInterval: 0.65,
+    spawnMaxInterval: 0.98,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "SHELL_BRUTE", weight: 0.35, hp: 38, speed: 2.2, scale: 1.45 },
+      { kind: "DASHER", weight: 0.65, hp: 18, speed: 6.8, scale: 1.15 },
+    ],
+  },
+  {
+    stage: 2,
+    targetKills: 28,
+    normalSpeed: 7.2,
+    eliteSpeed: 7.2,
+    normalHp: 20,
+    eliteHp: 20,
+    normalScale: 1.15,
+    eliteScale: 1.15,
+    eliteChance: 0,
+    spawnMinInterval: 0.52,
+    spawnMaxInterval: 0.82,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "DASHER", weight: 1, hp: 20, speed: 7.2, scale: 1.15 },
+    ],
+  },
+  {
+    stage: 3,
+    targetKills: 24,
+    normalSpeed: 3.5,
+    eliteSpeed: 3.5,
+    normalHp: 28,
+    eliteHp: 28,
+    normalScale: 1.28,
+    eliteScale: 1.28,
+    eliteChance: 0,
+    spawnMinInterval: 0.62,
+    spawnMaxInterval: 0.96,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "BLOATER", weight: 1, hp: 28, speed: 3.5, scale: 1.28 },
+    ],
+  },
+  {
+    stage: 4,
+    targetKills: 38,
+    normalSpeed: 7.3,
+    eliteSpeed: 2.3,
+    normalHp: 22,
+    eliteHp: 44,
+    normalScale: 1.18,
+    eliteScale: 1.5,
+    eliteChance: 0,
+    spawnMinInterval: 0.52,
+    spawnMaxInterval: 0.84,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "SHELL_BRUTE", weight: 0.24, hp: 44, speed: 2.3, scale: 1.5 },
+      { kind: "DASHER", weight: 0.4, hp: 22, speed: 7.3, scale: 1.18 },
+      { kind: "BLOATER", weight: 0.36, hp: 32, speed: 3.6, scale: 1.32 },
+    ],
+  },
+  {
+    stage: 5,
+    targetKills: 1,
+    normalSpeed: 1.45,
+    eliteSpeed: 1.45,
+    normalHp: 2800,
+    eliteHp: 2800, // Wave 5: Boss 3 Chrono Warrior (Chiến Binh Thời Gian)
+    normalScale: 5.2,
+    eliteScale: 5.2,
+    eliteChance: 1,
+    spawnMinInterval: 1.0,
+    spawnMaxInterval: 1.0,
+    maxBatchSize: 1,
+    isBossStage: true,
+  },
+];
+
+export const MAX_PLAYABLE_CHAPTER = 3;
 
 export const CHAPTER_STAGE_CATALOGS: Record<number, StageConfigDTO[]> = {
   1: STAGE_CATALOG,
   2: STAGE_CATALOG_CH2,
+  3: STAGE_CATALOG_CH3,
 };
 
 // Số phát bắn cần để kích hoạt Overdrive Buff trên bệ làn phải (chỉ tăng DMG & ROF, không đổi súng)

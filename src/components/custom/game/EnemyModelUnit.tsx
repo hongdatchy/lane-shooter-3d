@@ -21,7 +21,7 @@ import { useGameStore } from "@/state-manager/game-store";
 
 installModelBrowserCache();
 
-export type EnemyModelMode = "IDLE" | "WALK" | "ATTACK" | "ARMOR_BREAK" | "DEATH";
+export type EnemyModelMode = "IDLE" | "WALK" | "RUN" | "ATTACK" | "ARMOR_BREAK" | "DEATH";
 
 export interface EnemyModelUnitHandle {
   setMode: (mode: EnemyModelMode, duration?: number) => void;
@@ -56,6 +56,16 @@ export const ENEMY_MODEL_CONFIG: Record<EnemyVisualKind, EnemyModelSpec> = {
     rotationY: 0,
     targetHeight: 1.05,
   },
+  DASHER: {
+    walkFile: "enemies/dasher.glb",
+    rotationY: 0,
+    targetHeight: 1.15,
+  },
+  BLOATER: {
+    walkFile: "enemies/bloater.glb",
+    rotationY: 0,
+    targetHeight: 1.05,
+  },
   BOSS_STAGE1: {
     walkFile: "bosses/stage1/iron-warden-mechanical.glb",
     rotationY: 0,
@@ -65,6 +75,11 @@ export const ENEMY_MODEL_CONFIG: Record<EnemyVisualKind, EnemyModelSpec> = {
     walkFile: "bosses/stage2/nano-hydra-base-v3.glb",
     rotationY: 0,
     targetHeight: 1.25,
+  },
+  BOSS_STAGE3: {
+    walkFile: "bosses/stage3/chien-binh-thoi-gian-v2.glb",
+    rotationY: 0,
+    targetHeight: 1.35,
   },
 };
 
@@ -220,8 +235,11 @@ function NormalizedDualRig({
 
   const animBundle = useMemo(() => {
     const walkMixer = new THREE.AnimationMixer(walkData.clonedScene);
-    const walkClip = pickAnimationClip(walkAnimations, /walk|run|fly|move|march|idle|spawn|intro/i, true);
+    const walkClip = pickAnimationClip(walkAnimations, /walk|fly|move|march|idle|spawn|intro/i, true);
     const walkAction = walkClip ? walkMixer.clipAction(walkClip) : null;
+
+    const runClip = pickAnimationClip(walkAnimations, /run|sprint/i, false);
+    const runAction = runClip ? walkMixer.clipAction(runClip) : null;
 
     const attackClip = pickAnimationClip(
       walkAnimations,
@@ -241,13 +259,14 @@ function NormalizedDualRig({
       ? new THREE.AnimationMixer(deathData.clonedScene)
       : walkMixer;
     const deathClip = deathData
-      ? pickAnimationClip(deathAnimations, /dead|death|defeat|die|fall/i, true)
-      : pickAnimationClip(walkAnimations, /dead|death|defeat|die/i, false);
+      ? pickAnimationClip(deathAnimations, /dead|death|defeat|die|explode|fall/i, true)
+      : pickAnimationClip(walkAnimations, /dead|death|defeat|die|explode/i, false);
     const deathAction = deathClip ? deathMixer.clipAction(deathClip) : null;
 
     return {
       walkMixer,
       walkAction,
+      runAction,
       attackAction,
       armorBreakAction,
       deathMixer,
@@ -290,6 +309,7 @@ function NormalizedDualRig({
         if (walkHolder) walkHolder.visible = false;
         if (deathHolder) deathHolder.visible = false;
         animBundle.walkAction?.stop();
+        animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
         animBundle.armorBreakAction?.stop();
         animBundle.deathAction?.stop();
@@ -300,6 +320,7 @@ function NormalizedDualRig({
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
         animBundle.deathAction?.stop();
+        animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
         animBundle.armorBreakAction?.stop();
         if (animBundle.walkAction) {
@@ -314,10 +335,31 @@ function NormalizedDualRig({
         return;
       }
 
+      if (mode === "RUN") {
+        if (walkHolder) walkHolder.visible = true;
+        if (deathHolder) deathHolder.visible = false;
+        animBundle.deathAction?.stop();
+        animBundle.attackAction?.stop();
+        animBundle.armorBreakAction?.stop();
+        const sprintAction = animBundle.runAction ?? animBundle.walkAction;
+        if (animBundle.runAction) {
+          animBundle.walkAction?.stop();
+        }
+        if (sprintAction) {
+          sprintAction.reset();
+          sprintAction.setLoop(THREE.LoopRepeat, Infinity);
+          sprintAction.timeScale = animBundle.runAction ? 1.15 : 1.75;
+          sprintAction.play();
+          animBundle.walkMixer.update(0);
+        }
+        return;
+      }
+
       if (mode === "ATTACK") {
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
         animBundle.walkAction?.stop();
+        animBundle.runAction?.stop();
         animBundle.armorBreakAction?.stop();
         animBundle.deathAction?.stop();
         if (animBundle.attackAction) {
@@ -336,6 +378,7 @@ function NormalizedDualRig({
         if (walkHolder) walkHolder.visible = true;
         if (deathHolder) deathHolder.visible = false;
         animBundle.walkAction?.stop();
+        animBundle.runAction?.stop();
         animBundle.attackAction?.stop();
         animBundle.deathAction?.stop();
         if (animBundle.armorBreakAction) {
@@ -355,6 +398,7 @@ function NormalizedDualRig({
       if (walkHolder) walkHolder.visible = !hasSeparateDeath;
       if (deathHolder) deathHolder.visible = hasSeparateDeath;
       animBundle.walkAction?.stop();
+      animBundle.runAction?.stop();
       animBundle.attackAction?.stop();
       animBundle.armorBreakAction?.stop();
 
@@ -389,6 +433,13 @@ function NormalizedDualRig({
 
     if (modeRef.current === "WALK") {
       if (animBundle.walkAction) {
+        animBundle.walkMixer.update(delta);
+      }
+      return;
+    }
+
+    if (modeRef.current === "RUN") {
+      if (animBundle.runAction || animBundle.walkAction) {
         animBundle.walkMixer.update(delta);
       }
       return;
