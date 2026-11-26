@@ -144,7 +144,16 @@
     "guestLoginToSave": "Please log in to {platform} to save your progress, gold, and score to the Leaderboard.",
     "loginBtn": "Login",
     "scoreSyncFailed": "Failed to submit score: {err}",
-    "goldEarned": "Gold Earned"
+    "goldEarned": "Gold Earned",
+    "guestPopupBadge": "GUEST SESSION • SAVE PROGRESS",
+    "guestPopupTitleVictory": "Stage {stage} Cleared!",
+    "guestPopupTitleDefeat": "Ended at Stage {stage}!",
+    "guestPopupDesc": "Sign in with {platform} now to credit your Gold, Score, Kills, Leaderboard entry, and unlocked Stage directly to your account without replaying Stage {stage}.",
+    "guestPopupUnlockBadge": "Unlocks Stage {next} Immediately on Login",
+    "guestPopupSkip": "Skip for now",
+    "guestSyncedBanner": "Match rewards synced to {name}!",
+    "nextChapterBtn": "Continue to Stage {next}",
+    "replayChapterBtn": "Replay Stage {stage}"
   },
   "header": {
     "best": "BEST",

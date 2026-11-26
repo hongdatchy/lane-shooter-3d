@@ -144,7 +144,16 @@
     "guestLoginToSave": "Inicia sesión en {platform} para guardar tu progreso, oro y puntuación en la clasificación.",
     "loginBtn": "Entrar",
     "scoreSyncFailed": "Error al enviar puntuación: {err}",
-    "goldEarned": "Oro ganado"
+    "goldEarned": "Oro ganado",
+    "guestPopupBadge": "SESIÓN INVITADO • GUARDAR PROGRESO",
+    "guestPopupTitleVictory": "¡Nivel {stage} Completado!",
+    "guestPopupTitleDefeat": "¡Fin en Nivel {stage}!",
+    "guestPopupDesc": "Inicia sesión en {platform} ahora para sumar Oro, Puntos, Bajas, Clasificación y el Nivel desbloqueado a tu cuenta sin repetir el Nivel {stage}.",
+    "guestPopupUnlockBadge": "Desbloquea el Nivel {next} al iniciar sesión",
+    "guestPopupSkip": "Omitir por ahora",
+    "guestSyncedBanner": "¡Logros sincronizados con {name}!",
+    "nextChapterBtn": "Continuar al Nivel {next}",
+    "replayChapterBtn": "Repetir Nivel {stage}"
   },
   "header": {
     "best": "RÉCORD",

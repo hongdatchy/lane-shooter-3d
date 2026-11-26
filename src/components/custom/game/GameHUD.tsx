@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowRight,
   Camera,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -30,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { CameraMode } from "@/dto/GameDTO";
 import { useGameStore } from "@/state-manager/game-store";
 import { useAppStore } from "@/state-manager/app-store";
-import { weaponService } from "@/service/weapon-service";
+import { MAX_PLAYABLE_CHAPTER, weaponService } from "@/service/weapon-service";
 import { RAGE_CONFIG } from "@/service/game-constants";
 import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
@@ -59,7 +61,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     platformCapabilities,
     authLoading,
     authError,
+    saveError,
     scoreSyncError,
+    sessionId,
     score,
     highScore,
     lastGoldEarned,
@@ -96,7 +100,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     assetsWaitingToStart,
     setAssetsWaitingToStart,
     loginWithPlatform,
+    selectChapter,
     startGame,
+    startNextChapter,
     returnToMenu,
     togglePause,
     activateRage,
@@ -111,6 +117,8 @@ export function GameHUD({ containerRef }: GameHUDProps) {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [delayedResultReady, setDelayedResultReady] = useState(false);
+  const [guestLoginDismissed, setGuestLoginDismissed] = useState(false);
+  const [loggedInFromGuestModal, setLoggedInFromGuestModal] = useState(false);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const trans = useTransClientSide();
@@ -243,13 +251,36 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     }
   };
 
+  useEffect(() => {
+    setGuestLoginDismissed(false);
+    setLoggedInFromGuestModal(false);
+  }, [sessionId]);
+
   const handleRestart = () => {
     if (!assetsReady) {
       setAssetsWaitingToStart(true);
       return;
     }
     enterFullscreen();
+    selectChapter(activeChapter);
     startGame();
+  };
+
+  const handleNextChapter = () => {
+    if (!assetsReady) {
+      setAssetsWaitingToStart(true);
+      return;
+    }
+    enterFullscreen();
+    startNextChapter();
+  };
+
+  const handlePostMatchLogin = async () => {
+    const wasGuest = !useGameStore.getState().player;
+    await loginWithPlatform();
+    if (wasGuest && useGameStore.getState().player) {
+      setLoggedInFromGuestModal(true);
+    }
   };
 
   // Tự động vào game nếu người chơi đã bấm "Chơi ngay" trong lúc đang chờ tải tài nguyên
@@ -380,6 +411,19 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   const isBossWave = wave >= maxWaves;
   const currentCameraLabel = trans.camera[cameraMode] || cameraMode;
   const stageDisplay = isBossWave ? `${wave} / ${maxWaves}` : `${wave}`;
+  const canPromptLogin =
+    platformTarget === "crazygames" ||
+    Boolean(platformCapabilities?.supportsLoginPrompt);
+  const isMatchEnded =
+    (gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
+    delayedResultReady;
+  const showGuestLoginPopup =
+    isMatchEnded && !player && !guestLoginDismissed && canPromptLogin;
+  const nextChapterNumber = Math.min(MAX_PLAYABLE_CHAPTER, activeChapter + 1);
+  const hasNextPlayableChapter =
+    gameStatus === "VICTORY" &&
+    activeChapter < MAX_PLAYABLE_CHAPTER &&
+    saveData.unlockedChapter >= nextChapterNumber;
   const rageStatusText = icbmAiming
     ? trans.hud.rageAimingShort
     : icbmPending
@@ -678,17 +722,19 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           )}
         </AnimatePresence>
 
-        {/* Modal Pause / Game Over / Victory (Game Over & Victory đợi 3s) */}
-        <AnimatePresence>
-          {(gameStatus === "PAUSED" ||
-            ((gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
-              delayedResultReady)) && (
+        {/* Modal Pause / Guest Login Suggestion / Game Over / Victory */}
+        <AnimatePresence mode="wait">
+          {(gameStatus === "PAUSED" || isMatchEnded) && (
             <motion.div
-              key={gameStatus}
+              key={showGuestLoginPopup ? `${gameStatus}-guest-login` : gameStatus}
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              className="pointer-events-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-[#3B494B]/60 bg-[#191B23]/96 p-5 sm:p-6 text-center text-[#E1E2EC] shadow-[0_0_50px_rgba(0,0,0,0.75)] backdrop-blur-xl"
+              className={`pointer-events-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border bg-[#191B23]/96 p-5 sm:p-6 text-center text-[#E1E2EC] backdrop-blur-xl ${
+                showGuestLoginPopup
+                  ? "border-[#00F0FF]/55 shadow-[0_0_55px_rgba(0,240,255,0.22)]"
+                  : "border-[#3B494B]/60 shadow-[0_0_50px_rgba(0,0,0,0.75)]"
+              }`}
             >
               {gameStatus === "PAUSED" && (
                 <>
@@ -727,7 +773,118 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 </>
               )}
 
-              {(gameStatus === "GAME_OVER" || gameStatus === "VICTORY") && (
+              {showGuestLoginPopup && (
+                <>
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-[#00F0FF]/45 bg-[#00F0FF]/12 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-[#7DF4FF]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
+                    {trans.modals.guestPopupBadge}
+                  </div>
+                  <div
+                    className={`mx-auto mt-3 mb-3 flex h-12 w-12 items-center justify-center rounded-xl border ${
+                      gameStatus === "VICTORY"
+                        ? "bg-[#10B981]/15 border-[#10B981]/45 text-[#34D399]"
+                        : "bg-[#00F0FF]/12 border-[#00F0FF]/40 text-[#00F0FF]"
+                    }`}
+                  >
+                    <Trophy className="h-6 w-6" />
+                  </div>
+                  <h2
+                    className={`font-['Space_Grotesk'] text-2xl font-bold uppercase tracking-tight ${
+                      gameStatus === "VICTORY" ? "text-[#34D399]" : "text-[#DBFCFF]"
+                    }`}
+                  >
+                    {gameStatus === "VICTORY"
+                      ? formatText(trans.modals.guestPopupTitleVictory, {
+                          stage: activeChapter,
+                        })
+                      : formatText(trans.modals.guestPopupTitleDefeat, {
+                          stage: activeChapter,
+                        })}
+                  </h2>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#B9CACB]">
+                    {formatText(trans.modals.guestPopupDesc, {
+                      platform: platformTarget === "web" ? "Google" : "CrazyGames",
+                      stage: activeChapter,
+                    })}
+                  </p>
+
+                  {gameStatus === "VICTORY" && activeChapter < MAX_PLAYABLE_CHAPTER && (
+                    <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#10B981]/45 bg-[#10B981]/12 px-3 py-1.5 font-mono text-[11px] font-bold text-[#6EE7B7]">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34D399]" />
+                      <span>
+                        {formatText(trans.modals.guestPopupUnlockBadge, {
+                          next: nextChapterNumber,
+                        })}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[#272A32] bg-[#0B0E15]/80 p-3 font-mono text-xs">
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">
+                        {trans.modals.score}
+                      </span>
+                      <span className="text-base font-extrabold text-[#FFC080] tabular-nums">
+                        {score.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">
+                        {trans.modals.goldEarned}
+                      </span>
+                      <span className="text-base font-extrabold text-[#FE9800] tabular-nums">
+                        +{lastGoldEarned.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">
+                        {trans.modals.totalKills}
+                      </span>
+                      <span className="text-base font-extrabold text-[#34D399] tabular-nums">
+                        {kills}
+                      </span>
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div className="mt-3 rounded-lg border border-[#FE9800]/50 bg-[#FE9800]/12 px-3 py-2 text-xs text-[#FFC080] text-left">
+                      {authError}
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      size="lg"
+                      disabled={authLoading}
+                      onClick={() => void handlePostMatchLogin()}
+                      className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF] uppercase tracking-wider shadow-[0_0_24px_rgba(0,240,255,0.3)]"
+                    >
+                      {authLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <User className="h-4 w-4" />
+                      )}
+                      {authLoading
+                        ? trans.lobby.authenticating
+                        : platformTarget === "web"
+                          ? trans.lobby.loginGoogle
+                          : trans.lobby.loginCrazyGames}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={authLoading}
+                      onClick={() => setGuestLoginDismissed(true)}
+                      className="w-full text-xs font-mono text-[#849495] hover:bg-[#272A32] hover:text-[#E1E2EC]"
+                    >
+                      {trans.modals.guestPopupSkip}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {isMatchEnded && !showGuestLoginPopup && (
                 <>
                   <div
                     className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border ${
@@ -749,10 +906,21 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   </h2>
                   <p className="mt-1 font-mono text-xs text-[#849495]">
                     {playerName ? `${playerName} • ` : `${trans.modals.guestLabel} • `}
+                    {`CH.${String(activeChapter).padStart(2, "0")} • `}
                     {gameStatus === "VICTORY"
                       ? trans.modals.victoryDesc
                       : formatText(trans.modals.gameOverDesc, { stage: stageDisplay })}
                   </p>
+                  {player && loggedInFromGuestModal && !saveError && (
+                    <div className="mt-3 rounded-xl border border-[#10B981]/45 bg-[#10B981]/12 px-3.5 py-2 text-xs text-[#6EE7B7] flex items-center gap-2 text-left">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-[#34D399]" />
+                      <span>
+                        {formatText(trans.modals.guestSyncedBanner, {
+                          name: playerName || "Account",
+                        })}
+                      </span>
+                    </div>
+                  )}
                   {!player && (
                     <div className="mt-3 rounded-xl border border-[#00F0FF]/40 bg-[#0B0E15]/80 px-3.5 py-2.5 text-xs text-[#DBFCFF] flex flex-col gap-2 text-left">
                       <div className="flex items-start gap-2">
@@ -764,15 +932,15 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           })}
                         </span>
                       </div>
-                      {(platformTarget === "crazygames" ||
-                        platformCapabilities?.supportsLoginPrompt) && (
+                      {canPromptLogin && (
                         <Button
                           type="button"
                           size="sm"
                           disabled={authLoading}
-                          onClick={() => void loginWithPlatform()}
-                          className="w-full bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF] uppercase tracking-wider"
+                          onClick={() => void handlePostMatchLogin()}
+                          className="w-full gap-1.5 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF] uppercase tracking-wider"
                         >
+                          {authLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                           {authLoading
                             ? trans.lobby.authenticating
                             : platformTarget === "web"
@@ -785,6 +953,11 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                           {authError}
                         </div>
                       )}
+                    </div>
+                  )}
+                  {player && saveError && (
+                    <div className="mt-3 rounded-lg border border-[#FE9800]/45 bg-[#FE9800]/12 px-3 py-2 text-xs text-[#FFC080] text-left">
+                      {saveError}
                     </div>
                   )}
                   {player && scoreSyncError && (
@@ -813,15 +986,44 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     </div>
                   </div>
                   <div className="mt-5 flex flex-col gap-2">
-                    <Button
-                      type="button"
-                      onClick={handleRestart}
-                      className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
-                      size="lg"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      {trans.modals.restartFull}
-                    </Button>
+                    {hasNextPlayableChapter ? (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={handleNextChapter}
+                          className="w-full gap-2 bg-[#10B981] text-[#00291C] font-bold hover:bg-[#34D399] shadow-[0_0_24px_rgba(16,185,129,0.28)]"
+                          size="lg"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                          {formatText(trans.modals.nextChapterBtn, {
+                            next: nextChapterNumber,
+                          })}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleRestart}
+                          className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          {formatText(trans.modals.replayChapterBtn, {
+                            stage: activeChapter,
+                          })}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleRestart}
+                        className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
+                        size="lg"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        {formatText(trans.modals.replayChapterBtn, {
+                          stage: activeChapter,
+                        })}
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="outline"

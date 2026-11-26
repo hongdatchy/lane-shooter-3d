@@ -175,6 +175,7 @@ interface GameActions {
   cycleCombatWeapon: (dir?: 1 | -1) => void;
   selectChapter: (chapterId: number) => void;
   startGame: () => void;
+  startNextChapter: () => void;
   returnToMenu: () => void;
   pauseGame: () => void;
   resumeGame: () => void;
@@ -276,10 +277,10 @@ function applyMatchRewardToSave(
     activeChapter: number;
   }
 ): PlayerSaveData {
-  const nextUnlockedChapter =
-    match.victory && match.activeChapter >= baseSave.unlockedChapter
-      ? Math.min(10, match.activeChapter + 1)
-      : baseSave.unlockedChapter;
+  const reachedChapter = match.victory
+    ? Math.min(10, match.activeChapter + 1)
+    : match.activeChapter;
+  const nextUnlockedChapter = Math.max(baseSave.unlockedChapter, reachedChapter);
 
   return {
     ...baseSave,
@@ -328,53 +329,54 @@ async function hydrateAuthenticatedSession(player: PlatformPlayer): Promise<void
   const shouldSyncPending =
     Boolean(pending) && snapshot.syncedMatchSessionId !== pending?.sessionId;
 
+  let finalSave = loadedSave;
+  let writeSaveError: string | null = null;
+
+  if (shouldSyncPending && pending) {
+    const alreadyInLoadedSave =
+      pending.guestSavedUpdatedAt !== null &&
+      loadedSave.updatedAt === pending.guestSavedUpdatedAt;
+
+    if (!alreadyInLoadedSave) {
+      const mergedSave = applyMatchRewardToSave(loadedSave, pending);
+      try {
+        finalSave = await playerSaveService.writeSave(mergedSave);
+      } catch (err) {
+        writeSaveError = err instanceof Error ? err.message : String(err);
+      }
+    }
+  }
+
+  const syncedSuccessfully =
+    Boolean(shouldSyncPending && pending) && writeSaveError === null;
+
   useGameStore.setState((curr) => ({
     player,
     playerId: player.id,
     playerName: player.name,
-    saveData: loadedSave,
-    saveError: null,
+    saveData: finalSave,
+    saveError: writeSaveError,
     authError: null,
     scoreSyncError: null,
     syncedMatchSessionId:
-      shouldSyncPending && pending ? pending.sessionId : curr.syncedMatchSessionId,
-    pendingGuestMatch: null,
-    highScore: computeBestScore(player, curr.leaderboard, loadedSave),
+      syncedSuccessfully && pending ? pending.sessionId : curr.syncedMatchSessionId,
+    pendingGuestMatch: syncedSuccessfully ? null : curr.pendingGuestMatch,
+    selectedChapter: Math.min(
+      MAX_PLAYABLE_CHAPTER,
+      Math.max(curr.selectedChapter, finalSave.unlockedChapter)
+    ),
+    highScore: computeBestScore(player, curr.leaderboard, finalSave),
   }));
 
-  if (!shouldSyncPending || !pending) {
-    return;
+  if (shouldSyncPending && pending) {
+    submitLeaderboardMatch({
+      player,
+      score: pending.score,
+      wave: pending.wave,
+      kills: pending.kills,
+      victory: pending.victory,
+    });
   }
-
-  const alreadyInLoadedSave =
-    pending.guestSavedUpdatedAt !== null &&
-    loadedSave.updatedAt === pending.guestSavedUpdatedAt;
-
-  if (!alreadyInLoadedSave) {
-    const mergedSave = applyMatchRewardToSave(loadedSave, pending);
-    try {
-      const saved = await playerSaveService.writeSave(mergedSave);
-      useGameStore.setState((curr) => ({
-        saveData: saved,
-        saveError: null,
-        highScore: Math.max(
-          curr.highScore,
-          computeBestScore(curr.player, curr.leaderboard, saved)
-        ),
-      }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      useGameStore.setState({ saveError: msg });
-    }
-  }
-
-  submitLeaderboardMatch({
-    player,
-    score: pending.score,
-    wave: pending.wave,
-    kills: pending.kills,
-    victory: pending.victory,
-  });
 }
 
 function syncPostMatchOutcome(input: {
@@ -616,6 +618,10 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           profileLoaded: true,
           saveData: loadedSave,
           saveError: saveErr,
+          selectedChapter: Math.min(
+            MAX_PLAYABLE_CHAPTER,
+            Math.max(curr.selectedChapter, loadedSave.unlockedChapter)
+          ),
           highScore: computeBestScore(player, curr.leaderboard, loadedSave),
         }));
 
@@ -978,6 +984,16 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         sessionId: state.sessionId + 1,
       };
     });
+  },
+
+  startNextChapter: () => {
+    const state = get();
+    const nextChapter = Math.min(
+      MAX_PLAYABLE_CHAPTER,
+      Math.max(1, state.activeChapter + 1)
+    );
+    set({ selectedChapter: nextChapter });
+    get().startGame();
   },
 
   switchCombatWeaponSlot: (slotIndex) => {
@@ -1386,6 +1402,10 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         score: finalScore,
         lastGoldEarned: earnedGold,
         highScore: Math.max(nextHighScore, finalScore),
+        selectedChapter: Math.min(
+          MAX_PLAYABLE_CHAPTER,
+          Math.max(state.selectedChapter, state.activeChapter + 1)
+        ),
         gameStatus: "VICTORY",
         rage: 0,
         rageReady: false,

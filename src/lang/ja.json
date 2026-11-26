@@ -144,7 +144,16 @@
     "guestLoginToSave": "進行状況・ゴールド・このスコアをランキングに保存するには {platform} にログインしてください。",
     "loginBtn": "ログイン",
     "scoreSyncFailed": "スコア送信エラー: {err}",
-    "goldEarned": "獲得ゴールド"
+    "goldEarned": "獲得ゴールド",
+    "guestPopupBadge": "ゲストプレイ • 戦績を保存",
+    "guestPopupTitleVictory": "ステージ {stage} クリア!",
+    "guestPopupTitleDefeat": "ステージ {stage} で終了!",
+    "guestPopupDesc": "{platform} にログインすると、ステージ {stage} をやり直すことなくゴールド・スコア・撃破数・ランキング・解放進行度をそのままアカウントに反映します。",
+    "guestPopupUnlockBadge": "ログイン後すぐステージ {next} が解放されます",
+    "guestPopupSkip": "あとで",
+    "guestSyncedBanner": "戦績を {name} に同期しました!",
+    "nextChapterBtn": "ステージ {next} へ進む",
+    "replayChapterBtn": "ステージ {stage} を再挑戦"
   },
   "header": {
     "best": "記録",

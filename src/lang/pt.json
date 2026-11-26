@@ -144,7 +144,16 @@
     "guestLoginToSave": "Faça login no {platform} para salvar seu progresso, ouro e registrar esta pontuação no ranking.",
     "loginBtn": "Entrar",
     "scoreSyncFailed": "Erro ao enviar pontuação: {err}",
-    "goldEarned": "Ouro ganho"
+    "goldEarned": "Ouro ganho",
+    "guestPopupBadge": "MODO VISITANTE • SALVAR PROGRESSO",
+    "guestPopupTitleVictory": "Fase {stage} Concluída!",
+    "guestPopupTitleDefeat": "Fim na Fase {stage}!",
+    "guestPopupDesc": "Entre com {platform} agora para creditar Ouro, Pontos, Abates, Ranking e a Fase desbloqueada na sua conta sem precisar jogar a Fase {stage} de novo.",
+    "guestPopupUnlockBadge": "Desbloqueia a Fase {next} ao Entrar",
+    "guestPopupSkip": "Pular por enquanto",
+    "guestSyncedBanner": "Recompensas sincronizadas em {name}!",
+    "nextChapterBtn": "Continuar para Fase {next}",
+    "replayChapterBtn": "Jogar Fase {stage} de novo"
   },
   "header": {
     "best": "RECORDE",

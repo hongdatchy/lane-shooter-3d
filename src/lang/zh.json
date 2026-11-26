@@ -144,7 +144,16 @@
     "guestLoginToSave": "请登录 {platform} 以保存进度、金币并将本局分数上传至排行榜。",
     "loginBtn": "登录",
     "scoreSyncFailed": "提交分数失败: {err}",
-    "goldEarned": "获得金币"
+    "goldEarned": "获得金币",
+    "guestPopupBadge": "游客模式 • 保存战绩",
+    "guestPopupTitleVictory": "第 {stage} 关通关!",
+    "guestPopupTitleDefeat": "止步第 {stage} 关!",
+    "guestPopupDesc": "立即登录 {platform}，本局金币、得分、击杀、排行榜与关卡解锁进度将直接计入账号，无需重打第 {stage} 关。",
+    "guestPopupUnlockBadge": "登录后立即解锁第 {next} 关",
+    "guestPopupSkip": "暂不登录",
+    "guestSyncedBanner": "本局战绩已同步至 {name}!",
+    "nextChapterBtn": "继续挑战第 {next} 关",
+    "replayChapterBtn": "重玩第 {stage} 关"
   },
   "header": {
     "best": "最高",

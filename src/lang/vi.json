@@ -144,7 +144,16 @@
     "guestLoginToSave": "Hãy đăng nhập {platform} để lưu tiến trình, vàng và ghi điểm trận này lên BXH.",
     "loginBtn": "Đăng nhập",
     "scoreSyncFailed": "Lỗi gửi điểm: {err}",
-    "goldEarned": "Vàng nhận"
+    "goldEarned": "Vàng nhận",
+    "guestPopupBadge": "CHẾ ĐỘ KHÁCH • LƯU THÀNH TÍCH",
+    "guestPopupTitleVictory": "Hoàn thành Màn {stage}!",
+    "guestPopupTitleDefeat": "Kết thúc trận tại Màn {stage}!",
+    "guestPopupDesc": "Đăng nhập {platform} để cộng toàn bộ Vàng, Điểm, Kỷ lục, BXH và tiến trình vừa chơi vào tài khoản mà không cần chơi lại Màn {stage}.",
+    "guestPopupUnlockBadge": "Mở khóa ngay Màn {next} khi đăng nhập",
+    "guestPopupSkip": "Bỏ qua, xem kết quả",
+    "guestSyncedBanner": "Đã cộng thành tích trận vừa chơi vào tài khoản {name}!",
+    "nextChapterBtn": "Tiếp tục Màn {next}",
+    "replayChapterBtn": "Chơi lại Màn {stage}"
   },
   "header": {
     "best": "KỶ LỤC",
