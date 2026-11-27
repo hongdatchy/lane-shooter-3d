@@ -153,7 +153,22 @@
     "guestPopupSkip": "Skip for now",
     "guestSyncedBanner": "Match rewards synced to {name}!",
     "nextChapterBtn": "Continue to Stage {next}",
-    "replayChapterBtn": "Replay Stage {stage}"
+    "replayChapterBtn": "Replay Stage {stage}",
+    "firstRunMenuCta": "Go to Main Lobby & Armory"
+  },
+  "firstRun": {
+    "checkingProfile": "Preparing battlefield...",
+    "badge": "OPENING MISSION • STAGE 1",
+    "title": "Ready for Battle",
+    "subtitle": "Clear the incoming monster waves and defeat the first Boss to unlock the Main Lobby, Armory, and Campaign Map.",
+    "loadingLabel": "Loading battle data",
+    "readyLabel": "Battle data ready",
+    "startBtnReady": "START STAGE 1 NOW",
+    "startBtnLoading": "START STAGE 1 ({pct}%)",
+    "startingHint": "Finishing download ({pct}%), entering battle automatically...",
+    "retryBtn": "Retry Download",
+    "loadErrorHint": "Failed to load battle data. Please check your connection and try again.",
+    "controlsTip": "Move [A / D] or drag horizontally • Auto-fire ON • Press [R] at full Rage"
   },
   "header": {
     "best": "BEST",
@@ -238,7 +253,7 @@
     "statusSync": "SYNC...",
     "statusOnline": "ONLINE",
     "firestoreError": "FIRESTORE ERROR",
-    "boardMeta": "Wave {wave} • {kills} Kills",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} Kills",
     "winTag": "WIN",
     "ptsUnit": "PTS",
     "guestBoardWarning": "GUEST CANNOT SUBMIT RANK",

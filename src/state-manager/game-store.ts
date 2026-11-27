@@ -42,7 +42,9 @@ import {
 import {
   PlayerSaveData,
   createDefaultSaveData,
+  markBrowserFirstRunDone,
   playerSaveService,
+  readBrowserFirstRunDone,
 } from "@/service/player-save-service";
 import {
   PlatformCapabilities,
@@ -89,6 +91,8 @@ interface GameState {
   playerId: string;
   playerName: string;
   profileLoaded: boolean;
+  firstRunDone: boolean;
+  isCurrentRunFirstTime: boolean;
 
   // Cloud / Platform Save
   saveData: PlayerSaveData;
@@ -207,6 +211,8 @@ interface GameActions {
   switchCombatWeaponSlot: (slotIndex: number) => void;
   cycleCombatWeapon: (dir?: 1 | -1) => void;
   selectChapter: (chapterId: number) => void;
+  startFirstRun: () => void;
+  completeFirstRunOnboarding: () => void;
   startGame: () => void;
   startNextChapter: () => void;
   returnToMenu: () => void;
@@ -342,6 +348,17 @@ function safeNotifyPlatform(action: (adapter: ReturnType<typeof getPlatformAdapt
   }
 }
 
+function resolveFirstRunDone(save: PlayerSaveData): boolean {
+  return Boolean(
+    save.firstRunDone ||
+      readBrowserFirstRunDone() ||
+      save.gamesPlayed > 0 ||
+      save.bestScore > 0 ||
+      save.totalKills > 0 ||
+      save.unlockedChapter > 1
+  );
+}
+
 function applyMatchRewardToSave(
   baseSave: PlayerSaveData,
   match: {
@@ -359,6 +376,7 @@ function applyMatchRewardToSave(
 
   return {
     ...baseSave,
+    firstRunDone: true,
     gold: baseSave.gold + match.earnedGold,
     bestScore: Math.max(baseSave.bestScore, match.score),
     totalKills: baseSave.totalKills + match.kills,
@@ -370,6 +388,7 @@ function applyMatchRewardToSave(
 function submitLeaderboardMatch(input: {
   player: PlatformPlayer;
   score: number;
+  chapter: number;
   wave: number;
   kills: number;
   victory: boolean;
@@ -425,6 +444,10 @@ async function hydrateAuthenticatedSession(player: PlatformPlayer): Promise<void
   const syncedSuccessfully =
     Boolean(shouldSyncPending && pending) && writeSaveError === null;
 
+  if (syncedSuccessfully) {
+    markBrowserFirstRunDone();
+  }
+
   useGameStore.setState((curr) => ({
     player,
     playerId: player.id,
@@ -433,6 +456,7 @@ async function hydrateAuthenticatedSession(player: PlatformPlayer): Promise<void
     saveError: writeSaveError,
     authError: null,
     scoreSyncError: null,
+    firstRunDone: curr.firstRunDone || resolveFirstRunDone(finalSave),
     syncedMatchSessionId:
       syncedSuccessfully && pending ? pending.sessionId : curr.syncedMatchSessionId,
     pendingGuestMatch: syncedSuccessfully ? null : curr.pendingGuestMatch,
@@ -447,6 +471,7 @@ async function hydrateAuthenticatedSession(player: PlatformPlayer): Promise<void
     submitLeaderboardMatch({
       player,
       score: pending.score,
+      chapter: pending.activeChapter,
       wave: pending.wave,
       kills: pending.kills,
       victory: pending.victory,
@@ -534,6 +559,7 @@ function syncPostMatchOutcome(input: {
   submitLeaderboardMatch({
     player: input.player,
     score: input.score,
+    chapter: state.activeChapter,
     wave: input.wave,
     kills: input.kills,
     victory: input.victory,
@@ -561,6 +587,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   playerId: "",
   playerName: "",
   profileLoaded: false,
+  firstRunDone: false,
+  isCurrentRunFirstTime: false,
 
   saveData: createDefaultSaveData(),
   saveError: null,
@@ -689,6 +717,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
                   player: null,
                   playerId: "",
                   playerName: "",
+                  firstRunDone: resolveFirstRunDone(refreshedSave),
                   saveData: refreshedSave,
                   saveError: null,
                   authError: null,
@@ -714,6 +743,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           playerId: player?.id ?? "",
           playerName: player?.name ?? "",
           profileLoaded: true,
+          firstRunDone: resolveFirstRunDone(loadedSave),
           saveData: loadedSave,
           saveError: saveErr,
           selectedChapter: Math.min(
@@ -734,6 +764,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           platformReady: false,
           platformError: message,
           profileLoaded: true,
+          firstRunDone: readBrowserFirstRunDone(),
         });
       } finally {
         initInFlightPromise = null;
@@ -768,6 +799,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         player: null,
         playerId: "",
         playerName: "",
+        firstRunDone: resolveFirstRunDone(guestSave),
         saveData: guestSave,
         saveError: null,
         scoreSyncError: null,
@@ -1016,6 +1048,34 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   selectChapter: (chapterId) =>
     set({ selectedChapter: Math.min(10, Math.max(1, chapterId)) }),
 
+  startFirstRun: () => {
+    set({
+      selectedChapter: 1,
+      isCurrentRunFirstTime: true,
+    });
+    get().startGame();
+  },
+
+  completeFirstRunOnboarding: () => {
+    markBrowserFirstRunDone();
+    const state = get();
+    const nextSave: PlayerSaveData = state.saveData.firstRunDone
+      ? state.saveData
+      : { ...state.saveData, firstRunDone: true };
+    set({
+      firstRunDone: true,
+      saveData: nextSave,
+    });
+    if (
+      state.platformReady &&
+      !state.saveError &&
+      !state.devMode &&
+      !state.saveData.firstRunDone
+    ) {
+      void playerSaveService.writeSave(nextSave).catch(() => {});
+    }
+  },
+
   startGame: () => {
     soundService.unlock();
     safeNotifyPlatform((adapter) => adapter.notifyGameplayStart());
@@ -1104,8 +1164,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     );
     set(
       state.devMode
-        ? { devChapter: nextChapter, selectedChapter: nextChapter }
-        : { selectedChapter: nextChapter }
+        ? {
+            devChapter: nextChapter,
+            selectedChapter: nextChapter,
+            isCurrentRunFirstTime: false,
+          }
+        : { selectedChapter: nextChapter, isCurrentRunFirstTime: false }
     );
     get().startGame();
   },
@@ -1144,6 +1208,14 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   returnToMenu: () => {
     const state = get();
     safeNotifyPlatform((adapter) => adapter.notifyGameplayStop());
+    if (!state.devMode) {
+      markBrowserFirstRunDone();
+      if (!state.saveData.firstRunDone && state.platformReady && !state.saveError && state.score === 0) {
+        const markedSave: PlayerSaveData = { ...state.saveData, firstRunDone: true };
+        set({ saveData: markedSave });
+        void playerSaveService.writeSave(markedSave).catch(() => {});
+      }
+    }
     if ((state.gameStatus === "PLAYING" || state.gameStatus === "PAUSED") && state.score > 0) {
       syncPostMatchOutcome({
         player: state.player,
@@ -1156,6 +1228,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     set({
       gameStatus: "MENU",
       menuScreen: "LOBBY",
+      firstRunDone: state.devMode ? state.firstRunDone : true,
+      isCurrentRunFirstTime: false,
       rageReady: false,
       rageActive: false,
       rageTimeLeft: 0,
@@ -1523,6 +1597,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         adapter.notifyHappyTime();
       });
       const finalScore = nextScore + 1000;
+      if (!state.devMode) {
+        markBrowserFirstRunDone();
+      }
       const earnedGold = syncPostMatchOutcome({
         player: state.player,
         score: finalScore,
@@ -1536,6 +1613,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         score: finalScore,
         lastGoldEarned: earnedGold,
         highScore: Math.max(nextHighScore, finalScore),
+        firstRunDone: state.devMode ? state.firstRunDone : true,
         selectedChapter: state.devMode
           ? state.selectedChapter
           : Math.min(
@@ -1741,6 +1819,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     soundService.play(nextHp <= 0 ? "gameOver" : "playerHit");
     if (nextHp <= 0) {
       safeNotifyPlatform((adapter) => adapter.notifyGameplayStop());
+      if (!state.devMode) {
+        markBrowserFirstRunDone();
+      }
       const earnedGold = syncPostMatchOutcome({
         player: state.player,
         score: state.score,
@@ -1751,6 +1832,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       set({
         hp: 0,
         lastGoldEarned: earnedGold,
+        firstRunDone: state.devMode ? state.firstRunDone : true,
         gameStatus: "GAME_OVER",
         rage: 0,
         rageReady: false,
@@ -1823,6 +1905,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     if (!isLocalDevEnvironment()) return;
     set((curr) => ({
       devMode: true,
+      isCurrentRunFirstTime: false,
       devNarrowLane: overrides?.devNarrowLane ?? true,
       devWeaponId: overrides?.devWeaponId ?? curr.devWeaponId,
       devWeaponLevel:

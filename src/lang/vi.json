@@ -153,7 +153,22 @@
     "guestPopupSkip": "Bỏ qua, xem kết quả",
     "guestSyncedBanner": "Đã cộng thành tích trận vừa chơi vào tài khoản {name}!",
     "nextChapterBtn": "Tiếp tục Màn {next}",
-    "replayChapterBtn": "Chơi lại Màn {stage}"
+    "replayChapterBtn": "Chơi lại Màn {stage}",
+    "firstRunMenuCta": "Vào Sảnh Chính & Kho Vũ Khí"
+  },
+  "firstRun": {
+    "checkingProfile": "Đang chuẩn bị chiến trường...",
+    "badge": "NHIỆM VỤ MỞ MÀN • MÀN 1",
+    "title": "Sẵn Sàng Xuất Kích",
+    "subtitle": "Tiêu diệt các đợt quái vật & hạ gục Boss đầu tiên để mở khóa Sảnh Chính, Kho Súng và Bản Đồ Chiến Dịch.",
+    "loadingLabel": "Đang tải dữ liệu trận đấu",
+    "readyLabel": "Dữ liệu trận đấu đã sẵn sàng",
+    "startBtnReady": "BẮT ĐẦU MÀN 1 NGAY",
+    "startBtnLoading": "VÀO MÀN 1 ({pct}%)",
+    "startingHint": "Đang hoàn tất dữ liệu ({pct}%), tự động vào trận ngay...",
+    "retryBtn": "Thử tải lại",
+    "loadErrorHint": "Không tải được dữ liệu trận đấu. Vui lòng kiểm tra kết nối mạng và thử lại.",
+    "controlsTip": "Di chuyển [A / D] hoặc kéo ngang • Tự động bắn • Bấm [R] khi đầy Nộ"
   },
   "header": {
     "best": "KỶ LỤC",
@@ -238,7 +253,7 @@
     "statusSync": "ĐỒNG BỘ...",
     "statusOnline": "TRỰC TUYẾN",
     "firestoreError": "LỖI FIRESTORE",
-    "boardMeta": "Màn {wave} • {kills} Quái",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} Kills",
     "winTag": "THẮNG",
     "ptsUnit": "ĐIỂM",
     "guestBoardWarning": "KHÁCH KHÔNG GHI BXH",

@@ -153,7 +153,22 @@
     "guestPopupSkip": "Omitir por ahora",
     "guestSyncedBanner": "¡Logros sincronizados con {name}!",
     "nextChapterBtn": "Continuar al Nivel {next}",
-    "replayChapterBtn": "Repetir Nivel {stage}"
+    "replayChapterBtn": "Repetir Nivel {stage}",
+    "firstRunMenuCta": "Ir al Menú Principal y Armería"
+  },
+  "firstRun": {
+    "checkingProfile": "Preparando campo de batalla...",
+    "badge": "MISIÓN INICIAL • NIVEL 1",
+    "title": "Listo para el Combate",
+    "subtitle": "Derrota las oleadas y vence al primer Jefe para desbloquear el Menú Principal, la Armería y el Mapa.",
+    "loadingLabel": "Cargando datos de batalla",
+    "readyLabel": "Datos de batalla listos",
+    "startBtnReady": "EMPEZAR NIVEL 1 AHORA",
+    "startBtnLoading": "EMPEZAR NIVEL 1 ({pct}%)",
+    "startingHint": "Completando descarga ({pct}%), entrando automáticamente...",
+    "retryBtn": "Reintentar",
+    "loadErrorHint": "Error al cargar los datos de batalla. Revisa tu conexión e inténtalo de nuevo.",
+    "controlsTip": "Mover [A / D] o deslizar • Disparo automático • Pulsa [R] con Furia llena"
   },
   "header": {
     "best": "RÉCORD",
@@ -238,7 +253,7 @@
     "statusSync": "SINC...",
     "statusOnline": "EN LÍNEA",
     "firestoreError": "ERROR DE FIRESTORE",
-    "boardMeta": "Nivel {wave} • {kills} bajas",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} Bajas",
     "winTag": "VICTORIA",
     "ptsUnit": "PTS",
     "guestBoardWarning": "INVITADO NO ENVÍA RANKING",

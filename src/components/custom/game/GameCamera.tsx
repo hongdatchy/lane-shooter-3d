@@ -60,13 +60,13 @@ export function GameCamera({ runtimeRef }: GameCameraProps) {
       );
       desiredLookAt.set(pointerTiltX * 0.25, 0, -4.5);
     } else {
-      // THIRD_PERSON: Góc nhìn thấp sau vai nhân vật, bám theo trục X mượt mà
+      // THIRD_PERSON: Góc nhìn sau lưng nhân vật (kéo xa hơn để thấy rõ nhân vật & 2 làn), bám trục X mượt mà
       desiredPos.set(
         playerX * 0.65 + shakeX,
-        6.4 * portraitDistScale + shakeY,
-        15.5 * portraitDistScale
+        8.2 * portraitDistScale + shakeY,
+        19.0 * portraitDistScale
       );
-      desiredLookAt.set(playerX * 0.45, 1.3, -11);
+      desiredLookAt.set(playerX * 0.45, 1.1, -9.5);
     }
 
     if (!hasInitialized.current) {

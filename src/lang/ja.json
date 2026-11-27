@@ -153,7 +153,22 @@
     "guestPopupSkip": "あとで",
     "guestSyncedBanner": "戦績を {name} に同期しました!",
     "nextChapterBtn": "ステージ {next} へ進む",
-    "replayChapterBtn": "ステージ {stage} を再挑戦"
+    "replayChapterBtn": "ステージ {stage} を再挑戦",
+    "firstRunMenuCta": "メインロビー・武器庫へ"
+  },
+  "firstRun": {
+    "checkingProfile": "戦場を準備中...",
+    "badge": "初回ミッション • ステージ 1",
+    "title": "出撃準備完了",
+    "subtitle": "敵のウェーブと最初のボスを撃破して、メインロビー・武器庫・キャンペーンマップを解放しましょう。",
+    "loadingLabel": "戦闘データを読み込み中",
+    "readyLabel": "戦闘データの準備完了",
+    "startBtnReady": "今すぐステージ1を開始",
+    "startBtnLoading": "ステージ1を開始 ({pct}%)",
+    "startingHint": "読み込み完了待ち ({pct}%) — 完了次第自動で開始します...",
+    "retryBtn": "再読み込み",
+    "loadErrorHint": "戦闘データの読み込みに失敗しました。通信環境を確認してやり直してください。",
+    "controlsTip": "[A / D] またはドラッグで移動 • 自動射撃 • 怒りゲージMAXで [R]"
   },
   "header": {
     "best": "記録",
@@ -238,7 +253,7 @@
     "statusSync": "同期中...",
     "statusOnline": "オンライン",
     "firestoreError": "FIRESTORE エラー",
-    "boardMeta": "Stage {wave} • {kills} 撃破",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} 撃破",
     "winTag": "WIN",
     "ptsUnit": "点",
     "guestBoardWarning": "ゲストはスコア登録不可",

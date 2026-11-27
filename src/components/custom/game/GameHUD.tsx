@@ -122,6 +122,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     toggleAutoFire,
     toggleMute,
     clearRewardBanner,
+    isCurrentRunFirstTime,
     devMode,
     devGameSpeed,
     devWeaponId,
@@ -319,10 +320,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   useEffect(() => {
     if (assetsWaitingToStart && assetsReady) {
       setAssetsWaitingToStart(false);
-      enterFullscreen();
+      if (!isCurrentRunFirstTime) {
+        enterFullscreen();
+      }
       startGame();
     }
-  }, [assetsWaitingToStart, assetsReady]);
+  }, [assetsWaitingToStart, assetsReady, isCurrentRunFirstTime]);
 
   const handleBackToMenu = () => {
     exitFullscreen();
@@ -1288,24 +1291,35 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     </div>
                   </div>
                   <div className="mt-5 flex flex-col gap-2">
-                    {hasNextPlayableChapter ? (
+                    {isCurrentRunFirstTime ? (
                       <>
                         <Button
                           type="button"
-                          onClick={handleNextChapter}
-                          className="w-full gap-2 bg-[#10B981] text-[#00291C] font-bold hover:bg-[#34D399] shadow-[0_0_24px_rgba(16,185,129,0.28)]"
+                          onClick={handleBackToMenu}
+                          className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF] shadow-[0_0_24px_rgba(0,240,255,0.28)]"
                           size="lg"
                         >
-                          <ArrowRight className="h-4 w-4" />
-                          {formatText(trans.modals.nextChapterBtn, {
-                            next: nextChapterNumber,
-                          })}
+                          <Crown className="h-4 w-4 text-[#00363A]" />
+                          {trans.modals.firstRunMenuCta}
                         </Button>
+                        {hasNextPlayableChapter && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleNextChapter}
+                            className="w-full gap-2 border-[#10B981]/50 bg-[#1D1F27] text-[#6EE7B7] hover:bg-[#272A32]"
+                          >
+                            <ArrowRight className="h-4 w-4" />
+                            {formatText(trans.modals.nextChapterBtn, {
+                              next: nextChapterNumber,
+                            })}
+                          </Button>
+                        )}
                         <Button
                           type="button"
                           variant="outline"
                           onClick={handleRestart}
-                          className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                          className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#B9CACB] hover:bg-[#272A32] hover:text-white"
                         >
                           <RotateCcw className="h-4 w-4" />
                           {formatText(trans.modals.replayChapterBtn, {
@@ -1314,27 +1328,56 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                         </Button>
                       </>
                     ) : (
-                      <Button
-                        type="button"
-                        onClick={handleRestart}
-                        className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
-                        size="lg"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        {formatText(trans.modals.replayChapterBtn, {
-                          stage: activeChapter,
-                        })}
-                      </Button>
+                      <>
+                        {hasNextPlayableChapter ? (
+                          <>
+                            <Button
+                              type="button"
+                              onClick={handleNextChapter}
+                              className="w-full gap-2 bg-[#10B981] text-[#00291C] font-bold hover:bg-[#34D399] shadow-[0_0_24px_rgba(16,185,129,0.28)]"
+                              size="lg"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                              {formatText(trans.modals.nextChapterBtn, {
+                                next: nextChapterNumber,
+                              })}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleRestart}
+                              className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              {formatText(trans.modals.replayChapterBtn, {
+                                stage: activeChapter,
+                              })}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={handleRestart}
+                            className="w-full gap-2 bg-[#00F0FF] text-[#00363A] font-bold hover:bg-[#7DF4FF]"
+                            size="lg"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            {formatText(trans.modals.replayChapterBtn, {
+                              stage: activeChapter,
+                            })}
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleBackToMenu}
+                          className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
+                        >
+                          <Crown className="h-4 w-4 text-[#FE9800]" />
+                          {trans.modals.backToMenu}
+                        </Button>
+                      </>
                     )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBackToMenu}
-                      className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#E1E2EC] hover:bg-[#272A32] hover:text-white"
-                    >
-                      <Crown className="h-4 w-4 text-[#FE9800]" />
-                      {trans.modals.backToMenu}
-                    </Button>
                   </div>
                 </>
               )}

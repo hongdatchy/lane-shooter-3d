@@ -153,7 +153,22 @@
     "guestPopupSkip": "Pular por enquanto",
     "guestSyncedBanner": "Recompensas sincronizadas em {name}!",
     "nextChapterBtn": "Continuar para Fase {next}",
-    "replayChapterBtn": "Jogar Fase {stage} de novo"
+    "replayChapterBtn": "Jogar Fase {stage} de novo",
+    "firstRunMenuCta": "Ir para o Lobby e Arsenal"
+  },
+  "firstRun": {
+    "checkingProfile": "Preparando campo de batalha...",
+    "badge": "MISSÃO INICIAL • FASE 1",
+    "title": "Pronto para Combate",
+    "subtitle": "Elimine as ondas de monstros e derrote o primeiro Chefe para liberar o Lobby, o Arsenal e o Mapa.",
+    "loadingLabel": "Carregando dados da batalha",
+    "readyLabel": "Dados da batalha prontos",
+    "startBtnReady": "COMEÇAR FASE 1 AGORA",
+    "startBtnLoading": "COMEÇAR FASE 1 ({pct}%)",
+    "startingHint": "Concluindo download ({pct}%), entrando automaticamente...",
+    "retryBtn": "Tentar Novamente",
+    "loadErrorHint": "Falha ao carregar os dados da batalha. Verifique sua conexão e tente novamente.",
+    "controlsTip": "Mover [A / D] ou arrastar • Tiro automático • Aperte [R] com Fúria cheia"
   },
   "header": {
     "best": "RECORDE",
@@ -238,7 +253,7 @@
     "statusSync": "SINC...",
     "statusOnline": "ONLINE",
     "firestoreError": "ERRO FIRESTORE",
-    "boardMeta": "Fase {wave} • {kills} abates",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} Abates",
     "winTag": "VITÓRIA",
     "ptsUnit": "PTS",
     "guestBoardWarning": "VISITANTE NÃO ENVIA RANKING",

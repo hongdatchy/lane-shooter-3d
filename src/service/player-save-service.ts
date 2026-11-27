@@ -7,10 +7,30 @@ import {
 } from "@/service/armory-catalog";
 
 export const PLAYER_SAVE_STORAGE_KEY = "lane_shooter_save_v1";
+export const FIRST_RUN_LOCAL_KEY = "lane_shooter_first_run_done_v1";
+
+export function readBrowserFirstRunDone(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(FIRST_RUN_LOCAL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markBrowserFirstRunDone(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(FIRST_RUN_LOCAL_KEY, "1");
+  } catch {
+    // Bỏ qua nếu môi trường iframe/sandbox khóa localStorage
+  }
+}
 
 export interface PlayerSaveData {
   version: 1;
   locale?: string;
+  firstRunDone?: boolean;
   bestScore: number;
   totalKills: number;
   gamesPlayed: number;
@@ -27,6 +47,7 @@ export interface PlayerSaveData {
 export function createDefaultSaveData(): PlayerSaveData {
   return {
     version: 1,
+    firstRunDone: false,
     bestScore: 0,
     totalKills: 0,
     gamesPlayed: 0,
@@ -154,21 +175,32 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     equippedLoadoutIds.push("ak47");
   }
 
+  const bestScore =
+    typeof candidate.bestScore === "number" && Number.isFinite(candidate.bestScore)
+      ? Math.max(0, candidate.bestScore)
+      : defaults.bestScore;
+  const totalKills =
+    typeof candidate.totalKills === "number" && Number.isFinite(candidate.totalKills)
+      ? Math.max(0, candidate.totalKills)
+      : defaults.totalKills;
+  const gamesPlayed =
+    typeof candidate.gamesPlayed === "number" && Number.isFinite(candidate.gamesPlayed)
+      ? Math.max(0, candidate.gamesPlayed)
+      : defaults.gamesPlayed;
+  const hasPriorActivity =
+    gamesPlayed > 0 || bestScore > 0 || totalKills > 0 || unlockedChapter > 1;
+  const firstRunDone =
+    typeof candidate.firstRunDone === "boolean"
+      ? candidate.firstRunDone || hasPriorActivity
+      : hasPriorActivity;
+
   return {
     version: 1,
     locale: typeof candidate.locale === "string" ? candidate.locale : undefined,
-    bestScore:
-      typeof candidate.bestScore === "number" && Number.isFinite(candidate.bestScore)
-        ? Math.max(0, candidate.bestScore)
-        : defaults.bestScore,
-    totalKills:
-      typeof candidate.totalKills === "number" && Number.isFinite(candidate.totalKills)
-        ? Math.max(0, candidate.totalKills)
-        : defaults.totalKills,
-    gamesPlayed:
-      typeof candidate.gamesPlayed === "number" && Number.isFinite(candidate.gamesPlayed)
-        ? Math.max(0, candidate.gamesPlayed)
-        : defaults.gamesPlayed,
+    firstRunDone,
+    bestScore,
+    totalKills,
+    gamesPlayed,
     gold:
       typeof candidate.gold === "number" && Number.isFinite(candidate.gold)
         ? Math.max(0, candidate.gold)

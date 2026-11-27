@@ -153,7 +153,22 @@
     "guestPopupSkip": "暂不登录",
     "guestSyncedBanner": "本局战绩已同步至 {name}!",
     "nextChapterBtn": "继续挑战第 {next} 关",
-    "replayChapterBtn": "重玩第 {stage} 关"
+    "replayChapterBtn": "重玩第 {stage} 关",
+    "firstRunMenuCta": "进入主大厅与军械库"
+  },
+  "firstRun": {
+    "checkingProfile": "正在准备战场...",
+    "badge": "首次出击 • 第 1 关",
+    "title": "准备投入战斗",
+    "subtitle": "消灭来袭怪潮并击败首位Boss，即可解锁主大厅、军械库与战役地图。",
+    "loadingLabel": "正在加载战斗数据",
+    "readyLabel": "战斗数据已就绪",
+    "startBtnReady": "立即开始第 1 关",
+    "startBtnLoading": "开始第 1 关 ({pct}%)",
+    "startingHint": "正在完成加载 ({pct}%)，完成后将自动进入战斗...",
+    "retryBtn": "重新加载",
+    "loadErrorHint": "战斗数据加载失败，请检查网络连接后重试。",
+    "controlsTip": "使用 [A / D] 或左右滑动移动 • 自动开火 • 怒气满按 [R] 释放大招"
   },
   "header": {
     "best": "最高",
@@ -238,7 +253,7 @@
     "statusSync": "同步中...",
     "statusOnline": "在线",
     "firestoreError": "FIRESTORE 错误",
-    "boardMeta": "第 {wave} 关 • {kills} 击杀",
+    "boardMeta": "Ch.{chapter} • Wave {wave} • {kills} 击杀",
     "winTag": "通关",
     "ptsUnit": "分",
     "guestBoardWarning": "游客无法上传排名",

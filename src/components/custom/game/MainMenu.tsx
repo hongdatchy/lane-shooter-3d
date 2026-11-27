@@ -39,7 +39,6 @@ function LeaderboardRow({
   rank,
   isMe,
   youBadge,
-  winTag,
   ptsUnit,
   boardMetaTemplate,
 }: {
@@ -47,7 +46,6 @@ function LeaderboardRow({
   rank: number;
   isMe: boolean;
   youBadge: string;
-  winTag: string;
   ptsUnit: string;
   boardMetaTemplate: string;
 }) {
@@ -83,8 +81,11 @@ function LeaderboardRow({
             )}
           </div>
           <span className="font-mono text-[9px] text-[#B9CACB] leading-tight">
-            {formatText(boardMetaTemplate, { wave: entry.wave, kills: entry.kills })}
-            {entry.victory ? ` • ✓ ${winTag}` : ""}
+            {formatText(boardMetaTemplate, {
+              chapter: entry.chapter,
+              wave: entry.wave,
+              kills: entry.kills,
+            })}
           </span>
         </div>
       </div>
@@ -911,7 +912,6 @@ export function MainMenu() {
                     rank={i + 1}
                     isMe={Boolean(player) && entry.id === player?.id}
                     youBadge={trans.menu.youBadge}
-                    winTag={trans.lobby.winTag}
                     ptsUnit={trans.lobby.ptsUnit}
                     boardMetaTemplate={trans.lobby.boardMeta}
                   />
@@ -956,6 +956,7 @@ export function MainMenu() {
                       </div>
                       <span className="font-mono text-[9px] text-[#7DF4FF] leading-tight">
                         {formatText(trans.lobby.boardMeta, {
+                          chapter: myRankEntry.chapter,
                           wave: myRankEntry.wave,
                           kills: myRankEntry.kills,
                         })}

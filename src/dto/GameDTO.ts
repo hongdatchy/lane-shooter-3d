@@ -44,6 +44,7 @@ export interface LeaderboardEntryDTO {
   id: string;
   playerName: string;
   score: number;
+  chapter: number;
   wave: number;
   kills: number;
   victory: boolean;
