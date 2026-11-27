@@ -1,4 +1,8 @@
-export type EnemyGroup = "BASIC" | "TACTICAL" | "RANGED_SUPPORT" | "HIGH_THREAT";
+export type EnemyGroup =
+  | "BASIC"
+  | "TACTICAL"
+  | "RANGED_SUPPORT"
+  | "HIGH_THREAT";
 
 export interface EnemyArchetypeSpec {
   id: string;
@@ -81,8 +85,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     index: 1,
     name: "Crawler",
     group: "BASIC",
-    speed: 3.5,
-    baseHp: 15,
+    speed: 35,
+    baseHp: 4,
     scale: 0.72,
     modelFile: "enemies/crawler-walk-death-texture.glb",
     fallbackKind: "NORMAL",
@@ -139,7 +143,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 12,
     scoreValue: 30,
     appearanceVi: "Bọ khổng lồ, mai giáp cứng dày phía trước",
-    behaviorVi: "Mai giáp giảm 60% sát thương phía trước; vỡ mai sau khi nhận 20 sát thương.",
+    behaviorVi:
+      "Mai giáp giảm 60% sát thương phía trước; vỡ mai sau khi nhận 20 sát thương.",
     behaviorKey: "FRONT_ARMOR_SHELL",
     params: { frontArmorReduction: 0.6, armorBreakDamage: 20 },
   },
@@ -174,7 +179,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     fallbackKind: "NORMAL",
     goldDrop: 6,
     scoreValue: 20,
-    appearanceVi: "Sinh vật tròn phình to, da mỏng căng bóng, phát sáng đỏ bên trong",
+    appearanceVi:
+      "Sinh vật tròn phình to, da mỏng căng bóng, phát sáng đỏ bên trong",
     behaviorVi: "Lao thẳng xuống; khi chết phát nổ bán kính 2m.",
     behaviorKey: "VOLATILE_EXPLODE",
     params: { explosionRadius: 2.0 },
@@ -192,7 +198,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 8,
     scoreValue: 25,
     appearanceVi: "Thực thể vô hình dạng khói tối, chỉ thấy outline",
-    behaviorVi: "Ẩn hình hoàn toàn 2s mỗi 5s — không thể bắn trúng khi đang ẩn.",
+    behaviorVi:
+      "Ẩn hình hoàn toàn 2s mỗi 5s — không thể bắn trúng khi đang ẩn.",
     behaviorKey: "PHASE_STEALTH",
     params: { stealthDurationSec: 2.0, stealthCooldownSec: 5.0 },
   },
@@ -243,7 +250,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 5,
     scoreValue: 20,
     appearanceVi: "Sinh vật nhỏ dạng đỉa, trong suốt",
-    behaviorVi: "Chạy thẳng cực nhanh; chạm người chơi bám vào hút 1 HP/s trong 3s.",
+    behaviorVi:
+      "Chạy thẳng cực nhanh; chạm người chơi bám vào hút 1 HP/s trong 3s.",
     behaviorKey: "LATCH_DRAIN",
     params: { leechDps: 1, leechDurationSec: 3.0 },
   },
@@ -262,7 +270,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 14,
     scoreValue: 35,
     appearanceVi: "Sinh vật cột sống lộ ra ngoài, miệng rộng",
-    behaviorVi: "Đứng yên cố định ở đầu làn, mỗi 4s phun đạn axit về phía người chơi.",
+    behaviorVi:
+      "Đứng yên cố định ở đầu làn, mỗi 4s phun đạn axit về phía người chơi.",
     behaviorKey: "STATIC_ARTILLERY",
     params: { rangedIntervalSec: 4.0 },
   },
@@ -313,7 +322,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 12,
     scoreValue: 35,
     appearanceVi: "Sinh vật phát sáng có màng bong bóng năng lượng bao quanh",
-    behaviorVi: "Giảm 60% sát thương nhận vào cho toàn bộ quái trong bán kính 3m.",
+    behaviorVi:
+      "Giảm 60% sát thương nhận vào cho toàn bộ quái trong bán kính 3m.",
     behaviorKey: "SHIELD_AURA",
     params: { shieldDamageReduction: 0.6, auraRadius: 3.0 },
   },
@@ -349,7 +359,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 40,
     scoreValue: 100,
     appearanceVi: "Quái khổng lồ bọc giáp cực dày",
-    behaviorVi: "Bước chậm làm rung màn hình; chạm vạch cuối làm người chơi mất 2 HP.",
+    behaviorVi:
+      "Bước chậm làm rung màn hình; chạm vạch cuối làm người chơi mất 2 HP.",
     behaviorKey: "HEAVY_JUGGERNAUT",
     params: { defensePenaltyHp: 2 },
   },
@@ -399,8 +410,10 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     fallbackKind: "ELITE",
     goldDrop: 32,
     scoreValue: 80,
-    appearanceVi: "Giun khổng lồ thân đốt bọc giáp cứng, miệng có pháo sinh học",
-    behaviorVi: "Mỗi 5s phóng đạn rocket sinh học nổ bán kính 2m về phía người chơi.",
+    appearanceVi:
+      "Giun khổng lồ thân đốt bọc giáp cứng, miệng có pháo sinh học",
+    behaviorVi:
+      "Mỗi 5s phóng đạn rocket sinh học nổ bán kính 2m về phía người chơi.",
     behaviorKey: "SIEGE_MORTAR",
     params: { rangedIntervalSec: 5.0, rocketRadius: 2.0 },
   },
@@ -417,7 +430,8 @@ export const ENEMY_CATALOG: EnemyArchetypeSpec[] = [
     goldDrop: 55,
     scoreValue: 130,
     appearanceVi: "Sinh thể vật chất tối khổng lồ với lõi hút ánh sáng",
-    behaviorVi: "Chậm, HP cực cao; mỗi 10s phát xung 4m đẩy người chơi sang làn ngược lại.",
+    behaviorVi:
+      "Chậm, HP cực cao; mỗi 10s phát xung 4m đẩy người chơi sang làn ngược lại.",
     behaviorKey: "VOID_PULSE",
     params: { voidPulseCooldownSec: 10.0, voidPulseRadius: 4.0 },
   },
@@ -435,11 +449,25 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 250,
     scoreReward: 500,
     appearanceVi: "Mech robot 2 chân, cầm khiên và súng laser.",
-    coreMechanicVi: "Dưới 50% HP mất khiên, tốc độ bắn tăng gấp đôi và mở khóa Rocket Barrage.",
+    coreMechanicVi:
+      "Dưới 50% HP mất khiên, tốc độ bắn tăng gấp đôi và mở khóa Rocket Barrage.",
     skills: [
-      { name: "Laser Sweep", trigger: "Phase 1 (100%→50%)", descriptionVi: "Vạch đỏ cảnh báo 1.5s rồi quét tia laser toàn bộ làn trái." },
-      { name: "Shield Bash", trigger: "Phase 1", descriptionVi: "Lao lên tung sóng xung kích bán nguyệt bán kính 4m." },
-      { name: "Rocket Barrage", trigger: "Phase 2 (<50%)", descriptionVi: "Phóng 3 tên lửa zigzag rơi dọc làn." },
+      {
+        name: "Laser Sweep",
+        trigger: "Phase 1 (100%→50%)",
+        descriptionVi:
+          "Vạch đỏ cảnh báo 1.5s rồi quét tia laser toàn bộ làn trái.",
+      },
+      {
+        name: "Shield Bash",
+        trigger: "Phase 1",
+        descriptionVi: "Lao lên tung sóng xung kích bán nguyệt bán kính 4m.",
+      },
+      {
+        name: "Rocket Barrage",
+        trigger: "Phase 2 (<50%)",
+        descriptionVi: "Phóng 3 tên lửa zigzag rơi dọc làn.",
+      },
     ],
   },
   {
@@ -453,11 +481,24 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 400,
     scoreReward: 900,
     appearanceVi: "3 đầu rắn robot nối thân kim loại linh hoạt.",
-    coreMechanicVi: "Hạ từng đầu riêng (3 đầu x 2,666 HP); mỗi đầu chết các đầu còn lại tăng tốc 20%.",
+    coreMechanicVi:
+      "Hạ từng đầu riêng (3 đầu x 2,666 HP); mỗi đầu chết các đầu còn lại tăng tốc 20%.",
     skills: [
-      { name: "Acid Spray", trigger: "Đầu trái", descriptionVi: "Phun axit cong bao phủ làn trái." },
-      { name: "Headbutt Lunge", trigger: "Đầu giữa", descriptionVi: "Lao thẳng xuống gây knockback." },
-      { name: "Drone Deploy", trigger: "Đầu phải (8s)", descriptionVi: "Triệu hồi 2 Drone con mỗi 8s." },
+      {
+        name: "Acid Spray",
+        trigger: "Đầu trái",
+        descriptionVi: "Phun axit cong bao phủ làn trái.",
+      },
+      {
+        name: "Headbutt Lunge",
+        trigger: "Đầu giữa",
+        descriptionVi: "Lao thẳng xuống gây knockback.",
+      },
+      {
+        name: "Drone Deploy",
+        trigger: "Đầu phải (8s)",
+        descriptionVi: "Triệu hồi 2 Drone con mỗi 8s.",
+      },
     ],
   },
   {
@@ -470,11 +511,22 @@ export const BOSS_CATALOG: BossSpec[] = [
     modelFile: "bosses/stage3/chien-binh-thoi-gian-v2.glb",
     goldReward: 600,
     scoreReward: 1400,
-    appearanceVi: "Chiến binh thời gian mang Lưỡi Hái Chrono và Vòng Halo 12 khắc phát sáng.",
-    coreMechanicVi: "Tung chuỗi cầu năng lượng thời gian 3 hướng dọc theo nhịp vung Lưỡi Hái Chrono; khi gục ngã kích hoạt vụ nổ Lõi Hố Đen.",
+    appearanceVi:
+      "Chiến binh thời gian mang Lưỡi Hái Chrono và Vòng Halo 12 khắc phát sáng.",
+    coreMechanicVi:
+      "Tung chuỗi cầu năng lượng thời gian 3 hướng dọc theo nhịp vung Lưỡi Hái Chrono; khi gục ngã kích hoạt vụ nổ Lõi Hố Đen.",
     skills: [
-      { name: "Chrono Orb Volley", trigger: "Định kỳ", descriptionVi: "Tụ năng lượng từ ChronoScythe và phóng 3 quả cầu thời gian về phía người chơi." },
-      { name: "Singularity Collapse", trigger: "Khi chết", descriptionVi: "Lõi Hố Đen (BlackHole_Core) bùng nổ trước khi tan rã." },
+      {
+        name: "Chrono Orb Volley",
+        trigger: "Định kỳ",
+        descriptionVi:
+          "Tụ năng lượng từ ChronoScythe và phóng 3 quả cầu thời gian về phía người chơi.",
+      },
+      {
+        name: "Singularity Collapse",
+        trigger: "Khi chết",
+        descriptionVi: "Lõi Hố Đen (BlackHole_Core) bùng nổ trước khi tan rã.",
+      },
     ],
   },
   {
@@ -488,10 +540,19 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 850,
     scoreReward: 2000,
     appearanceVi: "Nhện khổng lồ cơ học mang 4 Ổ Trứng Lõi phát sáng.",
-    coreMechanicVi: "Boss miễn nhiễm hoàn toàn tới khi phá hết 4 Ổ Trứng Lõi (500 HP/ổ).",
+    coreMechanicVi:
+      "Boss miễn nhiễm hoàn toàn tới khi phá hết 4 Ổ Trứng Lõi (500 HP/ổ).",
     skills: [
-      { name: "Sprinter Brood", trigger: "Mỗi 6s", descriptionVi: "Đẻ 2 Sprinter từ bụng mỗi 6s." },
-      { name: "Acid Surge", trigger: "Phase 2", descriptionVi: "Tăng tốc x2 và phun axit bán kính 3m." },
+      {
+        name: "Sprinter Brood",
+        trigger: "Mỗi 6s",
+        descriptionVi: "Đẻ 2 Sprinter từ bụng mỗi 6s.",
+      },
+      {
+        name: "Acid Surge",
+        trigger: "Phase 2",
+        descriptionVi: "Tăng tốc x2 và phun axit bán kính 3m.",
+      },
     ],
   },
   {
@@ -505,11 +566,24 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 1200,
     scoreReward: 2800,
     appearanceVi: "T-Rex cơ khí có cánh và giàn tên lửa trên lưng.",
-    coreMechanicVi: "3 Phase chiến đấu: Không chiến (100→70%), Chạy bộ cắn làn (70→30%), Nổi điên giảm 50% cooldown (<30%).",
+    coreMechanicVi:
+      "3 Phase chiến đấu: Không chiến (100→70%), Chạy bộ cắn làn (70→30%), Nổi điên giảm 50% cooldown (<30%).",
     skills: [
-      { name: "Orbital Laser", trigger: "Phase 1+", descriptionVi: "Cảnh báo 2s rồi rọi chùm laser từ trên cao." },
-      { name: "Missile Rain", trigger: "Phase 1+", descriptionVi: "Thả 5 tên lửa dàn ngang." },
-      { name: "Chomp", trigger: "Phase 2+", descriptionVi: "Cắn thẳng vào làn cảnh báo đỏ 1s." },
+      {
+        name: "Orbital Laser",
+        trigger: "Phase 1+",
+        descriptionVi: "Cảnh báo 2s rồi rọi chùm laser từ trên cao.",
+      },
+      {
+        name: "Missile Rain",
+        trigger: "Phase 1+",
+        descriptionVi: "Thả 5 tên lửa dàn ngang.",
+      },
+      {
+        name: "Chomp",
+        trigger: "Phase 2+",
+        descriptionVi: "Cắn thẳng vào làn cảnh báo đỏ 1s.",
+      },
     ],
   },
   {
@@ -523,10 +597,19 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 1600,
     scoreReward: 3800,
     appearanceVi: "Hình người bóng đen thuần túy, mắt trắng phát sáng.",
-    coreMechanicVi: "Tạo bản sao phân thân (chỉ Boss thật chớp sáng trắng khi trúng đạn).",
+    coreMechanicVi:
+      "Tạo bản sao phân thân (chỉ Boss thật chớp sáng trắng khi trúng đạn).",
     skills: [
-      { name: "Reality Flip", trigger: "Định kỳ", descriptionVi: "Đảo ngược 2 làn chơi trong 5s." },
-      { name: "Mirror Bullets", trigger: "Định kỳ", descriptionVi: "Phản xạ ngược đạn người chơi trong 2s." },
+      {
+        name: "Reality Flip",
+        trigger: "Định kỳ",
+        descriptionVi: "Đảo ngược 2 làn chơi trong 5s.",
+      },
+      {
+        name: "Mirror Bullets",
+        trigger: "Định kỳ",
+        descriptionVi: "Phản xạ ngược đạn người chơi trong 2s.",
+      },
     ],
   },
   {
@@ -540,10 +623,19 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 2100,
     scoreReward: 5000,
     appearanceVi: "Khổng lồ dung nham vỏ đá nứt nẻ rực lửa.",
-    coreMechanicVi: "Phase 1 miễn nhiễm trừ điểm nứt sáng (Weak Point); dưới 50% HP lộ lõi thường trực.",
+    coreMechanicVi:
+      "Phase 1 miễn nhiễm trừ điểm nứt sáng (Weak Point); dưới 50% HP lộ lõi thường trực.",
     skills: [
-      { name: "Lava Surge", trigger: "Định kỳ", descriptionVi: "Phun sóng dung nham dọc một làn." },
-      { name: "Eruption", trigger: "Định kỳ", descriptionVi: "Rải 8 cột lửa tồn tại 3s khắp màn." },
+      {
+        name: "Lava Surge",
+        trigger: "Định kỳ",
+        descriptionVi: "Phun sóng dung nham dọc một làn.",
+      },
+      {
+        name: "Eruption",
+        trigger: "Định kỳ",
+        descriptionVi: "Rải 8 cột lửa tồn tại 3s khắp màn.",
+      },
     ],
   },
   {
@@ -557,11 +649,24 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 2800,
     scoreReward: 6500,
     appearanceVi: "Robot đồng hồ cát khổng lồ với 2 nửa thân xoay ngược chiều.",
-    coreMechanicVi: "Điều khiển thời gian và tự tua ngược hồi 10,000 HP mỗi 30s.",
+    coreMechanicVi:
+      "Điều khiển thời gian và tự tua ngược hồi 10,000 HP mỗi 30s.",
     skills: [
-      { name: "Time Slow", trigger: "Định kỳ", descriptionVi: "Làm chậm đạn người chơi 70% trong 4s." },
-      { name: "Time Stop", trigger: "Định kỳ", descriptionVi: "Đóng băng mọi đạn/quái 2.5s." },
-      { name: "Temporal Clone", trigger: "Định kỳ", descriptionVi: "Gọi bản sao quá khứ tồn tại 10s." },
+      {
+        name: "Time Slow",
+        trigger: "Định kỳ",
+        descriptionVi: "Làm chậm đạn người chơi 70% trong 4s.",
+      },
+      {
+        name: "Time Stop",
+        trigger: "Định kỳ",
+        descriptionVi: "Đóng băng mọi đạn/quái 2.5s.",
+      },
+      {
+        name: "Temporal Clone",
+        trigger: "Định kỳ",
+        descriptionVi: "Gọi bản sao quá khứ tồn tại 10s.",
+      },
     ],
   },
   {
@@ -575,10 +680,19 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 3800,
     scoreReward: 9000,
     appearanceVi: "Rắn vũ trụ 10 đốt phát sáng tím đen.",
-    coreMechanicVi: "Phải phá từng đốt lần lượt từ đuôi lên đầu (15,000 HP/đốt).",
+    coreMechanicVi:
+      "Phải phá từng đốt lần lượt từ đuôi lên đầu (15,000 HP/đốt).",
     skills: [
-      { name: "Cosmic Ray", trigger: "Phase 1+", descriptionVi: "Bắn tia vũ trụ xuyên thẳng toàn màn." },
-      { name: "Void Drain", trigger: "Định kỳ", descriptionVi: "Hút toàn bộ đạn trên màn trong 3s." },
+      {
+        name: "Cosmic Ray",
+        trigger: "Phase 1+",
+        descriptionVi: "Bắn tia vũ trụ xuyên thẳng toàn màn.",
+      },
+      {
+        name: "Void Drain",
+        trigger: "Định kỳ",
+        descriptionVi: "Hút toàn bộ đạn trên màn trong 3s.",
+      },
     ],
   },
   {
@@ -592,11 +706,24 @@ export const BOSS_CATALOG: BossSpec[] = [
     goldReward: 6000,
     scoreReward: 15000,
     appearanceVi: "Lõi năng lượng vũ trụ hình cầu với 3 vòng giáp quỹ đạo.",
-    coreMechanicVi: "Phá 3 vòng bảo vệ (mỗi vòng 4 ụ súng) để lộ lõi; dưới 20% HP bật đếm ngược Supernova 10s.",
+    coreMechanicVi:
+      "Phá 3 vòng bảo vệ (mỗi vòng 4 ụ súng) để lộ lõi; dưới 20% HP bật đếm ngược Supernova 10s.",
     skills: [
-      { name: "Gravity Well", trigger: "Phase 1+", descriptionVi: "Kéo người chơi về phía Boss." },
-      { name: "System Purge", trigger: "Định kỳ", descriptionVi: "Triệu hồi 10 quái ngẫu nhiên." },
-      { name: "Supernova Warning", trigger: "<20% HP", descriptionVi: "Đếm ngược 10s bắt buộc kết liễu Boss." },
+      {
+        name: "Gravity Well",
+        trigger: "Phase 1+",
+        descriptionVi: "Kéo người chơi về phía Boss.",
+      },
+      {
+        name: "System Purge",
+        trigger: "Định kỳ",
+        descriptionVi: "Triệu hồi 10 quái ngẫu nhiên.",
+      },
+      {
+        name: "Supernova Warning",
+        trigger: "<20% HP",
+        descriptionVi: "Đếm ngược 10s bắt buộc kết liễu Boss.",
+      },
     ],
   },
 ];
@@ -669,7 +796,9 @@ export function getEnemyById(id: string): EnemyArchetypeSpec | undefined {
 }
 
 export function getBossByChapter(chapter: number): BossSpec {
-  return BOSS_CATALOG.find((item) => item.chapter === chapter) ?? BOSS_CATALOG[0];
+  return (
+    BOSS_CATALOG.find((item) => item.chapter === chapter) ?? BOSS_CATALOG[0]
+  );
 }
 
 export function getChapterWavePool(chapter: number): ChapterWaveConfigSpec {

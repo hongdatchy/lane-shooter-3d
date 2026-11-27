@@ -48,6 +48,15 @@ export function formatText(
   );
 }
 
+export function getWeaponDisplayName(
+  weaponId: string,
+  fallbackName: string,
+  armoryTrans: TranslationData["armory"]
+): string {
+  const map = armoryTrans.weaponNames as Record<string, string> | undefined;
+  return map?.[weaponId] ?? fallbackName;
+}
+
 // Hook lấy từ điển theo ngôn ngữ hiện tại (theo pattern useTransClientSide của blog-fe)
 export const useTransClientSide = (): TranslationData => {
   const locale = useAppStore((s) => s.locale);

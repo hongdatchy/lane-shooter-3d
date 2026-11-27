@@ -81,7 +81,12 @@
     "rageSkillActive": "{skill} ({time}s)",
     "rageSkillActiveUpper": "{skill} {time}s",
     "rageResultDelayVictory": "VICTORY! Calculating rewards...",
-    "rageResultDelayDefeat": "DEFEAT! Wrapping up match..."
+    "rageResultDelayDefeat": "DEFEAT! Wrapping up match...",
+    "audioMixerTitle": "AUDIO MIXER",
+    "audioBgm": "GAME MUSIC",
+    "audioSfx": "GUNS & SFX",
+    "audioOn": "ON",
+    "audioMuted": "MUTED"
   },
   "crate": {
     "maxTitle": "Max Level",
@@ -279,7 +284,12 @@
     "modeSurvivorTag": "360° ARENA",
     "modeSurvivorTitle": "SURVIVOR WAVES",
     "modeSurvivorSub": "3D Zombie Waves Survival",
-    "modeSurvivorDesc": "Free WASD 360° movement against endless monster hordes."
+    "modeSurvivorDesc": "Free WASD 360° movement against endless monster hordes.",
+    "navHero": "HERO",
+    "navBattle": "BATTLE",
+    "navIntel": "INTEL",
+    "navArmory": "ARMORY",
+    "guideOpenArmory": "Tap weapon to open Armory & upgrade!"
   },
   "banners": {
     "stage1Start": "Stage 1 — Ready!",
@@ -412,7 +422,32 @@
     "unlockWeaponBtn": "UNLOCK WEAPON · {cost} G",
     "needGoldUnlockBtn": "NEED {cost} GOLD TO UNLOCK",
     "prereqMetNote": "CH.{ch} PREREQUISITE MET · PAY {cost} G TO UNLOCK",
-    "escHint": "ESC: BACK"
+    "escHint": "ESC: BACK",
+    "guideUpgradePrompt": "Tap Upgrade to boost weapon power!",
+    "guideUpgradeUnavailable": "Not enough gold or max level",
+    "guideCloseBtn": "Close",
+    "weaponNames": {
+      "pistol": "Pistol (Sidearm)",
+      "ak47": "AK Hyperion",
+      "shotgun": "Shard Shotgun",
+      "smg_neon": "SMG Neon",
+      "cryo_gun": "Cryo Gun",
+      "minigun": "Minigun",
+      "tesla_gun": "Tesla Gun",
+      "scatter": "Scatter Gun",
+      "cannon": "Heavy Cannon",
+      "rocket_launcher": "Rocket Launcher",
+      "grenade_launcher": "Grenade Launcher",
+      "flamethrower": "Flamethrower",
+      "acid_sprayer": "Acid Sprayer",
+      "plasma_rifle": "Plasma Rifle",
+      "rail_gun": "Rail Gun",
+      "laser_cannon": "Laser Cannon",
+      "vortex_gun": "Vortex Gun",
+      "photon_burst": "Photon Burst",
+      "nuke_launcher": "Nuke Launcher",
+      "icbm": "ICBM Strike Unit"
+    }
   },
   "buffs": {
     "scopeRun": "FULL RUN",

@@ -33,8 +33,8 @@ export interface ArmoryWeaponSpec {
 
 export const MAX_WEAPON_LEVEL = 10;
 export const MAX_LOADOUT_SLOTS = 1;
-export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol", "ak47"];
-export const DEFAULT_LOADOUT_IDS: string[] = ["ak47"];
+export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol"];
+export const DEFAULT_LOADOUT_IDS: string[] = ["pistol"];
 
 export function getWeaponUpgradeCost(weapon: ArmoryWeaponSpec, currentLevel: number): number {
   return weapon.upgradeBaseCost * currentLevel;
@@ -79,10 +79,10 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     name: "Súng Lục (Pistol)",
     caliber: "9MM CYBER PULSE",
     imagePath: "images/weapons/01-pistol.jpg",
-    fireRate: 3.6,
+    fireRate: 1.6,
     projectilesPerShot: 1,
     projectileLabel: "1 SINGLE TRACER",
-    damage: 1.5,
+    damage: 4.5,
     splashRadius: 0,
     tracerLabel: "CYAN PULSE FX",
     tracerHex: "#7DF4FF",
@@ -113,7 +113,7 @@ export const ARMORY_WEAPONS: ArmoryWeaponSpec[] = [
     tracerLabel: "GOLD TRACER FX",
     tracerHex: "#FE9800",
     unlockChapter: 1,
-    unlockCost: 0,
+    unlockCost: 250,
     upgradeBaseCost: 300,
     rageSkillName: "AK BULLET RAIN",
     rageSkillDescEn: "Fires 10 rounds/sec with 1.5x damage multiplier for 5 seconds.",

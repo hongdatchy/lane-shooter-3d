@@ -9,7 +9,7 @@ import {
   getWeaponImageUrl,
   getWeaponStatsAtLevel,
 } from "@/service/armory-catalog";
-import { TranslationData, formatText } from "@/lang/useTransClientSide";
+import { TranslationData, formatText, getWeaponDisplayName } from "@/lang/useTransClientSide";
 
 export const CLASS_BADGE_MAP: Record<WeaponClass, string> = {
   KINETIC: "bg-[#272A32] text-[#E1E2EC] border-[#3B494B]",
@@ -133,9 +133,9 @@ export function WeaponInspectionPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3 shrink-0">
+    <div className="flex flex-col gap-2 lg:flex-1 lg:min-h-0">
       {/* Inspector Header */}
-      <div className="flex items-start justify-between gap-2 pb-1.5 border-b border-[#272A32] shrink-0">
+      <div className="flex items-start justify-between gap-2 pb-1 border-b border-[#272A32] shrink-0">
         <div className="flex flex-col min-w-0">
           <span className="font-mono text-[9px] text-[#00F0FF] tracking-widest uppercase truncate">
             {formatText(t.inspectionBadge, {
@@ -143,15 +143,15 @@ export function WeaponInspectionPanel({
               serial: weapon.serial,
             })}
           </span>
-          <h2 className="font-['Space_Grotesk'] text-lg font-bold text-[#E1E2EC] uppercase truncate">
-            {weapon.name}
+          <h2 className="font-['Space_Grotesk'] text-base xl:text-lg font-bold text-[#E1E2EC] uppercase truncate leading-tight">
+            {getWeaponDisplayName(weapon.id, weapon.name, t)}
           </h2>
           <span className="font-mono text-[10px] text-[#B9CACB]">
             {getClassLabel(weapon.weaponClass, t)} · {weapon.classLabel}
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-1 shrink-0">
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
           <span
             className={`px-2 py-0.5 rounded border font-mono text-[10px] font-bold uppercase ${
               CLASS_BADGE_MAP[weapon.weaponClass]
@@ -171,7 +171,7 @@ export function WeaponInspectionPanel({
       </div>
 
       {/* Interactive Artwork Stage */}
-      <div className="relative rounded-xl bg-[#0A0D14] border border-[#272A32] overflow-hidden aspect-[16/10] flex items-center justify-center shrink-0">
+      <div className="relative rounded-xl bg-[#0A0D14] border border-[#272A32] overflow-hidden h-[130px] lg:h-auto lg:flex-1 lg:min-h-[115px] flex items-center justify-center">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -217,63 +217,65 @@ export function WeaponInspectionPanel({
       </div>
 
       {/* Statistics Telemetry Delta */}
-      <div className="rounded-xl bg-[#0E121B] border border-[#272A32] p-3 flex flex-col gap-2.5 shrink-0">
+      <div className="rounded-xl bg-[#0E121B] border border-[#272A32] p-2.5 flex flex-col gap-1.5 shrink-0">
         <div className="font-mono text-[10px] font-bold text-[#7DF4FF] tracking-wider uppercase flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-[#00F0FF]" />
+          <Sparkles className="w-3 h-3 text-[#00F0FF]" />
           <span>{t.telemetryTitle}</span>
         </div>
 
-        {/* Fire Rate */}
-        <div>
-          <div className="flex items-center justify-between font-mono text-[10px]">
-            <span className="text-[#B9CACB] uppercase">{t.fireRateLabel}</span>
-            <div className="flex items-center gap-1.5">
-              <strong className="text-[#E1E2EC]">
-                {weapon.fireRateLabel ?? `${stats.fireRate}/s`}
-              </strong>
-              {!isMax && weapon.fireRate > 0 && (
-                <span className="text-[#00F0FF] font-bold">
-                  → {stats.nextFireRate}/s
-                </span>
-              )}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Fire Rate */}
+          <div>
+            <div className="flex items-center justify-between font-mono text-[9px] gap-1">
+              <span className="text-[#B9CACB] uppercase truncate">{t.fireRateLabel}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <strong className="text-[#E1E2EC]">
+                  {weapon.fireRateLabel ?? `${stats.fireRate}/s`}
+                </strong>
+                {!isMax && weapon.fireRate > 0 && (
+                  <span className="text-[#00F0FF] font-bold">
+                    →{stats.nextFireRate}
+                  </span>
+                )}
+              </div>
             </div>
+            <TelemetrySegmentBar ratio={rofRatio} accentHex="#00F0FF" />
           </div>
-          <TelemetrySegmentBar ratio={rofRatio} accentHex="#00F0FF" />
-        </div>
 
-        {/* Damage / Shot */}
-        <div>
-          <div className="flex items-center justify-between font-mono text-[10px]">
-            <span className="text-[#B9CACB] uppercase">{t.damageLabel}</span>
-            <div className="flex items-center gap-1.5">
-              <strong className="text-[#E1E2EC]">{stats.damage}</strong>
-              {!isMax && (
-                <span className="text-[#FE9800] font-bold">
-                  → {stats.nextDamage}
-                </span>
-              )}
+          {/* Damage / Shot */}
+          <div>
+            <div className="flex items-center justify-between font-mono text-[9px] gap-1">
+              <span className="text-[#B9CACB] uppercase truncate">{t.damageLabel}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <strong className="text-[#E1E2EC]">{stats.damage}</strong>
+                {!isMax && (
+                  <span className="text-[#FE9800] font-bold">
+                    →{stats.nextDamage}
+                  </span>
+                )}
+              </div>
             </div>
+            <TelemetrySegmentBar ratio={dmgRatio} accentHex="#FE9800" />
           </div>
-          <TelemetrySegmentBar ratio={dmgRatio} accentHex="#FE9800" />
         </div>
 
         {/* Projectile & Tracer Specs */}
-        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#272A32]/80">
-          <div className="flex flex-col bg-[#131722] rounded-lg px-2.5 py-1.5 border border-[#272A32]">
-            <span className="font-mono text-[9px] text-[#849495] uppercase">
+        <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#272A32]/80">
+          <div className="flex flex-col bg-[#131722] rounded-lg px-2 py-1 border border-[#272A32]">
+            <span className="font-mono text-[8px] text-[#849495] uppercase">
               {t.projectileLabel}
             </span>
             <span className="font-mono text-[10px] font-bold text-[#E1E2EC] uppercase truncate">
               {weapon.projectileLabel}
             </span>
           </div>
-          <div className="flex flex-col bg-[#131722] rounded-lg px-2.5 py-1.5 border border-[#272A32]">
-            <span className="font-mono text-[9px] text-[#849495] uppercase">
+          <div className="flex flex-col bg-[#131722] rounded-lg px-2 py-1 border border-[#272A32]">
+            <span className="font-mono text-[8px] text-[#849495] uppercase">
               {t.tracerLabel}
             </span>
             <div className="flex items-center gap-1.5 min-w-0">
               <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
+                className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: weapon.tracerHex }}
               />
               <span className="font-mono text-[10px] font-bold text-[#E1E2EC] uppercase truncate">

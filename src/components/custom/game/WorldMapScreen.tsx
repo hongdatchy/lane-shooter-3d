@@ -30,7 +30,7 @@ import { getArmoryWeaponById } from "@/service/armory-catalog";
 import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import { useGameStore } from "@/state-manager/game-store";
-import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { formatText, getWeaponDisplayName, useTransClientSide } from "@/lang/useTransClientSide";
 
 interface WorldMapScreenProps {
   onDeployCombat: () => void;
@@ -742,7 +742,7 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
                     {trans.worldMap.slot1Label}
                   </span>
                   <span className="font-['Space_Grotesk'] text-[11px] text-[#DBFCFF] font-bold uppercase max-w-[140px] truncate">
-                    {equippedWeapon.name}
+                    {getWeaponDisplayName(equippedWeapon.id, equippedWeapon.name, trans.armory)}
                   </span>
                 </div>
                 <span className="font-mono text-[9px] text-[#B9CACB]">

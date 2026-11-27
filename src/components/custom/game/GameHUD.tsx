@@ -38,8 +38,9 @@ import { MAX_PLAYABLE_CHAPTER, weaponService } from "@/service/weapon-service";
 import { RAGE_CONFIG } from "@/service/game-constants";
 import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
-import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { formatText, getWeaponDisplayName, useTransClientSide } from "@/lang/useTransClientSide";
 import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
+import { SoundSettingsControl } from "@/components/custom/game/SoundSettingsControl";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import {
   ARMORY_WEAPONS,
@@ -672,25 +673,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
               </span>
             </button>
 
-            <button
-              type="button"
-              aria-label={isMuted ? trans.hud.unmute : trans.hud.mute}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                toggleMute();
-              }}
-              className={`h-7 w-7 sm:h-8 sm:w-8 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
-                isMuted
-                  ? "bg-[#93000A]/35 border-[#FFB4AB]/45 text-[#FFB4AB]"
-                  : "bg-[#1D1F27] border-[#3B494B]/45 text-[#B9CACB] hover:text-[#DBFCFF]"
-              }`}
-            >
-              {isMuted ? (
-                <VolumeX className="h-3.5 w-3.5" />
-              ) : (
-                <Volume2 className="h-3.5 w-3.5" />
-              )}
-            </button>
+            <SoundSettingsControl variant="hud" />
 
             <LanguageSwitcher variant="hud" />
 
@@ -1372,7 +1355,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                     </span>
                   </div>
                   <span className="font-['Space_Grotesk'] text-xs font-bold text-[#DBFCFF] truncate max-w-[125px] uppercase">
-                    {weapon.name}
+                    {getWeaponDisplayName(weapon.id, weapon.name, trans.armory)}
                   </span>
                 </div>
               </div>

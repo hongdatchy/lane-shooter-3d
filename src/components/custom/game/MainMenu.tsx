@@ -15,7 +15,7 @@ import {
 import { CHAPTER_CATALOG } from "@/service/chapter-catalog";
 import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { DEV_SPEED_OPTIONS, isLocalDevEnvironment } from "@/service/dev-mode-service";
-import { TranslationData, formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { TranslationData, formatText, getWeaponDisplayName, useTransClientSide } from "@/lang/useTransClientSide";
 import {
   CLASS_BADGE_MAP,
   TelemetrySegmentBar,
@@ -157,7 +157,7 @@ function LobbyWeaponShowcase({
       <div className="flex items-center justify-between gap-2 pb-1 border-b border-[#272A32]/80">
         <div className="flex items-baseline gap-2 min-w-0">
           <h2 className="font-['Space_Grotesk'] text-sm font-bold text-[#E1E2EC] uppercase truncate">
-            {weapon.name}
+            {getWeaponDisplayName(weapon.id, weapon.name, t)}
           </h2>
           <span className="font-mono text-[9px] text-[#B9CACB] truncate hidden sm:inline">
             {getClassLabel(weapon.weaponClass, t)} · {weapon.classLabel}
@@ -257,6 +257,7 @@ function LobbyWeaponShowcase({
 export function MainMenu() {
   const openWorldMap = useGameStore((s) => s.openWorldMap);
   const openArmory = useGameStore((s) => s.openArmory);
+  const postFirstRunGuideStep = useGameStore((s) => s.postFirstRunGuideStep);
   const assetsReady = useGameStore((s) => s.assetsReady);
   const assetsPercent = useGameStore((s) => s.assetsPercent);
   const assetsError = useGameStore((s) => s.assetsError);
@@ -354,6 +355,12 @@ export function MainMenu() {
 
   return (
     <div className="w-full flex-1 flex flex-col overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none pb-16 lg:pb-3">
+      {postFirstRunGuideStep === "OPEN_ARMORY" && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-[1px]"
+          aria-hidden="true"
+        />
+      )}
       {/* Platform / Save Fatal Error Bar (Zero Fallback) */}
       {(platformError || (player && (saveError || scoreSyncError))) && (
         <div className="px-3 py-2 rounded-lg bg-[#93000A]/35 border border-[#FFB4AB]/40 font-mono text-[11px] text-[#FFB4AB] shrink-0">
@@ -502,14 +509,30 @@ export function MainMenu() {
             </div>
           )}
 
-          <LobbyWeaponShowcase
-            weapon={equippedWeapon}
-            level={equippedWeaponLevel}
-            chapterMet={saveData.unlockedChapter >= equippedWeapon.unlockChapter}
-            isOwned={saveData.unlockedWeaponIds.includes(equippedWeapon.id)}
-            t={trans.armory}
-            onOpen={() => openArmory("ARSENAL")}
-          />
+          <div
+            className={
+              postFirstRunGuideStep === "OPEN_ARMORY"
+                ? "relative z-[70] rounded-xl ring-2 ring-[#00F0FF] shadow-[0_0_32px_rgba(0,240,255,0.55)]"
+                : ""
+            }
+          >
+            {postFirstRunGuideStep === "OPEN_ARMORY" && (
+              <div className="mb-2 rounded-xl bg-[#0D1A26] border border-[#00F0FF] px-3 py-2 flex items-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.35)]">
+                <span className="text-[#00F0FF] animate-bounce text-sm shrink-0">👇</span>
+                <span className="font-mono text-[11px] font-bold text-[#DBFCFF]">
+                  {trans.lobby.guideOpenArmory}
+                </span>
+              </div>
+            )}
+            <LobbyWeaponShowcase
+              weapon={equippedWeapon}
+              level={equippedWeaponLevel}
+              chapterMet={saveData.unlockedChapter >= equippedWeapon.unlockChapter}
+              isOwned={saveData.unlockedWeaponIds.includes(equippedWeapon.id)}
+              t={trans.armory}
+              onOpen={() => openArmory("ARSENAL")}
+            />
+          </div>
 
           {authError && (
             <div className="px-2.5 py-1.5 rounded bg-[#93000A]/30 border border-[#FFB4AB]/40 font-mono text-[10px] text-[#FFB4AB] shrink-0">
@@ -532,15 +555,7 @@ export function MainMenu() {
               <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider truncate">
                 {displayChapter.id === 1
                   ? trans.lobby.sectorSubtitle
-                  : `CHAPTER ${displayChapter.id} · WAVE 1 / ${displayChapter.waves} · ${displayChapter.biome}`}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#272A32] shrink-0">
-              <span className="font-mono text-[10px] text-[#B9CACB] uppercase">
-                {trans.lobby.progressLabel}
-              </span>
-              <span className="font-mono text-base md:text-lg font-bold text-[#FE9800]">
-                WAVE 1 / {displayChapter.waves}
+                  : `CHAPTER ${displayChapter.id} · ${displayChapter.biome}`}
               </span>
             </div>
           </div>

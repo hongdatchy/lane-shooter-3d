@@ -34,6 +34,7 @@ import { useAppStore } from "@/state-manager/app-store";
 import {
   TranslationData,
   formatText,
+  getWeaponDisplayName,
   useTransClientSide,
 } from "@/lang/useTransClientSide";
 
@@ -226,7 +227,7 @@ function WeaponGridCard({
       {/* Name & Telemetry */}
       <div className="flex flex-col gap-1">
         <span className="font-['Space_Grotesk'] text-xs font-bold text-[#E1E2EC] uppercase truncate">
-          {weapon.name}
+          {getWeaponDisplayName(weapon.id, weapon.name, t)}
         </span>
         <div className="flex items-center justify-between font-mono text-[10px] text-[#B9CACB]">
           <span>
@@ -315,6 +316,8 @@ export function ArmoryScreen() {
   const closeArmory = useGameStore((s) => s.closeArmory);
   const openLobby = useGameStore((s) => s.openLobby);
   const openWorldMap = useGameStore((s) => s.openWorldMap);
+  const postFirstRunGuideStep = useGameStore((s) => s.postFirstRunGuideStep);
+  const dismissPostFirstRunGuide = useGameStore((s) => s.dismissPostFirstRunGuide);
   const unlockArmoryWeapon = useGameStore((s) => s.unlockArmoryWeapon);
   const assignWeaponToLoadout = useGameStore((s) => s.assignWeaponToLoadout);
   const upgradeArmoryWeapon = useGameStore((s) => s.upgradeArmoryWeapon);
@@ -332,6 +335,9 @@ export function ArmoryScreen() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (useGameStore.getState().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+          return;
+        }
         e.preventDefault();
         closeArmory();
       }
@@ -481,16 +487,11 @@ export function ArmoryScreen() {
           )}
         </div>
 
-        <div className="hidden xl:flex items-center gap-2 font-mono text-[10px] tracking-widest text-[#7DF4FF] uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
-          <span>{t.protocolBanner}</span>
-        </div>
-
         <div className="flex items-center gap-2 md:gap-3">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#191B23] border border-[#00F0FF]/35 font-mono text-[10px] text-[#00F0FF] font-bold">
             <Crosshair className="w-3 h-3" />
             <span className="max-w-[180px] truncate uppercase">
-              {equippedWeapon.name} · LV.{equippedWeaponLevel}
+              {getWeaponDisplayName(equippedWeapon.id, equippedWeapon.name, t)} · LV.{equippedWeaponLevel}
             </span>
           </div>
 
@@ -578,7 +579,13 @@ export function ArmoryScreen() {
           onOpenArsenal={() => setArmoryTab("ARSENAL")}
         />
       ) : (
-        <div className="relative z-10 flex-1 grid grid-cols-12 gap-3 p-3 md:p-4 min-h-0">
+        <div className="relative flex-1 grid grid-cols-12 gap-3 p-3 md:p-4 min-h-0">
+          {postFirstRunGuideStep === "UPGRADE_WEAPON" && (
+            <div
+              className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-[1px]"
+              aria-hidden="true"
+            />
+          )}
           {/* ══ LEFT COLUMN (2/3): SINGLE EQUIPPED WEAPON BAR + FILTER BAR + WEAPON GRID ══ */}
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-2.5 min-h-0">
             {/* Active Single-Weapon Combat Strip */}
@@ -626,7 +633,7 @@ export function ArmoryScreen() {
                     </span>
                   </div>
                   <span className="font-['Space_Grotesk'] text-xs sm:text-sm font-bold text-white uppercase truncate max-w-[190px] leading-tight">
-                    {equippedWeapon.name}
+                    {getWeaponDisplayName(equippedWeapon.id, equippedWeapon.name, t)}
                   </span>
                   <span className="font-mono text-[9px] text-[#7DF4FF]/85 uppercase truncate leading-none">
                     {getClassLabel(equippedWeapon.weaponClass, t)} · {t.dmgShort}{" "}
@@ -726,7 +733,7 @@ export function ArmoryScreen() {
           </div>
 
           {/* ══ RIGHT COLUMN (1/3): WEAPON INSPECTION VAULT (first on mobile so stats & equip are immediately visible) ══ */}
-          <div className="order-first lg:order-none col-span-12 lg:col-span-4 bg-[#131722] border border-[#272A32] rounded-xl p-3.5 flex flex-col gap-3 min-h-0 lg:overflow-y-auto cyber-scroll">
+          <div className="order-first lg:order-none col-span-12 lg:col-span-4 bg-[#131722] border border-[#272A32] rounded-xl p-2.5 flex flex-col gap-2 min-h-0 lg:overflow-y-auto cyber-scroll">
             <WeaponInspectionPanel
               weapon={inspectedWeapon}
               level={inspectedLevel}
@@ -736,7 +743,7 @@ export function ArmoryScreen() {
             />
 
             {/* Rage Skill Card */}
-            <div className="rounded-xl bg-[#1A1614] border border-[#FE9800]/35 p-3 flex flex-col gap-1 shrink-0">
+            <div className="rounded-xl bg-[#1A1614] border border-[#FE9800]/35 p-2.5 flex flex-col gap-0.5 shrink-0">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-[9px] font-bold text-[#FE9800] tracking-wider uppercase flex items-center gap-1">
                   <Flame className="w-3.5 h-3.5" />
@@ -746,15 +753,15 @@ export function ArmoryScreen() {
                   {inspectedWeapon.rageSkillName}
                 </span>
               </div>
-              <p className="text-[11px] text-[#E1E2EC]/90 leading-relaxed">
+              <p className="text-[11px] text-[#E1E2EC]/90 leading-snug">
                 {locale === "vi"
                   ? inspectedWeapon.rageSkillDescVi
                   : inspectedWeapon.rageSkillDescEn}
               </p>
             </div>
 
-            {/* Action Dock: 3-Slot Assignment + Upgrade */}
-            <div className="flex flex-col gap-2 mt-auto pt-1 shrink-0">
+            {/* Action Dock: Single-Slot Assignment + Upgrade */}
+            <div className="flex flex-col gap-1.5 pt-0.5 shrink-0">
               {!inspectedChapterMet ? (
                 <div className="flex flex-col gap-1.5">
                   <button
@@ -813,15 +820,11 @@ export function ArmoryScreen() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl bg-[#0E121B] border border-[#272A32] p-2.5 flex flex-col gap-2">
-                  <div className="flex items-center justify-between font-mono text-[10px] text-[#7DF4FF] uppercase">
-                    <span>{t.assignSlotTitle}</span>
-                  </div>
-
+                <div className="grid grid-cols-2 gap-1.5">
                   {isInspectedEquipped ? (
-                    <div className="w-full py-2.5 px-3 rounded-lg bg-[#00F0FF]/18 border border-[#00F0FF]/65 text-[#00F0FF] font-mono text-xs font-bold uppercase flex items-center justify-center gap-1.5">
-                      <Check className="w-4 h-4" strokeWidth={2.5} />
-                      <span>{t.inSlotActiveBtn}</span>
+                    <div className="w-full py-2 px-2.5 rounded-lg bg-[#00F0FF]/18 border border-[#00F0FF]/65 text-[#00F0FF] font-mono text-[11px] font-bold uppercase flex items-center justify-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                      <span className="truncate">{t.inSlotActiveBtn}</span>
                     </div>
                   ) : (
                     <button
@@ -830,47 +833,74 @@ export function ArmoryScreen() {
                       onClick={() =>
                         void assignWeaponToLoadout(inspectedWeapon.id)
                       }
-                      className="w-full py-2.5 px-3 rounded-lg bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-xs font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[0_0_16px_rgba(0,240,255,0.28)] disabled:opacity-50"
+                      className="w-full py-2 px-2.5 rounded-lg bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-[11px] font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[0_0_16px_rgba(0,240,255,0.28)] disabled:opacity-50"
                     >
-                      <Crosshair className="w-4 h-4" />
-                      <span>
+                      <Crosshair className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
                         {armorySaving ? t.savingBtn : t.addToLoadoutBtn}
                       </span>
                     </button>
                   )}
-                </div>
-              )}
 
-              {/* Upgrade Button */}
-              {inspectedUnlocked && (
-                <button
-                  type="button"
-                  disabled={inspectedIsMax || !hasEnoughGold || !canPersist}
-                  onClick={() => void upgradeArmoryWeapon(inspectedWeapon.id)}
-                  className={`w-full py-2.5 rounded-lg font-mono text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${
-                    inspectedIsMax
-                      ? "bg-[#272A32] text-[#849495] border border-[#3B494B] cursor-not-allowed"
-                      : hasEnoughGold && canPersist
-                        ? "bg-[#FE9800] hover:bg-[#FFB03B] text-[#140B00] cursor-pointer shadow-[0_0_16px_rgba(254,152,0,0.28)]"
-                        : "bg-[#272A32] text-[#FFB4AB] border border-[#93000A]/60 cursor-not-allowed opacity-85"
-                  }`}
-                >
-                  <ArrowUpCircle className="w-4 h-4" />
-                  <span>
-                    {armorySaving
-                      ? t.savingBtn
-                      : inspectedIsMax
-                        ? t.maxLevelBtn
-                        : hasEnoughGold
-                          ? formatText(t.upgradeBtn, {
-                              next: inspectedLevel + 1,
-                              cost: upgradeCost.toLocaleString(),
-                            })
-                          : formatText(t.insufficientGoldBtn, {
-                              cost: upgradeCost.toLocaleString(),
-                            })}
-                  </span>
-                </button>
+                  <div
+                    className={
+                      postFirstRunGuideStep === "UPGRADE_WEAPON"
+                        ? "relative z-[70]"
+                        : ""
+                    }
+                  >
+                    {postFirstRunGuideStep === "UPGRADE_WEAPON" && (
+                      <div className="mb-2 rounded-xl bg-[#1A1614] border border-[#FE9800] px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-[0_0_20px_rgba(254,152,0,0.4)]">
+                        <span className="font-mono text-[10px] font-bold text-[#FFC080]">
+                          {hasEnoughGold && !inspectedIsMax
+                            ? t.guideUpgradePrompt
+                            : t.guideUpgradeUnavailable}
+                        </span>
+                        {(!hasEnoughGold || inspectedIsMax) && (
+                          <button
+                            type="button"
+                            onClick={dismissPostFirstRunGuide}
+                            className="px-1.5 py-0.5 rounded bg-[#272A32] hover:bg-[#363941] font-mono text-[9px] text-[#B9CACB] uppercase shrink-0 cursor-pointer"
+                          >
+                            {t.guideCloseBtn}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={inspectedIsMax || !hasEnoughGold || !canPersist}
+                      onClick={() => void upgradeArmoryWeapon(inspectedWeapon.id)}
+                      className={`w-full py-2 px-2.5 rounded-lg font-mono text-[11px] font-bold uppercase flex items-center justify-center gap-1.5 transition-colors ${
+                        postFirstRunGuideStep === "UPGRADE_WEAPON"
+                          ? "ring-2 ring-[#FE9800] shadow-[0_0_26px_rgba(254,152,0,0.65)] "
+                          : ""
+                      }${
+                        inspectedIsMax
+                          ? "bg-[#272A32] text-[#849495] border border-[#3B494B] cursor-not-allowed"
+                          : hasEnoughGold && canPersist
+                            ? "bg-[#FE9800] hover:bg-[#FFB03B] text-[#140B00] cursor-pointer shadow-[0_0_16px_rgba(254,152,0,0.28)]"
+                            : "bg-[#272A32] text-[#FFB4AB] border border-[#93000A]/60 cursor-not-allowed opacity-85"
+                      }`}
+                    >
+                      <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
+                        {armorySaving
+                          ? t.savingBtn
+                          : inspectedIsMax
+                            ? t.maxLevelBtn
+                            : hasEnoughGold
+                              ? formatText(t.upgradeBtn, {
+                                  next: inspectedLevel + 1,
+                                  cost: upgradeCost.toLocaleString(),
+                                })
+                              : formatText(t.insufficientGoldBtn, {
+                                  cost: upgradeCost.toLocaleString(),
+                                })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

@@ -2,15 +2,12 @@
 
 import { useGameStore } from "@/state-manager/game-store";
 import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
+import { SoundSettingsControl } from "@/components/custom/game/SoundSettingsControl";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 
 export function GameHeader() {
-  const isMuted = useGameStore((s) => s.isMuted);
-  const toggleMute = useGameStore((s) => s.toggleMute);
   const highScore = useGameStore((s) => s.highScore);
   const score = useGameStore((s) => s.score);
-  const wave = useGameStore((s) => s.wave);
-  const maxWaves = useGameStore((s) => s.maxWaves);
   const gameStatus = useGameStore((s) => s.gameStatus);
 
   const platformTarget = useGameStore((s) => s.platformTarget);
@@ -61,12 +58,6 @@ export function GameHeader() {
               </span>
               <span className="font-mono text-[12px] font-bold text-[#FE9800]">
                 {displayScore > 0 ? displayScore.toLocaleString() : "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#272A32]">
-              <span className="text-[#7DF4FF] text-xs">⚡</span>
-              <span className="font-mono text-[12px] font-bold text-[#7DF4FF]">
-                {formatText(trans.header.waveBadge, { wave, max: maxWaves })}
               </span>
             </div>
           </div>
@@ -128,22 +119,7 @@ export function GameHeader() {
           {/* Language + Icon buttons */}
           <div className="flex items-center gap-1">
             <LanguageSwitcher variant="hud" />
-            <button
-              type="button"
-              onClick={toggleMute}
-              className="w-8 h-8 rounded bg-[#272A32] hover:bg-[#363941] flex items-center justify-center text-[#B9CACB] hover:text-[#E1E2EC] transition-colors"
-              title={isMuted ? trans.hud.unmute : trans.hud.mute}
-            >
-              {isMuted ? (
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
-                  <path d="M16.5 12A4.5 4.5 0 0 0 14 7.97V10.18L16.45 12.63C16.48 12.43 16.5 12.22 16.5 12ZM19 12C19 12.94 18.8 13.82 18.46 14.64L19.97 16.15C20.63 14.91 21 13.5 21 12C21 7.72 18.01 4.14 14 3.23V5.29C16.89 6.15 19 8.83 19 12ZM4.27 3L3 4.27 7.73 9H3V15H7L12 20V13.27L16.25 17.52C15.58 18.04 14.83 18.45 14 18.7V20.76C15.38 20.45 16.63 19.82 17.68 18.96L19.73 21 21 19.73 12 10.73 4.27 3ZM12 4L9.91 6.09 12 8.18V4Z" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                </svg>
-              )}
-            </button>
+            <SoundSettingsControl variant="header" />
             <button
               type="button"
               onClick={() => {

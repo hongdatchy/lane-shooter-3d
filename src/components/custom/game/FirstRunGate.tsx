@@ -25,6 +25,12 @@ export function FirstRunGate() {
   }, []);
 
   useEffect(() => {
+    if (assetsReady && !assetsError) {
+      startFirstRun();
+    }
+  }, [assetsReady, assetsError, startFirstRun]);
+
+  useEffect(() => {
     if (queuedStart && assetsReady) {
       setQueuedStart(false);
       startFirstRun();

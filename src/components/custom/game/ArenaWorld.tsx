@@ -173,6 +173,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const sessionId = useGameStore((s) => s.sessionId);
   const icbmAiming = useGameStore((s) => s.icbmAiming);
   const aimingWeaponId = useGameStore((s) => s.aimingWeaponId);
+  const hasPendingStrikes = useGameStore(
+    (s) => s.rageStrikesPending.length > 0 || s.icbmPending !== null
+  );
   const activeRageWeaponId = useGameStore((s) =>
     s.rageActive ? s.activeRageWeaponId : null
   );
@@ -227,6 +230,19 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const enemyProjectileInstancedRef = useRef<THREE.InstancedMesh>(null);
   const mineInstancedRef = useRef<THREE.InstancedMesh>(null);
   const laserBeamGroupRef = useRef<THREE.Group>(null);
+  const boss2LaserRef = useRef<{
+    mode: "NONE" | "SUMMON" | "LASER_WARN" | "LASER_FIRE";
+    nextIsLaser: boolean;
+    targetX: number;
+  }>({
+    mode: "NONE",
+    nextIsLaser: false,
+    targetX: 0,
+  });
+  const boss2TelegraphRef = useRef<THREE.Group>(null);
+  const boss2TelegraphLineRef = useRef<THREE.Group>(null);
+  const boss2TelegraphRingRef = useRef<THREE.Mesh>(null);
+  const boss2BeamRef = useRef<THREE.Group>(null);
   const vortexMeshRef = useRef<THREE.Group>(null);
   const falloutMeshRefs = useRef<(THREE.Group | null)[]>([]);
   const strikeGroupRefs = useRef<(THREE.Group | null)[]>([]);
@@ -414,6 +430,13 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       startX: 0,
       startZ: 0,
     };
+    boss2LaserRef.current = {
+      mode: "NONE",
+      nextIsLaser: false,
+      targetX: 0,
+    };
+    if (boss2TelegraphRef.current) boss2TelegraphRef.current.visible = false;
+    if (boss2BeamRef.current) boss2BeamRef.current.visible = false;
 
     enemiesPoolRef.current.forEach((enemy, idx) => {
       enemy.active = false;
@@ -607,9 +630,12 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
     const storeForKill = useGameStore.getState();
     const activeCh = storeForKill.activeChapter;
+    const countsTowardStage =
+      isBoss || !weaponService.getStageConfig(storeForKill.wave, activeCh).isBossStage;
     if (isBoss && storeForKill.devMode) {
       storeForKill.recordDevBossKilled(simElapsedRef.current);
     } else if (
+      countsTowardStage &&
       storeForKill.devMode &&
       storeForKill.wave >= storeForKill.maxWaves &&
       storeForKill.stageKills + 1 >= storeForKill.stageTargetKills
@@ -629,7 +655,26 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
             ? 15
             : 10;
-    storeForKill.registerEnemyKill(scorePts);
+    storeForKill.registerEnemyKill(scorePts, countsTowardStage);
+
+    // Khi Boss chết, dọn các quái con triệu hồi còn sống để kết màn sạch sẽ
+    if (isBoss) {
+      boss2LaserRef.current.mode = "NONE";
+      if (boss2TelegraphRef.current) boss2TelegraphRef.current.visible = false;
+      if (boss2BeamRef.current) boss2BeamRef.current.visible = false;
+      const enemies = enemiesPoolRef.current;
+      for (let m = 0; m < BOSS_POOL_START; m++) {
+        const minion = enemies[m];
+        if (!minion.active || minion.dying) continue;
+        minion.hp = 0;
+        minion.dying = true;
+        minion.castTimer = 0;
+        minion.deathTimer = 0;
+        minion.deathDuration = ENEMY_DEATH_DURATION[minion.kind];
+        enemyUnitRefs.current[m]?.setMode("DEATH", minion.deathDuration);
+        spawnParticles(minion.x, 0.7 * minion.scale, minion.z, "#10b981", 8, 0.9);
+      }
+    }
 
     // Quái #6 (Bloater): Khi chết phát nổ bán kính 2m gây sát thương xung quanh & người chơi nếu đứng sát
     if (isBloater) {
@@ -1478,10 +1523,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           weapon.modelKind === "cannon" || weapon.modelKind === "icbm" ? 0.14 : 0.06;
         shotCounterRef.current += 1;
 
-        if (weapon.modelKind === "pistol") soundService.play("shootPistol");
-        else if (weapon.modelKind === "ak-rifle") soundService.play("shootAk");
-        else if (weapon.modelKind === "machine-gun") soundService.play("shootMachineGun");
-        else soundService.play("shootCannon");
+        soundService.playWeaponShot(weapon.id);
 
         const streams = rageSpec?.parallelStreams ?? 1;
         const barrelOffsetX =
@@ -1981,6 +2023,124 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               POISON_INTERVAL_MIN +
               Math.random() * (POISON_INTERVAL_MAX - POISON_INTERVAL_MIN);
           }
+        } else if (e.kind === "BOSS" && store.activeChapter === 2 && e.castTimer > 0) {
+          // Boss 2 (Nano Hydra): đứng yên gồng triệu hồi quái con hoặc gồng cảnh báo bắn laze đỏ
+          e.castTimer = Math.max(0, e.castTimer - delta * freezeFactor);
+          const b2State = boss2LaserRef.current;
+
+          if (b2State.mode === "LASER_WARN") {
+            if (Math.random() < 0.4) {
+              spawnParticles(e.x, 1.9, e.z + 1.0, "#ef4444", 1, 0.55);
+            }
+            if (e.castTimer <= 0) {
+              b2State.mode = "LASER_FIRE";
+              e.castTimer = 0.42;
+              e.castFired = false;
+            }
+          } else if (b2State.mode === "LASER_FIRE") {
+            if (!e.castFired) {
+              e.castFired = true;
+              soundService.play("shootCannon");
+              spawnParticles(b2State.targetX, 0.9, ARENA_CONFIG.playerZ, "#ef4444", 20, 1.3);
+              if (Math.abs(runtimeRef.current.playerX - b2State.targetX) <= 0.95) {
+                useGameStore.getState().damagePlayer(1, "ENEMY_PROJECTILE");
+                runtimeRef.current.screenShake = Math.max(
+                  runtimeRef.current.screenShake,
+                  0.35
+                );
+              }
+            }
+            if (e.castTimer <= 0) {
+              b2State.mode = "NONE";
+              b2State.nextIsLaser = false;
+              enemyUnitRefs.current[i]?.setMode("WALK");
+              e.attackCooldown = 2.6 + Math.random() * 0.6;
+            }
+          } else {
+            // SUMMON mode
+            if (Math.random() < 0.35) {
+              spawnParticles(
+                e.x + (Math.random() - 0.5) * 1.6,
+                1.4,
+                e.z + 0.6,
+                "#10b981",
+                1,
+                0.7
+              );
+            }
+            if (!e.castFired && e.castTimer <= 1.0) {
+              e.castFired = true;
+              spawnParticles(e.x, 2.2, e.z + 1.0, "#10b981", 22, 1.3);
+              soundService.play("shootCannon");
+
+              // Chọn tọa độ X ở làn khác với vị trí người chơi hiện tại (cách >= 2.8m)
+              const minSpawnX = laneBounds.minX + (isNarrowDev ? 0.15 : 0.65);
+              const maxSpawnX = laneBounds.maxEnemyX - (isNarrowDev ? 0.15 : 0.65);
+              const px = runtimeRef.current.playerX;
+              const leftSpace = px - 2.8 - minSpawnX;
+              const rightSpace = maxSpawnX - (px + 2.8);
+              const spawnXs: number[] =
+                leftSpace >= rightSpace
+                  ? [
+                      THREE.MathUtils.clamp(minSpawnX + 0.5, minSpawnX, maxSpawnX),
+                      THREE.MathUtils.clamp(px - 3.2, minSpawnX, maxSpawnX),
+                    ]
+                  : [
+                      THREE.MathUtils.clamp(px + 3.2, minSpawnX, maxSpawnX),
+                      THREE.MathUtils.clamp(maxSpawnX - 0.5, minSpawnX, maxSpawnX),
+                    ];
+
+              const [crawlerStart, crawlerEnd] = getChapterPoolSlots(
+                store.activeChapter
+              ).getRange("NORMAL");
+              const summonZ = THREE.MathUtils.clamp(
+                e.z + 1.4,
+                ARENA_CONFIG.spawnZ + 0.5,
+                ARENA_CONFIG.defenseLineZ - 5.5
+              );
+              for (let sIdx = 0; sIdx < spawnXs.length; sIdx++) {
+                for (let slot = crawlerStart; slot < crawlerEnd; slot++) {
+                  const m = enemies[slot];
+                  if (m.active) continue;
+                  const mScale = 0.92;
+                  m.active = true;
+                  m.dying = false;
+                  m.deathTimer = 0;
+                  m.deathDuration = 0;
+                  m.stunTimer = 0;
+                  m.acidTimer = 0;
+                  m.armorBroken = false;
+                  m.shellArmorHp = 0;
+                  m.enraged = false;
+                  m.attackCooldown = 999;
+                  m.castTimer = 0;
+                  m.castFired = false;
+                  m.id = enemyIdSeqRef.current++;
+                  m.kind = "NORMAL";
+                  m.x = spawnXs[sIdx];
+                  m.z = summonZ + sIdx * 0.6;
+                  m.speed = 4.0;
+                  m.maxHp = 16;
+                  m.hp = 16;
+                  m.scale = mScale;
+                  m.radius = 0.52 * mScale;
+                  m.hitFlash = 0;
+                  m.phase = Math.random() * Math.PI * 2;
+                  m.knockbackVx = 0;
+                  m.knockbackVz = 0;
+                  enemyUnitRefs.current[slot]?.setMode("WALK");
+                  spawnParticles(m.x, 0.95, m.z, "#00F0FF", 16, 1.15);
+                  break;
+                }
+              }
+            }
+            if (e.castTimer <= 0) {
+              b2State.mode = "NONE";
+              b2State.nextIsLaser = true;
+              enemyUnitRefs.current[i]?.setMode("WALK");
+              e.attackCooldown = 2.6 + Math.random() * 0.6;
+            }
+          }
         } else {
           if (e.kind === "DASHER" && !e.enraged && e.hp <= e.maxHp * 0.2) {
             e.enraged = true;
@@ -2060,45 +2220,31 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
                 spawnParticles(e.x - 1.35, 2.0, e.z + 1.0, "#f97316", 8, 0.7);
               }
             }
-          } else if (e.kind === "BOSS" && store.activeChapter === 2) {
-            // Boss 2 (Nano Hydra v4): chạy Ultimate_LaserSweep khi tấn công, rồi quay lại clip Walk
-            if (e.castTimer > 0) {
-              e.castTimer = Math.max(0, e.castTimer - delta * freezeFactor);
-              if (!e.castFired && e.castTimer <= BOSS2_SHOOT_DURATION * 0.62) {
-                e.castFired = true;
-                const muzzleZ = e.z + 1.1;
-                spawnParticles(e.x, 2.2, muzzleZ, "#10b981", 16, 1.1);
-                soundService.play("shootCannon");
-                for (const offset of [-1.05, 0, 1.05]) {
-                  spawnEnemyProjectile(
-                    e.x + offset,
-                    2.1,
-                    muzzleZ,
-                    THREE.MathUtils.clamp(
-                      runtimeRef.current.playerX + offset * 1.1,
-                      ARENA_CONFIG.playerMinX,
-                      ARENA_CONFIG.playerMaxX
-                    ),
-                    ARENA_CONFIG.playerZ,
-                    POISON_PROJECTILE_SPEED * 0.9 * freezeFactor,
-                    "#10b981"
-                  );
-                }
-              }
-              if (e.castTimer <= 0) {
-                enemyUnitRefs.current[i]?.setMode("WALK");
-                e.attackCooldown = 2.6 + Math.random() * 0.8;
-              }
-            } else if (
-              e.z > ARENA_CONFIG.spawnZ + 0.5 &&
-              e.z < ARENA_CONFIG.defenseLineZ - 4.0
-            ) {
-              e.attackCooldown -= delta * freezeFactor;
-              if (e.attackCooldown <= 0) {
-                e.castTimer = BOSS2_SHOOT_DURATION;
+          } else if (
+            e.kind === "BOSS" &&
+            store.activeChapter === 2 &&
+            e.z > ARENA_CONFIG.spawnZ + 0.5 &&
+            e.z < ARENA_CONFIG.defenseLineZ - 5.0
+          ) {
+            // Boss 2 (Nano Hydra v4): xen kẽ giữa Triệu hồi quái con và Bắn Laze đỏ có cảnh báo trước
+            e.attackCooldown -= delta * freezeFactor;
+            if (e.attackCooldown <= 0) {
+              const b2State = boss2LaserRef.current;
+              if (b2State.nextIsLaser) {
+                b2State.mode = "LASER_WARN";
+                b2State.targetX = THREE.MathUtils.clamp(
+                  runtimeRef.current.playerX,
+                  ARENA_CONFIG.playerMinX,
+                  ARENA_CONFIG.playerMaxX
+                );
+                e.castTimer = 1.25;
                 e.castFired = false;
-                enemyUnitRefs.current[i]?.setMode("ATTACK", BOSS2_SHOOT_DURATION);
-                spawnParticles(e.x, 2.2, e.z + 1.0, "#10b981", 8, 0.7);
+                spawnParticles(e.x, 1.9, e.z + 1.0, "#ef4444", 12, 0.9);
+              } else {
+                b2State.mode = "SUMMON";
+                e.castTimer = 2.0;
+                e.castFired = false;
+                spawnParticles(e.x, 2.2, e.z + 1.0, "#10b981", 12, 0.9);
               }
             }
           } else if (e.kind === "BOSS" && store.activeChapter === 3) {
@@ -2443,6 +2589,58 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         const ratio = Math.max(0.01, e.hp / e.maxHp);
         hpFill.scale.x = ratio;
         hpFill.position.x = -(1 - ratio) * 0.55;
+      }
+    }
+
+    // Đồng bộ tia cảnh báo & tia laze đỏ của Boss 2 (Nano Hydra)
+    const b2Mode = boss2LaserRef.current.mode;
+    let activeBoss2: EnemyEntity | null = null;
+    if (b2Mode === "LASER_WARN" || b2Mode === "LASER_FIRE") {
+      for (let i = BOSS_POOL_START; i < BOSS_POOL_END; i++) {
+        const cand = enemies[i];
+        if (cand.active && !cand.dying && cand.kind === "BOSS") {
+          activeBoss2 = cand;
+          break;
+        }
+      }
+    }
+    if (boss2TelegraphRef.current) {
+      if (activeBoss2 && b2Mode === "LASER_WARN") {
+        boss2TelegraphRef.current.visible = true;
+        const startX = activeBoss2.x;
+        const startZ = activeBoss2.z + 1.0;
+        const endX = boss2LaserRef.current.targetX;
+        const endZ = ARENA_CONFIG.playerZ + 1.0;
+        const dist = Math.max(0.5, Math.hypot(endX - startX, endZ - startZ));
+        if (boss2TelegraphLineRef.current) {
+          boss2TelegraphLineRef.current.position.set(startX, 0.08, startZ);
+          boss2TelegraphLineRef.current.lookAt(endX, 0.08, endZ);
+          boss2TelegraphLineRef.current.scale.set(1, 1, dist);
+        }
+        if (boss2TelegraphRingRef.current) {
+          const pulse = 0.88 + 0.2 * Math.sin(elapsed * 18);
+          boss2TelegraphRingRef.current.position.set(endX, 0.09, ARENA_CONFIG.playerZ);
+          boss2TelegraphRingRef.current.scale.setScalar(pulse);
+        }
+      } else {
+        boss2TelegraphRef.current.visible = false;
+      }
+    }
+    if (boss2BeamRef.current) {
+      if (activeBoss2 && b2Mode === "LASER_FIRE") {
+        boss2BeamRef.current.visible = true;
+        const startX = activeBoss2.x;
+        const startY = 1.85;
+        const startZ = activeBoss2.z + 1.0;
+        const endX = boss2LaserRef.current.targetX;
+        const endY = 0.85;
+        const endZ = ARENA_CONFIG.playerZ + 0.8;
+        const dist = Math.max(0.5, Math.hypot(endX - startX, endY - startY, endZ - startZ));
+        boss2BeamRef.current.position.set(startX, startY, startZ);
+        boss2BeamRef.current.lookAt(endX, endY, endZ);
+        boss2BeamRef.current.scale.set(1, 1, dist);
+      } else {
+        boss2BeamRef.current.visible = false;
       }
     }
 
@@ -2906,6 +3104,51 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         </group>
       )}
 
+      {/* [BOSS 2 NANO HYDRA] Cảnh báo vệt đỏ trên sân trước khi bắn laze */}
+      <group ref={boss2TelegraphRef} visible={false}>
+        <group ref={boss2TelegraphLineRef}>
+          <mesh position={[0, 0, 0.5]}>
+            <boxGeometry args={[0.24, 0.03, 1]} />
+            <meshBasicMaterial
+              color="#ef4444"
+              transparent
+              opacity={0.78}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+        </group>
+        <mesh ref={boss2TelegraphRingRef} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.55, 0.85, 28]} />
+          <meshBasicMaterial
+            color="#ef4444"
+            transparent
+            opacity={0.85}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+
+      {/* [BOSS 2 NANO HYDRA] Tia laze đỏ mảnh bắn thẳng tới vị trí đã khóa */}
+      <group ref={boss2BeamRef} visible={false}>
+        <mesh position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.07, 0.07, 1, 10]} />
+          <meshBasicMaterial color="#fff1f2" toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 0, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.17, 0.17, 1, 12]} />
+          <meshBasicMaterial
+            color="#ef4444"
+            transparent
+            opacity={0.62}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+
       {/* [VORTEX GUN] Singularity Hố Đen hút và nghiền nát quái 6s */}
       {activeRageWeaponId === "vortex_gun" && (
         <group
@@ -2989,8 +3232,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         </>
       )}
 
-      {/* Vùng khóa mục tiêu & Đầu đạn / Pháo quỹ đạo (tối đa 3 điểm nổ) */}
-      {STRIKE_INDICES.map((idx) => (
+      {/* Vùng khóa mục tiêu & Đầu đạn / Pháo quỹ đạo (chỉ mount khi thực sự có đợt không kích) */}
+      {hasPendingStrikes &&
+        STRIKE_INDICES.map((idx) => (
         <group
           key={`strike-${idx}`}
           ref={(el) => {

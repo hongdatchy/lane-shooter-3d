@@ -81,7 +81,12 @@
     "rageSkillActive": "{skill} ({time}s)",
     "rageSkillActiveUpper": "{skill} {time}s",
     "rageResultDelayVictory": "VITÓRIA! Calculando recompensas...",
-    "rageResultDelayDefeat": "DERROTA! Finalizando partida..."
+    "rageResultDelayDefeat": "DERROTA! Finalizando partida...",
+    "audioMixerTitle": "ÁUDIO",
+    "audioBgm": "MÚSICA",
+    "audioSfx": "ARMAS E SFX",
+    "audioOn": "ON",
+    "audioMuted": "MUDO"
   },
   "crate": {
     "maxTitle": "Nível Máximo",
@@ -279,7 +284,12 @@
     "modeSurvivorTag": "ARENA 360°",
     "modeSurvivorTitle": "SURVIVOR WAVES",
     "modeSurvivorSub": "Sobrevivência 3D Zombie Waves",
-    "modeSurvivorDesc": "Movimento livre WASD 360° contra hordas de monstros."
+    "modeSurvivorDesc": "Movimento livre WASD 360° contra hordas de monstros.",
+    "navHero": "HERÓI",
+    "navBattle": "BATALHA",
+    "navIntel": "RANKING",
+    "navArmory": "ARSENAL",
+    "guideOpenArmory": "Toque na arma para abrir o Arsenal e melhorar!"
   },
   "banners": {
     "stage1Start": "Fase 1 — Preparar!",
@@ -412,7 +422,32 @@
     "unlockWeaponBtn": "DESBLOQUEAR · {cost} OURO",
     "needGoldUnlockBtn": "PRECISA {cost} OURO PARA ABRIR",
     "prereqMetNote": "CAP.{ch} LIBERADO · PAGUE {cost} OURO",
-    "escHint": "ESC: VOLTAR"
+    "escHint": "ESC: VOLTAR",
+    "guideUpgradePrompt": "Toque em Melhorar para aumentar o poder!",
+    "guideUpgradeUnavailable": "Ouro insuficiente ou nível máx.",
+    "guideCloseBtn": "Fechar",
+    "weaponNames": {
+      "pistol": "Pistola (Sidearm)",
+      "ak47": "AK Hyperion",
+      "shotgun": "Escopeta de Estilhaços",
+      "smg_neon": "SMG Neon",
+      "cryo_gun": "Arma Criogênica",
+      "minigun": "Minigun",
+      "tesla_gun": "Arma Tesla",
+      "scatter": "Arma Dispersora",
+      "cannon": "Canhão Pesado",
+      "rocket_launcher": "Lança-Foguetes",
+      "grenade_launcher": "Lança-Granadas",
+      "flamethrower": "Lança-Chamas",
+      "acid_sprayer": "Borrifador de Ácido",
+      "plasma_rifle": "Rifle de Plasma",
+      "rail_gun": "Canhão Elétrico",
+      "laser_cannon": "Canhão Laser",
+      "vortex_gun": "Arma Vórtice",
+      "photon_burst": "Rajada de Fótons",
+      "nuke_launcher": "Lançador Nuclear",
+      "icbm": "Unidade ICBM"
+    }
   },
   "buffs": {
     "scopeRun": "TODA PARTIDA",

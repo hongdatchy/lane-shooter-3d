@@ -81,7 +81,12 @@
     "rageSkillActive": "{skill} ({time}s)",
     "rageSkillActiveUpper": "{skill} {time}s",
     "rageResultDelayVictory": "胜利！正在结算奖励...",
-    "rageResultDelayDefeat": "战败！正在结算对局..."
+    "rageResultDelayDefeat": "战败！正在结算对局...",
+    "audioMixerTitle": "音频控制",
+    "audioBgm": "游戏音乐",
+    "audioSfx": "枪械与音效",
+    "audioOn": "开",
+    "audioMuted": "静音"
   },
   "crate": {
     "maxTitle": "已达最高级",
@@ -279,7 +284,12 @@
     "modeSurvivorTag": "360° 竞技场",
     "modeSurvivorTitle": "SURVIVOR WAVES",
     "modeSurvivorSub": "3D 僵尸波次生存竞技场",
-    "modeSurvivorDesc": "WASD 360° 自由移动，抵御无尽怪物潮。"
+    "modeSurvivorDesc": "WASD 360° 自由移动，抵御无尽怪物潮。",
+    "navHero": "英雄",
+    "navBattle": "战斗",
+    "navIntel": "排行",
+    "navArmory": "军械库",
+    "guideOpenArmory": "点击武器打开军械库并升级！"
   },
   "banners": {
     "stage1Start": "第 1 关 — 准备就绪!",
@@ -412,7 +422,32 @@
     "unlockWeaponBtn": "解锁武器 · {cost} 金币",
     "needGoldUnlockBtn": "需要 {cost} 金币解锁",
     "prereqMetNote": "已满足第 {ch} 章条件 · 支付 {cost} 金币解锁",
-    "escHint": "ESC: 返回"
+    "escHint": "ESC: 返回",
+    "guideUpgradePrompt": "点击升级强化武器火力！",
+    "guideUpgradeUnavailable": "金币不足或已满级",
+    "guideCloseBtn": "关闭",
+    "weaponNames": {
+      "pistol": "脉冲手枪",
+      "ak47": "AK 海伯利安",
+      "shotgun": "碎裂霰弹枪",
+      "smg_neon": "霓虹冲锋枪",
+      "cryo_gun": "冷冻射线枪",
+      "minigun": "加特林机枪",
+      "tesla_gun": "特斯拉电枪",
+      "scatter": "散射霰弹枪",
+      "cannon": "重型加农炮",
+      "rocket_launcher": "火箭发射器",
+      "grenade_launcher": "榴弹发射器",
+      "flamethrower": "火焰喷射器",
+      "acid_sprayer": "酸液喷射器",
+      "plasma_rifle": "等离子步枪",
+      "rail_gun": "电磁轨道炮",
+      "laser_cannon": "激光加农炮",
+      "vortex_gun": "涡流黑洞炮",
+      "photon_burst": "光子脉冲枪",
+      "nuke_launcher": "核弹发射器",
+      "icbm": "洲际导弹单元"
+    }
   },
   "buffs": {
     "scopeRun": "整局有效",

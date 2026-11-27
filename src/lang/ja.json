@@ -81,7 +81,12 @@
     "rageSkillActive": "{skill} ({time}s)",
     "rageSkillActiveUpper": "{skill} {time}s",
     "rageResultDelayVictory": "勝利！報酬を集計中...",
-    "rageResultDelayDefeat": "敗北！結果を集計中..."
+    "rageResultDelayDefeat": "敗北！結果を集計中...",
+    "audioMixerTitle": "オーディオ",
+    "audioBgm": "BGM",
+    "audioSfx": "銃・効果音",
+    "audioOn": "ON",
+    "audioMuted": "消音"
   },
   "crate": {
     "maxTitle": "最大レベル",
@@ -279,7 +284,12 @@
     "modeSurvivorTag": "360° アリーナ",
     "modeSurvivorTitle": "SURVIVOR WAVES",
     "modeSurvivorSub": "3D ゾンビウェーブ・サバイバル",
-    "modeSurvivorDesc": "WASDで360°自由に移動し、迫り来るモンスターの群れを生き延びろ。"
+    "modeSurvivorDesc": "WASDで360°自由に移動し、迫り来るモンスターの群れを生き延びろ。",
+    "navHero": "ヒーロー",
+    "navBattle": "バトル",
+    "navIntel": "順位",
+    "navArmory": "武器庫",
+    "guideOpenArmory": "武器をタップして武器庫で強化しよう！"
   },
   "banners": {
     "stage1Start": "ステージ 1 — スタート!",
@@ -412,7 +422,32 @@
     "unlockWeaponBtn": "武器を解放 · {cost} G",
     "needGoldUnlockBtn": "解放に {cost} G 必要",
     "prereqMetNote": "CH.{ch} 条件達成 · {cost} G で購入解放",
-    "escHint": "ESC: 戻る"
+    "escHint": "ESC: 戻る",
+    "guideUpgradePrompt": "強化をタップして火力を上げよう！",
+    "guideUpgradeUnavailable": "ゴールド不足または最大レベル",
+    "guideCloseBtn": "閉じる",
+    "weaponNames": {
+      "pistol": "ピストル",
+      "ak47": "AK ハイペリオン",
+      "shotgun": "シャードショットガン",
+      "smg_neon": "SMG ネオン",
+      "cryo_gun": "クライオガン",
+      "minigun": "ミニガン",
+      "tesla_gun": "テスラガン",
+      "scatter": "スキャッターガン",
+      "cannon": "ヘビーキャノン",
+      "rocket_launcher": "ロケットランチャー",
+      "grenade_launcher": "グレネードランチャー",
+      "flamethrower": "火炎放射器",
+      "acid_sprayer": "アシッドスプレイヤー",
+      "plasma_rifle": "プラズマライフル",
+      "rail_gun": "レールガン",
+      "laser_cannon": "レーザーキャノン",
+      "vortex_gun": "ヴォルテックスガン",
+      "photon_burst": "フォトンバースト",
+      "nuke_launcher": "ニュークランチャー",
+      "icbm": "ICBM ストライク"
+    }
   },
   "buffs": {
     "scopeRun": "ラン中継続",

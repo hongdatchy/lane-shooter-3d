@@ -59,6 +59,7 @@ const getCurrentTrans = () => getTranslation(useAppStore.getState().locale);
 export type MenuScreen = "LOBBY" | "WORLD_MAP" | "ARMORY";
 export type ArmoryTab = "UPGRADES" | "PETS" | "ARSENAL";
 export type MobileLobbyTab = "hero" | "battle" | "intel";
+export type PostFirstRunGuideStep = "NONE" | "OPEN_ARMORY" | "UPGRADE_WEAPON";
 
 interface PendingGuestMatch {
   sessionId: number;
@@ -94,6 +95,7 @@ interface GameState {
   profileLoaded: boolean;
   firstRunDone: boolean;
   isCurrentRunFirstTime: boolean;
+  postFirstRunGuideStep: PostFirstRunGuideStep;
 
   // Cloud / Platform Save
   saveData: PlayerSaveData;
@@ -151,6 +153,8 @@ interface GameState {
   cameraMode: CameraMode;
   autoFire: boolean;
   isMuted: boolean;
+  bgmVolume: number;
+  sfxVolume: number;
   sessionId: number;
 
   // 3D Asset Preloading
@@ -215,6 +219,7 @@ interface GameActions {
   selectChapter: (chapterId: number) => void;
   startFirstRun: () => void;
   completeFirstRunOnboarding: () => void;
+  dismissPostFirstRunGuide: () => void;
   startGame: () => void;
   startNextChapter: () => void;
   returnToMenu: () => void;
@@ -225,13 +230,15 @@ interface GameActions {
   cycleCameraMode: () => void;
   toggleAutoFire: () => void;
   toggleMute: () => void;
+  setBgmVolume: (volume: number) => void;
+  setSfxVolume: (volume: number) => void;
   addRage: (amount: number) => void;
   activateRage: () => void;
   launchIcbm: (targetX: number, targetZ: number, startX: number) => void;
   finishIcbmStrike: () => void;
   tickRage: (delta: number) => void;
   tickBuffTimers: (delta: number) => void;
-  registerEnemyKill: (points: number) => void;
+  registerEnemyKill: (points: number, countsTowardStage?: boolean) => void;
   registerGateHit: (slotIndex: 0 | 1) => { claimed: boolean; buff: BuffGateSpecDTO | null };
   damagePlayer: (amount: number, sourceKind?: DamageSourceKind) => void;
   clearRewardBanner: () => void;
@@ -577,6 +584,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   profileLoaded: false,
   firstRunDone: false,
   isCurrentRunFirstTime: false,
+  postFirstRunGuideStep: "NONE",
 
   saveData: createDefaultSaveData(),
   saveError: null,
@@ -631,6 +639,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   cameraMode: "THIRD_PERSON",
   autoFire: true,
   isMuted: false,
+  bgmVolume: 0.55,
+  sfxVolume: 0.75,
   sessionId: 0,
 
   assetsReady: false,
@@ -896,11 +906,16 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       menuScreen: "ARMORY",
       armoryTab: tab,
       previousMenuScreen: state.menuScreen === "WORLD_MAP" ? "WORLD_MAP" : "LOBBY",
+      postFirstRunGuideStep:
+        state.postFirstRunGuideStep === "OPEN_ARMORY"
+          ? "UPGRADE_WEAPON"
+          : state.postFirstRunGuideStep,
     })),
 
   closeArmory: () =>
     set((state) => ({
       menuScreen: state.previousMenuScreen,
+      postFirstRunGuideStep: "NONE",
     })),
 
   setMobileLobbyTab: (tab) => set({ mobileLobbyTab: tab }),
@@ -924,6 +939,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       unlockedWeaponIds: [...state.saveData.unlockedWeaponIds, weaponId],
     };
     await commitArmorySave(nextSave, set);
+    if (get().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+      set({ postFirstRunGuideStep: "NONE" });
+    }
   },
 
   assignWeaponToLoadout: async (weaponId) => {
@@ -952,6 +970,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       equippedLoadoutIds: [weaponId],
     };
     await commitArmorySave(nextSave, set);
+    if (get().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+      set({ postFirstRunGuideStep: "NONE" });
+    }
   },
 
   removeWeaponFromLoadout: async (weaponId) => {
@@ -969,6 +990,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       equippedLoadoutIds: [nextLoadout[0]],
     };
     await commitArmorySave(nextSave, set);
+    if (get().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+      set({ postFirstRunGuideStep: "NONE" });
+    }
   },
 
   selectActiveLoadoutWeapon: async (weaponId) => {
@@ -996,6 +1020,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       equippedLoadoutIds: [weaponId],
     };
     await commitArmorySave(nextSave, set);
+    if (get().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+      set({ postFirstRunGuideStep: "NONE" });
+    }
   },
 
   upgradeArmoryWeapon: async (weaponId) => {
@@ -1025,6 +1052,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       },
     };
     await commitArmorySave(nextSave, set);
+    if (get().postFirstRunGuideStep === "UPGRADE_WEAPON") {
+      set({ postFirstRunGuideStep: "NONE" });
+    }
   },
 
   selectChapter: (chapterId) =>
@@ -1057,6 +1087,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       void playerSaveService.writeSave(nextSave).catch(() => {});
     }
   },
+
+  dismissPostFirstRunGuide: () => set({ postFirstRunGuideStep: "NONE" }),
 
   startGame: () => {
     soundService.unlock();
@@ -1208,9 +1240,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         victory: false,
       });
     }
+    const shouldGuideArmory = state.isCurrentRunFirstTime && !state.devMode;
     set({
       gameStatus: "MENU",
       menuScreen: "LOBBY",
+      mobileLobbyTab: shouldGuideArmory ? "hero" : state.mobileLobbyTab,
+      postFirstRunGuideStep: shouldGuideArmory ? "OPEN_ARMORY" : state.postFirstRunGuideStep,
       firstRunDone: state.devMode ? state.firstRunDone : true,
       isCurrentRunFirstTime: false,
       rageReady: false,
@@ -1265,6 +1300,18 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextMuted = !get().isMuted;
     soundService.setMuted(nextMuted);
     set({ isMuted: nextMuted });
+  },
+
+  setBgmVolume: (volume) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    soundService.setBgmVolume(clamped);
+    set({ bgmVolume: clamped });
+  },
+
+  setSfxVolume: (volume) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    soundService.setSfxVolume(clamped);
+    set({ sfxVolume: clamped });
   },
 
   addRage: (amount) => {
@@ -1553,7 +1600,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       };
     }),
 
-  registerEnemyKill: (points) => {
+  registerEnemyKill: (points, countsTowardStage = true) => {
     const state = get();
     if (state.gameStatus !== "PLAYING") return;
 
@@ -1561,9 +1608,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextKills = state.kills + 1;
     const nextScore = state.score + Math.round(points * scoreMultiplier);
     const nextHighScore = Math.max(state.highScore, nextScore);
-    const nextStageKills = state.stageKills + 1;
+    const nextStageKills = countsTowardStage ? state.stageKills + 1 : state.stageKills;
 
-    if (nextStageKills < state.stageTargetKills) {
+    if (!countsTowardStage || nextStageKills < state.stageTargetKills) {
       set({
         kills: nextKills,
         stageKills: nextStageKills,

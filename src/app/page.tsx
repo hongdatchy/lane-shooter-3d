@@ -10,6 +10,8 @@ import { ArmoryScreen } from "@/components/custom/game/ArmoryScreen";
 import { FirstRunGate } from "@/components/custom/game/FirstRunGate";
 import { GameHeader } from "@/layout/game-header";
 import { leaderboardService } from "@/service/leaderboard-service";
+import { soundService } from "@/service/sound-service";
+import { weaponService } from "@/service/weapon-service";
 import { useTransClientSide } from "@/lang/useTransClientSide";
 import { useGameStore } from "@/state-manager/game-store";
 import "@/service/model-cache";
@@ -35,6 +37,8 @@ const GameViewport = dynamic(
 export default function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameStatus = useGameStore((s) => s.gameStatus);
+  const wave = useGameStore((s) => s.wave);
+  const activeChapter = useGameStore((s) => s.activeChapter);
   const menuScreen = useGameStore((s) => s.menuScreen);
   const mobileLobbyTab = useGameStore((s) => s.mobileLobbyTab);
   const setMobileLobbyTab = useGameStore((s) => s.setMobileLobbyTab);
@@ -96,6 +100,36 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Unlock Web Audio on first user interaction & sync BGM track (Lobby / Combat / Boss)
+  useEffect(() => {
+    const handleFirstGesture = () => {
+      soundService.unlock();
+    };
+    window.addEventListener("pointerdown", handleFirstGesture, { passive: true });
+    window.addEventListener("keydown", handleFirstGesture, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", handleFirstGesture);
+      window.removeEventListener("keydown", handleFirstGesture);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (showBootSplash) {
+      soundService.setBgmTrack("NONE");
+      return;
+    }
+    if (gameStatus === "PLAYING") {
+      const isBossStage = weaponService.getStageConfig(wave, activeChapter).isBossStage;
+      soundService.setBgmTrack(isBossStage ? "BOSS" : "COMBAT");
+      return;
+    }
+    if (gameStatus === "MENU") {
+      soundService.setBgmTrack("LOBBY");
+      return;
+    }
+    soundService.setBgmTrack("NONE");
+  }, [gameStatus, wave, activeChapter, showBootSplash]);
+
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-[#0A0D14] lg:overflow-hidden">
       {/* Header visible on standard MENU after first-run check */}
@@ -137,10 +171,10 @@ export default function HomePage() {
           <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-[#111318]/95 backdrop-blur-md border-t border-[#272A32] h-14 px-2">
             {(
               [
-                { id: "hero", icon: <User className="w-5 h-5" />, label: "HERO" },
-                { id: "battle", icon: <Rocket className="w-5 h-5" />, label: "BATTLE" },
-                { id: "intel", icon: <Trophy className="w-5 h-5" />, label: "INTEL" },
-                { id: "armory", icon: <Wrench className="w-5 h-5" />, label: "ARMORY" },
+                { id: "hero", icon: <User className="w-5 h-5" />, label: trans.lobby.navHero },
+                { id: "battle", icon: <Rocket className="w-5 h-5" />, label: trans.lobby.navBattle },
+                { id: "intel", icon: <Trophy className="w-5 h-5" />, label: trans.lobby.navIntel },
+                { id: "armory", icon: <Wrench className="w-5 h-5" />, label: trans.lobby.navArmory },
               ] as const
             ).map((tab) => {
               const isActive =

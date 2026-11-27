@@ -215,8 +215,8 @@ export const STAGE_CATALOG_CH2: StageConfigDTO[] = [
   {
     stage: 5,
     targetKills: 1,
-    normalSpeed: 1.35,
-    eliteSpeed: 1.35,
+    normalSpeed: 1.65,
+    eliteSpeed: 1.65,
     normalHp: 1200,
     eliteHp: 1200, // Wave 5: Boss 2 Nano Hydra
     normalScale: 5.0,

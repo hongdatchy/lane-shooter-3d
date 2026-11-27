@@ -81,7 +81,12 @@
     "rageSkillActive": "{skill} ({time}s)",
     "rageSkillActiveUpper": "{skill} {time}s",
     "rageResultDelayVictory": "CHIẾN THẮNG! Đang tổng kết...",
-    "rageResultDelayDefeat": "THẤT BẠI! Đang tổng kết trận..."
+    "rageResultDelayDefeat": "THẤT BẠI! Đang tổng kết trận...",
+    "audioMixerTitle": "ÂM THANH",
+    "audioBgm": "NHẠC GAME",
+    "audioSfx": "SÚNG & HIỆU ỨNG",
+    "audioOn": "BẬT",
+    "audioMuted": "TẮT"
   },
   "crate": {
     "maxTitle": "Đã đạt tối đa",
@@ -279,7 +284,12 @@
     "modeSurvivorTag": "ĐẤU TRƯỜNG 360°",
     "modeSurvivorTitle": "SURVIVOR WAVES",
     "modeSurvivorSub": "Đấu Trường 3D Sinh Tồn Zombie Waves",
-    "modeSurvivorDesc": "WASD di chuyển tự do, sinh tồn trước bầy quái 360°."
+    "modeSurvivorDesc": "WASD di chuyển tự do, sinh tồn trước bầy quái 360°.",
+    "navHero": "CHIẾN BINH",
+    "navBattle": "CHIẾN ĐẤU",
+    "navIntel": "XẾP HẠNG",
+    "navArmory": "TRANG BỊ",
+    "guideOpenArmory": "Nhấn vào súng để mở Trang Bị & nâng cấp!"
   },
   "banners": {
     "stage1Start": "Màn 1 — Khởi động!",
@@ -412,7 +422,32 @@
     "unlockWeaponBtn": "MỞ KHÓA VŨ KHÍ · {cost} VÀNG",
     "needGoldUnlockBtn": "CẦN {cost} VÀNG ĐỂ MỞ KHÓA",
     "prereqMetNote": "ĐỦ ĐIỀU KIỆN CH.{ch} · TRẢ {cost} VÀNG ĐỂ MỞ",
-    "escHint": "ESC: QUAY LẠI"
+    "escHint": "ESC: QUAY LẠI",
+    "guideUpgradePrompt": "Nhấn Nâng Cấp để tăng sức mạnh!",
+    "guideUpgradeUnavailable": "Chưa đủ vàng hoặc đã tối đa",
+    "guideCloseBtn": "Đóng",
+    "weaponNames": {
+      "pistol": "Súng Lục (Pistol)",
+      "ak47": "AK Hyperion",
+      "shotgun": "Shotgun Phân Mảnh",
+      "smg_neon": "SMG Neon",
+      "cryo_gun": "Súng Băng Cryo",
+      "minigun": "Minigun",
+      "tesla_gun": "Tesla Gun",
+      "scatter": "Scatter Gun",
+      "cannon": "Đại Bác Cannon",
+      "rocket_launcher": "Rocket Launcher",
+      "grenade_launcher": "Phóng Lựu",
+      "flamethrower": "Súng Phun Lửa",
+      "acid_sprayer": "Súng Axit",
+      "plasma_rifle": "Súng Plasma",
+      "rail_gun": "Rail Gun",
+      "laser_cannon": "Pháo Laser",
+      "vortex_gun": "Súng Hố Đen",
+      "photon_burst": "Photon Burst",
+      "nuke_launcher": "Pháo Hạt Nhân",
+      "icbm": "Tên Lửa ICBM"
+    }
   },
   "buffs": {
     "scopeRun": "HẾT TRẬN",
