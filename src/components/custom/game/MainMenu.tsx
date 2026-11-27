@@ -1,19 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Gauge, GitFork, Lock, Play, Radar, Rocket, ShieldCheck, Wrench } from "lucide-react";
+import { Gauge, GitFork, Lock, Play, Radar, Rocket, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
 import { useGameStore } from "@/state-manager/game-store";
 import { LeaderboardEntryDTO } from "@/dto/GameDTO";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import {
   ARMORY_WEAPONS,
+  ArmoryWeaponSpec,
   MAX_WEAPON_LEVEL,
   getArmoryWeaponById,
+  getWeaponImageUrl,
 } from "@/service/armory-catalog";
 import { CHAPTER_CATALOG } from "@/service/chapter-catalog";
 import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { DEV_SPEED_OPTIONS, isLocalDevEnvironment } from "@/service/dev-mode-service";
-import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import { TranslationData, formatText, useTransClientSide } from "@/lang/useTransClientSide";
+import {
+  CLASS_BADGE_MAP,
+  TelemetrySegmentBar,
+  computeWeaponTelemetry,
+  getClassLabel,
+  getWeaponUnlockBadge,
+} from "@/components/custom/game/WeaponInspectionPanel";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -107,10 +116,152 @@ function StatBlock({
   valueColor?: string;
 }) {
   return (
-    <div className="flex flex-col p-2 rounded bg-[#272A32] items-center justify-center">
+    <div className="flex flex-col py-1.5 px-2 rounded bg-[#272A32] items-center justify-center">
       <span className="font-mono text-[10px] text-[#B9CACB] uppercase tracking-wider">{label}</span>
       <span className={`font-mono text-base font-bold leading-tight ${valueColor}`}>{value}</span>
       {sub && <span className="font-mono text-[9px] text-[#849495]">{sub}</span>}
+    </div>
+  );
+}
+
+function LobbyWeaponShowcase({
+  weapon,
+  level,
+  chapterMet,
+  isOwned,
+  t,
+}: {
+  weapon: ArmoryWeaponSpec;
+  level: number;
+  chapterMet: boolean;
+  isOwned: boolean;
+  t: TranslationData["armory"];
+}) {
+  const [inspectAngleDeg, setInspectAngleDeg] = useState(0);
+
+  useEffect(() => {
+    setInspectAngleDeg(0);
+  }, [weapon.id]);
+
+  const { clampedLevel, stats, rofRatio, dmgRatio } = computeWeaponTelemetry(
+    weapon,
+    level
+  );
+  const unlockBadge = getWeaponUnlockBadge(weapon, chapterMet, isOwned, t);
+
+  return (
+    <div className="rounded-xl bg-[#131722] border border-[#272A32] p-2.5 flex flex-col gap-1.5 shrink-0">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between gap-2 pb-1 border-b border-[#272A32]/80">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h2 className="font-['Space_Grotesk'] text-sm font-bold text-[#E1E2EC] uppercase truncate">
+            {weapon.name}
+          </h2>
+          <span className="font-mono text-[9px] text-[#B9CACB] truncate hidden sm:inline">
+            {getClassLabel(weapon.weaponClass, t)} · {weapon.classLabel}
+          </span>
+        </div>
+
+        <span
+          className={`px-1.5 py-0.5 rounded border font-mono text-[9px] font-bold uppercase shrink-0 ${
+            CLASS_BADGE_MAP[weapon.weaponClass]
+          }`}
+        >
+          {formatText(t.levelProgress, {
+            lv: clampedLevel,
+            max: MAX_WEAPON_LEVEL,
+          })}
+        </span>
+      </div>
+
+      {/* Compact Pedestal Stage */}
+      <div className="relative rounded-lg bg-[#0A0D14] border border-[#272A32] overflow-hidden h-[116px] xl:h-[132px] flex items-center justify-center shrink-0">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at center, ${weapon.tracerHex}22 0%, transparent 70%)`,
+          }}
+        />
+        <img
+          src={getWeaponImageUrl(weapon, true)}
+          alt={weapon.name}
+          className="w-full h-full object-cover object-center transition-transform duration-500"
+          style={{
+            transform: `perspective(900px) rotateY(${inspectAngleDeg}deg) scale(${
+              inspectAngleDeg === 0 ? 1 : 1.04
+            })`,
+          }}
+        />
+
+        <button
+          type="button"
+          onClick={() =>
+            setInspectAngleDeg((prev) => (prev === 0 ? -16 : prev < 0 ? 16 : 0))
+          }
+          className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded bg-[#131722]/90 hover:bg-[#272A32] border border-[#3B494B] font-mono text-[9px] font-bold text-[#00F0FF] uppercase flex items-center gap-1 transition-colors cursor-pointer"
+        >
+          <RotateCcw className="w-2.5 h-2.5" />
+          <span>{inspectAngleDeg === 0 ? t.inspect360 : t.resetView}</span>
+        </button>
+
+        <div className="absolute bottom-1.5 inset-x-1.5 flex items-center justify-between gap-2 z-10">
+          <span className="px-1.5 py-0.5 rounded bg-[#131722]/90 border border-[#272A32] font-mono text-[8px] text-[#7DF4FF] uppercase truncate">
+            {weapon.caliber}
+          </span>
+          <span
+            className={`px-1.5 py-0.5 rounded font-mono text-[8px] font-bold uppercase shrink-0 ${unlockBadge.className}`}
+          >
+            {unlockBadge.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Compact 2-Col Telemetry */}
+      <div className="rounded-lg bg-[#0E121B] border border-[#272A32] p-2 flex flex-col gap-1.5 shrink-0">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div>
+            <div className="flex items-center justify-between font-mono text-[9px]">
+              <span className="text-[#B9CACB] uppercase truncate">{t.fireRateLabel}</span>
+              <strong className="text-[#E1E2EC] shrink-0">
+                {weapon.fireRateLabel ?? `${stats.fireRate}/s`}
+              </strong>
+            </div>
+            <TelemetrySegmentBar ratio={rofRatio} accentHex="#00F0FF" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between font-mono text-[9px]">
+              <span className="text-[#B9CACB] uppercase truncate">{t.damageLabel}</span>
+              <strong className="text-[#E1E2EC] shrink-0">{stats.damage}</strong>
+            </div>
+            <TelemetrySegmentBar ratio={dmgRatio} accentHex="#FE9800" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#272A32]/80">
+          <div className="flex flex-col bg-[#131722] rounded px-2 py-1 border border-[#272A32]">
+            <span className="font-mono text-[8px] text-[#849495] uppercase truncate">
+              {t.projectileLabel}
+            </span>
+            <span className="font-mono text-[9px] font-bold text-[#E1E2EC] uppercase truncate">
+              {weapon.projectileLabel}
+            </span>
+          </div>
+          <div className="flex flex-col bg-[#131722] rounded px-2 py-1 border border-[#272A32]">
+            <span className="font-mono text-[8px] text-[#849495] uppercase truncate">
+              {t.tracerLabel}
+            </span>
+            <div className="flex items-center gap-1 min-w-0">
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: weapon.tracerHex }}
+              />
+              <span className="font-mono text-[9px] font-bold text-[#E1E2EC] uppercase truncate">
+                {weapon.tracerLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -250,7 +401,7 @@ export function MainMenu() {
       {/* ─── MAIN 3-COLUMN DECK ─── */}
       <div className="grid grid-cols-12 gap-2 md:gap-3 flex-1 min-h-0 items-stretch">
         {/* ══ COL 1: HERO SHOWCASE ══ */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 md:p-4 min-h-0 border border-[#272A32] gap-2">
+        <div className="col-span-12 lg:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 min-h-0 border border-[#272A32] gap-1.5">
           {/* Hero Header */}
           <div className="flex items-center justify-between pb-1 shrink-0">
             <div className="flex flex-col min-w-0">
@@ -287,7 +438,7 @@ export function MainMenu() {
           </div>
 
           {/* Hero Visual */}
-          <div className="relative flex-1 min-h-[160px] max-h-[220px] lg:max-h-[300px] rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
+          <div className="relative flex-1 min-h-[145px] max-h-[260px] rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/30 to-transparent z-10 pointer-events-none" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#00F0FF]/10 via-transparent to-transparent pointer-events-none z-10" />
             <div
@@ -298,7 +449,7 @@ export function MainMenu() {
               }}
             />
             <img
-              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+              className="w-full h-full object-cover object-[50%_20%] group-hover:scale-105 transition-transform duration-700"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBK1w-CrHDgTXVm1EE9RIsHWMwKEy_m10GuGE2KpVtouyCBI7tcRAvz5DY_njVbddr0YZPAqnDryPeqYBkmrojPcsgVZ27-eLbfwO3mSiHHmteAATJtXeKeexJf_VCMhWmJvIHSVYnlDxv9d-KsClvtrWWVTTQGB2MnGksN4oGA-IoNzBzlxEh5MjcZ39w0JJhJk7h4QG7D4rUY-L1RKRh-Dd8NRaHvutgBbNrDcDWw"
               alt="Cyber Mercenary"
               style={{ filter: "drop-shadow(0 0 24px rgba(0,240,255,0.25))" }}
@@ -384,12 +535,20 @@ export function MainMenu() {
             <button
               type="button"
               onClick={() => openArmory("ARSENAL")}
-              className="w-full py-2 rounded-lg bg-[#272A32] hover:bg-[#363941] text-[#00F0FF] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border border-[#3B494B] hover:border-[#00F0FF]/60 cursor-pointer"
+              className="w-full py-1.5 rounded-lg bg-[#272A32] hover:bg-[#363941] text-[#00F0FF] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border border-[#3B494B] hover:border-[#00F0FF]/60 cursor-pointer"
             >
               <span>⚙</span>
               <span>{trans.lobby.customizeLoadout}</span>
             </button>
           </div>
+
+          <LobbyWeaponShowcase
+            weapon={equippedWeapon}
+            level={equippedWeaponLevel}
+            chapterMet={saveData.unlockedChapter >= equippedWeapon.unlockChapter}
+            isOwned={saveData.unlockedWeaponIds.includes(equippedWeapon.id)}
+            t={trans.armory}
+          />
 
           {authError && (
             <div className="px-2.5 py-1.5 rounded bg-[#93000A]/30 border border-[#FFB4AB]/40 font-mono text-[10px] text-[#FFB4AB] shrink-0">
