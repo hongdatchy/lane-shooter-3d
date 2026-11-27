@@ -58,6 +58,7 @@ const getCurrentTrans = () => getTranslation(useAppStore.getState().locale);
 
 export type MenuScreen = "LOBBY" | "WORLD_MAP" | "ARMORY";
 export type ArmoryTab = "UPGRADES" | "PETS" | "ARSENAL";
+export type MobileLobbyTab = "hero" | "battle" | "intel";
 
 interface PendingGuestMatch {
   sessionId: number;
@@ -73,6 +74,7 @@ interface PendingGuestMatch {
 interface GameState {
   gameStatus: GameStatus;
   menuScreen: MenuScreen;
+  mobileLobbyTab: MobileLobbyTab;
   previousMenuScreen: "LOBBY" | "WORLD_MAP";
   armoryTab: ArmoryTab;
   armorySaving: boolean;
@@ -201,6 +203,7 @@ interface GameActions {
   openLobby: () => void;
   openArmory: (tab?: ArmoryTab) => void;
   closeArmory: () => void;
+  setMobileLobbyTab: (tab: MobileLobbyTab) => void;
   setArmoryTab: (tab: ArmoryTab) => void;
   unlockArmoryWeapon: (weaponId: string) => Promise<void>;
   assignWeaponToLoadout: (weaponId: string, slotIndex?: number) => Promise<void>;
@@ -555,6 +558,7 @@ function syncPostMatchOutcome(input: {
 export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   gameStatus: "MENU",
   menuScreen: "LOBBY",
+  mobileLobbyTab: "battle",
   previousMenuScreen: "LOBBY",
   armoryTab: "ARSENAL",
   armorySaving: false,
@@ -898,6 +902,8 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     set((state) => ({
       menuScreen: state.previousMenuScreen,
     })),
+
+  setMobileLobbyTab: (tab) => set({ mobileLobbyTab: tab }),
 
   setArmoryTab: (tab) => set({ armoryTab: tab }),
 

@@ -96,8 +96,13 @@ function WeaponGridCard({
   isEquipped,
   chapterMet,
   isOwned,
+  canAffordUnlock,
+  canPersist,
+  armorySaving,
   t,
   onSelect,
+  onEquip,
+  onUnlock,
 }: {
   weapon: ArmoryWeaponSpec;
   level: number;
@@ -105,8 +110,13 @@ function WeaponGridCard({
   isEquipped: boolean;
   chapterMet: boolean;
   isOwned: boolean;
+  canAffordUnlock: boolean;
+  canPersist: boolean;
+  armorySaving: boolean;
   t: TranslationData["armory"];
   onSelect: () => void;
+  onEquip: () => void;
+  onUnlock: () => void;
 }) {
   const stats = getWeaponStatsAtLevel(weapon, level);
   const rofText = weapon.fireRateLabel ?? `${stats.fireRate}/s`;
@@ -114,9 +124,16 @@ function WeaponGridCard({
   const isUsable = chapterMet && isOwned;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={`group text-left rounded-xl p-2.5 transition-all flex flex-col gap-2 border relative overflow-hidden cursor-pointer ${
         isSelected
           ? "bg-[#192334] border-[#00F0FF] shadow-[0_0_22px_rgba(0,240,255,0.28)]"
@@ -221,7 +238,64 @@ function WeaponGridCard({
           </span>
         </div>
       </div>
-    </button>
+
+      {/* Inline quick-action when card is selected */}
+      {isSelected && (
+        <div className="pt-1 border-t border-[#272A32]/80">
+          {!chapterMet ? (
+            <div className="w-full py-1.5 px-2 rounded-lg bg-[#272A32] border border-[#3B494B] font-mono text-[10px] font-bold text-[#849495] uppercase flex items-center justify-center gap-1">
+              <Lock className="w-3 h-3" />
+              <span className="truncate">
+                {formatText(t.lockedChapter, { ch: weapon.unlockChapter })}
+              </span>
+            </div>
+          ) : !isOwned ? (
+            <button
+              type="button"
+              disabled={!canAffordUnlock || !canPersist}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUnlock();
+              }}
+              className={`w-full py-1.5 px-2 rounded-lg font-mono text-[10px] font-bold uppercase flex items-center justify-center gap-1 transition-colors ${
+                canAffordUnlock && canPersist
+                  ? "bg-[#FE9800] hover:bg-[#FFB03B] text-[#140B00] cursor-pointer"
+                  : "bg-[#272A32] text-[#FFB4AB] border border-[#93000A]/60 cursor-not-allowed opacity-85"
+              }`}
+            >
+              <Coins className="w-3 h-3 shrink-0" />
+              <span className="truncate">
+                {armorySaving
+                  ? t.savingBtn
+                  : formatText(t.buyCostShort, {
+                      cost: weapon.unlockCost.toLocaleString(),
+                    })}
+              </span>
+            </button>
+          ) : inLoadout ? (
+            <div className="w-full py-1.5 px-2 rounded-lg bg-[#00F0FF]/18 border border-[#00F0FF]/65 text-[#00F0FF] font-mono text-[10px] font-bold uppercase flex items-center justify-center gap-1">
+              <Check className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+              <span className="truncate">{t.inLoadoutBadge}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={!canPersist}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEquip();
+              }}
+              className="w-full py-1.5 px-2 rounded-lg bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-[10px] font-bold uppercase flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.28)] disabled:opacity-50"
+            >
+              <Crosshair className="w-3 h-3 shrink-0" />
+              <span className="truncate">
+                {armorySaving ? t.savingBtn : t.addToLoadoutBtn}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -362,7 +436,7 @@ export function ArmoryScreen() {
   }
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#0A0D14] text-[#E1E2EC] relative overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] select-none">
+    <div className="w-full flex-1 flex flex-col bg-[#0A0D14] text-[#E1E2EC] relative overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] pb-16 lg:pb-0 select-none">
       {/* Subtle tactical backdrop */}
       <div
         className="absolute inset-0 opacity-15 pointer-events-none"
@@ -627,7 +701,7 @@ export function ArmoryScreen() {
             </div>
 
             {/* Scrollable 20-Weapon Grid */}
-            <div className="flex-1 min-h-0 lg:overflow-y-auto pr-0.5">
+            <div className="flex-1 min-h-0 lg:overflow-y-auto pr-0.5 cyber-scroll">
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 pb-2">
                 {filteredWeapons.map((weapon) => (
                   <WeaponGridCard
@@ -638,16 +712,21 @@ export function ArmoryScreen() {
                     isEquipped={equippedWeapon.id === weapon.id}
                     chapterMet={saveData.unlockedChapter >= weapon.unlockChapter}
                     isOwned={ownedWeaponSet.has(weapon.id)}
+                    canAffordUnlock={saveData.gold >= weapon.unlockCost}
+                    canPersist={canPersist}
+                    armorySaving={armorySaving}
                     t={t}
                     onSelect={() => handleSelectWeapon(weapon.id)}
+                    onEquip={() => void assignWeaponToLoadout(weapon.id)}
+                    onUnlock={() => void unlockArmoryWeapon(weapon.id)}
                   />
                 ))}
               </div>
             </div>
           </div>
 
-          {/* ══ RIGHT COLUMN (1/3): WEAPON INSPECTION VAULT ══ */}
-          <div className="col-span-12 lg:col-span-4 bg-[#131722] border border-[#272A32] rounded-xl p-3.5 flex flex-col gap-3 min-h-0 lg:overflow-y-auto">
+          {/* ══ RIGHT COLUMN (1/3): WEAPON INSPECTION VAULT (first on mobile so stats & equip are immediately visible) ══ */}
+          <div className="order-first lg:order-none col-span-12 lg:col-span-4 bg-[#131722] border border-[#272A32] rounded-xl p-3.5 flex flex-col gap-3 min-h-0 lg:overflow-y-auto cyber-scroll">
             <WeaponInspectionPanel
               weapon={inspectedWeapon}
               level={inspectedLevel}

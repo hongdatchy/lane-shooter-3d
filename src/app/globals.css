@@ -198,3 +198,27 @@
     animation: none !important;
   }
 }
+
+/* ─── Cyber Custom Scrollbar ─────────────────────────────────────────────────
+   Dùng class .cyber-scroll trên bất kỳ container nào có overflow-y-auto/scroll
+   để thay thế thanh cuộn mặc định bằng thanh kiểu cyber/dark.
+   Firefox dùng scrollbar-color; Webkit dùng ::-webkit-scrollbar-*.
+─────────────────────────────────────────────────────────────────────────────── */
+.cyber-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #00F0FF33 transparent;
+}
+.cyber-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.cyber-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cyber-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00F0FF55 0%, #00F0FF22 100%);
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+.cyber-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #00F0FFaa 0%, #00F0FF55 100%);
+}

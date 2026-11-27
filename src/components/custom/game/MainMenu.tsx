@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Gauge, GitFork, Lock, Play, Radar, Rocket, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
+import { Gauge, GitFork, Lock, Play, Radar, Rocket, ShieldCheck, Wrench } from "lucide-react";
 import { useGameStore } from "@/state-manager/game-store";
 import { LeaderboardEntryDTO } from "@/dto/GameDTO";
 import { startBackgroundPreload } from "@/service/asset-preloader";
@@ -130,19 +130,15 @@ function LobbyWeaponShowcase({
   chapterMet,
   isOwned,
   t,
+  onOpen,
 }: {
   weapon: ArmoryWeaponSpec;
   level: number;
   chapterMet: boolean;
   isOwned: boolean;
   t: TranslationData["armory"];
+  onOpen?: () => void;
 }) {
-  const [inspectAngleDeg, setInspectAngleDeg] = useState(0);
-
-  useEffect(() => {
-    setInspectAngleDeg(0);
-  }, [weapon.id]);
-
   const { clampedLevel, stats, rofRatio, dmgRatio } = computeWeaponTelemetry(
     weapon,
     level
@@ -150,7 +146,13 @@ function LobbyWeaponShowcase({
   const unlockBadge = getWeaponUnlockBadge(weapon, chapterMet, isOwned, t);
 
   return (
-    <div className="rounded-xl bg-[#131722] border border-[#272A32] p-2.5 flex flex-col gap-1.5 shrink-0">
+    <div
+      className={`rounded-xl bg-[#131722] border border-[#272A32] p-2.5 flex flex-col gap-1.5 shrink-0 ${onOpen ? "cursor-pointer hover:border-[#00F0FF]/40 hover:bg-[#161b28] transition-colors" : ""}`}
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={onOpen ? (e) => e.key === "Enter" && onOpen() : undefined}
+    >
       {/* Compact Header */}
       <div className="flex items-center justify-between gap-2 pb-1 border-b border-[#272A32]/80">
         <div className="flex items-baseline gap-2 min-w-0">
@@ -185,24 +187,8 @@ function LobbyWeaponShowcase({
         <img
           src={getWeaponImageUrl(weapon, true)}
           alt={weapon.name}
-          className="w-full h-full object-cover object-center transition-transform duration-500"
-          style={{
-            transform: `perspective(900px) rotateY(${inspectAngleDeg}deg) scale(${
-              inspectAngleDeg === 0 ? 1 : 1.04
-            })`,
-          }}
+          className="w-full h-full object-cover object-center"
         />
-
-        <button
-          type="button"
-          onClick={() =>
-            setInspectAngleDeg((prev) => (prev === 0 ? -16 : prev < 0 ? 16 : 0))
-          }
-          className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded bg-[#131722]/90 hover:bg-[#272A32] border border-[#3B494B] font-mono text-[9px] font-bold text-[#00F0FF] uppercase flex items-center gap-1 transition-colors cursor-pointer"
-        >
-          <RotateCcw className="w-2.5 h-2.5" />
-          <span>{inspectAngleDeg === 0 ? t.inspect360 : t.resetView}</span>
-        </button>
 
         <div className="absolute bottom-1.5 inset-x-1.5 flex items-center justify-between gap-2 z-10">
           <span className="px-1.5 py-0.5 rounded bg-[#131722]/90 border border-[#272A32] font-mono text-[8px] text-[#7DF4FF] uppercase truncate">
@@ -301,6 +287,7 @@ export function MainMenu() {
   const setAssetsWaitingToStart = useGameStore((s) => s.setAssetsWaitingToStart);
 
   const [isLocalEnv, setIsLocalEnv] = useState(false);
+  const mobileTab = useGameStore((s) => s.mobileLobbyTab);
 
   useEffect(() => {
     setIsLocalEnv(isLocalDevEnvironment());
@@ -366,7 +353,7 @@ export function MainMenu() {
   }, [handleDeploy]);
 
   return (
-    <div className="w-full flex-1 flex flex-col overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none">
+    <div className="w-full flex-1 flex flex-col overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none pb-16 lg:pb-3">
       {/* Platform / Save Fatal Error Bar (Zero Fallback) */}
       {(platformError || (player && (saveError || scoreSyncError))) && (
         <div className="px-3 py-2 rounded-lg bg-[#93000A]/35 border border-[#FFB4AB]/40 font-mono text-[11px] text-[#FFB4AB] shrink-0">
@@ -401,7 +388,7 @@ export function MainMenu() {
       {/* ─── MAIN 3-COLUMN DECK ─── */}
       <div className="grid grid-cols-12 gap-2 md:gap-3 flex-1 min-h-0 items-stretch">
         {/* ══ COL 1: HERO SHOWCASE ══ */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 min-h-0 border border-[#272A32] gap-1.5">
+        <div className={`col-span-12 lg:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 min-h-0 border border-[#272A32] gap-1.5${mobileTab !== "hero" ? " hidden lg:flex" : ""}`}>
           {/* Hero Header */}
           <div className="flex items-center justify-between pb-1 shrink-0">
             <div className="flex flex-col min-w-0">
@@ -438,7 +425,7 @@ export function MainMenu() {
           </div>
 
           {/* Hero Visual */}
-          <div className="relative flex-1 min-h-[145px] max-h-[260px] rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
+          <div className="relative min-h-[145px] max-h-[220px] lg:flex-1 lg:max-h-none rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/30 to-transparent z-10 pointer-events-none" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#00F0FF]/10 via-transparent to-transparent pointer-events-none z-10" />
             <div
@@ -454,22 +441,6 @@ export function MainMenu() {
               alt="Cyber Mercenary"
               style={{ filter: "drop-shadow(0 0 24px rgba(0,240,255,0.25))" }}
             />
-            {/* Weapon badge */}
-            <button
-              type="button"
-              onClick={() => openArmory("ARSENAL")}
-              className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#32353D]/90 hover:bg-[#3A3E48] border border-[#3B494B] hover:border-[#00F0FF]/60 backdrop-blur-md shadow-lg transition-colors cursor-pointer"
-            >
-              <span className="text-[#FE9800] text-sm">⚔</span>
-              <div className="flex flex-col text-right">
-                <span className="font-mono text-[10px] text-[#FE9800] tracking-wider uppercase max-w-[160px] truncate">
-                  {equippedWeapon.name}
-                </span>
-                <span className="font-mono text-[9px] text-[#B9CACB]">
-                  {trans.lobby.weaponLoadoutCount} · LV.{equippedWeaponLevel}
-                </span>
-              </div>
-            </button>
             {/* Bottom strip */}
             <div className="absolute bottom-2 inset-x-3 z-20 flex items-center justify-between px-2 py-1 rounded bg-[#272A32]/80 backdrop-blur-md">
               <span className="font-mono text-[10px] text-[#B9CACB]">
@@ -511,36 +482,25 @@ export function MainMenu() {
             />
           </div>
 
-          {/* Account Action / Loadout CTA */}
-          <div className="flex flex-col gap-1.5 shrink-0">
-            {!player && profileLoaded && platformReady && platformCapabilities?.supportsLoginPrompt && (
-              <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  disabled={authLoading}
-                  onClick={() => void loginWithPlatform()}
-                  className="w-full py-2 rounded-lg bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border border-[#00F0FF]/50 cursor-pointer disabled:opacity-50"
-                >
-                  <span>🔐</span>
-                  <span>{authLoading ? trans.lobby.authenticating : loginButtonLabel}</span>
-                </button>
-                <span className="font-mono text-[9px] text-[#B9CACB] text-center">
-                  {platformCapabilities.supportsGuestPersistence
-                    ? trans.lobby.guestHintCrazyGames
-                    : trans.lobby.guestHintWeb}
-                </span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => openArmory("ARSENAL")}
-              className="w-full py-1.5 rounded-lg bg-[#272A32] hover:bg-[#363941] text-[#00F0FF] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border border-[#3B494B] hover:border-[#00F0FF]/60 cursor-pointer"
-            >
-              <span>⚙</span>
-              <span>{trans.lobby.customizeLoadout}</span>
-            </button>
-          </div>
+          {/* Account Action / Login CTA (guests only) */}
+          {!player && profileLoaded && platformReady && platformCapabilities?.supportsLoginPrompt && (
+            <div className="flex flex-col gap-1 shrink-0">
+              <button
+                type="button"
+                disabled={authLoading}
+                onClick={() => void loginWithPlatform()}
+                className="w-full py-2 rounded-lg bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF] font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all border border-[#00F0FF]/50 cursor-pointer disabled:opacity-50"
+              >
+                <span>🔐</span>
+                <span>{authLoading ? trans.lobby.authenticating : loginButtonLabel}</span>
+              </button>
+              <span className="font-mono text-[9px] text-[#B9CACB] text-center">
+                {platformCapabilities.supportsGuestPersistence
+                  ? trans.lobby.guestHintCrazyGames
+                  : trans.lobby.guestHintWeb}
+              </span>
+            </div>
+          )}
 
           <LobbyWeaponShowcase
             weapon={equippedWeapon}
@@ -548,6 +508,7 @@ export function MainMenu() {
             chapterMet={saveData.unlockedChapter >= equippedWeapon.unlockChapter}
             isOwned={saveData.unlockedWeaponIds.includes(equippedWeapon.id)}
             t={trans.armory}
+            onOpen={() => openArmory("ARSENAL")}
           />
 
           {authError && (
@@ -558,7 +519,7 @@ export function MainMenu() {
         </div>
 
         {/* ══ COL 2: MISSION TERMINAL & 2 MODES ══ */}
-        <div className="col-span-12 lg:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32] gap-2.5">
+        <div className={`col-span-12 lg:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32] gap-2.5${mobileTab !== "battle" ? " hidden lg:flex" : ""}`}>
           {/* Sector info bar */}
           <div className="flex items-center justify-between pb-1 shrink-0 gap-2">
             <div className="flex flex-col min-w-0">
@@ -1146,7 +1107,7 @@ export function MainMenu() {
         </div>
 
         {/* ══ COL 3: INTEL & LEADERBOARD ══ */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col bg-[#191B23] rounded-xl p-3 md:p-4 min-h-0 gap-3 border border-[#272A32]">
+        <div className={`col-span-12 lg:col-span-3 flex flex-col bg-[#191B23] rounded-xl p-3 md:p-4 min-h-0 gap-3 border border-[#272A32]${mobileTab !== "intel" ? " hidden lg:flex" : ""}`}>
           {/* Tactical Contracts */}
           <div className="shrink-0">
             <div className="flex items-center justify-between pb-2 border-b border-[#3B494B]/40">
@@ -1228,7 +1189,7 @@ export function MainMenu() {
               </div>
             </div>
 
-            <div className="flex flex-col flex-1 min-h-0 max-h-[360px] lg:max-h-none divide-y divide-[#3B494B]/20 overflow-y-auto pr-1 my-1">
+            <div className="flex flex-col flex-1 min-h-0 max-h-[360px] lg:max-h-none divide-y divide-[#3B494B]/20 overflow-y-auto pr-1 my-1 cyber-scroll">
               {leaderboardError ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-3 text-center gap-1">
                   <span className="font-mono text-[11px] font-bold text-[#FFB4AB]">
@@ -1364,6 +1325,5 @@ export function MainMenu() {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 }
