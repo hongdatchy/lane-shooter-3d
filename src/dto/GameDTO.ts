@@ -9,6 +9,8 @@ export type EnemyKind =
   | "SHELL_BRUTE"
   | "DASHER"
   | "BLOATER"
+  | "WRAITH"
+  | "REGEN_BEAST"
   | "BOSS";
 
 export type EnemyVisualKind =
@@ -18,9 +20,12 @@ export type EnemyVisualKind =
   | "SHELL_BRUTE"
   | "DASHER"
   | "BLOATER"
+  | "WRAITH"
+  | "REGEN_BEAST"
   | "BOSS_STAGE1"
   | "BOSS_STAGE2"
-  | "BOSS_STAGE3";
+  | "BOSS_STAGE3"
+  | "BOSS_STAGE4";
 
 export type WeaponModelKindDTO = "pistol" | "ak-rifle" | "machine-gun" | "cannon" | "icbm";
 

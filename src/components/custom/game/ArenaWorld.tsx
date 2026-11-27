@@ -47,6 +47,35 @@ interface ChapterPoolSlots {
 }
 
 function getChapterPoolSlots(chapterId: number): ChapterPoolSlots {
+  if (chapterId === 4) {
+    return {
+      getSlotKind(idx: number): EnemyKind {
+        if (idx >= BOSS_POOL_START) return "BOSS";
+        if (idx >= 32) return "BLOATER";
+        if (idx >= 16) return "REGEN_BEAST";
+        return "WRAITH";
+      },
+      getVisualKind(idx: number): EnemyVisualKind {
+        if (idx >= BOSS_POOL_START) return "BOSS_STAGE4";
+        if (idx >= 32) return "BLOATER";
+        if (idx >= 16) return "REGEN_BEAST";
+        return "WRAITH";
+      },
+      getRange(kind: EnemyKind): readonly [number, number] {
+        switch (kind) {
+          case "BOSS":
+            return [BOSS_POOL_START, BOSS_POOL_END];
+          case "BLOATER":
+            return [32, 48];
+          case "REGEN_BEAST":
+            return [16, 32];
+          default:
+            return [0, 16];
+        }
+      },
+    };
+  }
+
   if (chapterId === 3) {
     return {
       getSlotKind(idx: number): EnemyKind {
@@ -156,6 +185,8 @@ const ENEMY_DEATH_DURATION: Record<EnemyKind, number> = {
   SHELL_BRUTE: 1.5,
   DASHER: 1.75,
   BLOATER: 1.5,
+  WRAITH: 1.1,
+  REGEN_BEAST: 1.4,
   BOSS: 2.5,
 };
 
@@ -243,6 +274,16 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const boss2TelegraphLineRef = useRef<THREE.Group>(null);
   const boss2TelegraphRingRef = useRef<THREE.Mesh>(null);
   const boss2BeamRef = useRef<THREE.Group>(null);
+  const boss4ShieldRef = useRef<{
+    active: boolean;
+    nextIsShield: boolean;
+    reflectHits: number;
+  }>({
+    active: false,
+    nextIsShield: true,
+    reflectHits: 0,
+  });
+  const boss4ShieldMeshRef = useRef<THREE.Group>(null);
   const vortexMeshRef = useRef<THREE.Group>(null);
   const falloutMeshRefs = useRef<(THREE.Group | null)[]>([]);
   const strikeGroupRefs = useRef<(THREE.Group | null)[]>([]);
@@ -437,6 +478,12 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     };
     if (boss2TelegraphRef.current) boss2TelegraphRef.current.visible = false;
     if (boss2BeamRef.current) boss2BeamRef.current.visible = false;
+    boss4ShieldRef.current = {
+      active: false,
+      nextIsShield: true,
+      reflectHits: 0,
+    };
+    if (boss4ShieldMeshRef.current) boss4ShieldMeshRef.current.visible = false;
 
     enemiesPoolRef.current.forEach((enemy, idx) => {
       enemy.active = false;
@@ -643,18 +690,22 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       storeForKill.finalizeDevMatchTiming(simElapsedRef.current);
     }
     const scorePts = isBoss
-      ? activeCh === 3
-        ? 1400
-        : activeCh === 2
-          ? 900
-          : 500
-      : enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE"
+      ? activeCh === 4
+        ? 2000
+        : activeCh === 3
+          ? 1400
+          : activeCh === 2
+            ? 900
+            : 500
+      : enemy.kind === "ELITE" || enemy.kind === "SHELL_BRUTE" || enemy.kind === "REGEN_BEAST"
         ? 30
-        : isBloater
-          ? 20
-          : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
-            ? 15
-            : 10;
+        : enemy.kind === "WRAITH"
+          ? 25
+          : isBloater
+            ? 20
+            : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
+              ? 15
+              : 10;
     storeForKill.registerEnemyKill(scorePts, countsTowardStage);
 
     // Khi Boss chết, dọn các quái con triệu hồi còn sống để kết màn sạch sẽ
@@ -662,6 +713,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       boss2LaserRef.current.mode = "NONE";
       if (boss2TelegraphRef.current) boss2TelegraphRef.current.visible = false;
       if (boss2BeamRef.current) boss2BeamRef.current.visible = false;
+      boss4ShieldRef.current.active = false;
+      if (boss4ShieldMeshRef.current) boss4ShieldMeshRef.current.visible = false;
       const enemies = enemiesPoolRef.current;
       for (let m = 0; m < BOSS_POOL_START; m++) {
         const minion = enemies[m];
@@ -713,6 +766,40 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     particleCount?: number
   ): void => {
     if (!enemy.active || enemy.dying) return;
+    if (enemy.kind === "REGEN_BEAST") {
+      enemy.attackCooldown = 2.0; // Reset bộ đếm 2s không trúng đạn mới hồi máu
+    }
+    if (
+      enemy.kind === "BOSS" &&
+      useGameStore.getState().activeChapter === 4 &&
+      boss4ShieldRef.current.active
+    ) {
+      // Boss 4 (Solar Vanguard) bật khiên Solar Aegis: giảm 85% sát thương và phản đạn ngược về người chơi
+      enemy.hp -= rawDamage * 0.15;
+      enemy.hitFlash = Math.max(enemy.hitFlash, 0.08);
+      boss4ShieldRef.current.reflectHits += 1;
+      spawnParticles(enemy.x, 1.8, enemy.z + 1.5, "#fbbf24", 4, 0.85);
+      if (boss4ShieldRef.current.reflectHits % 3 === 0) {
+        soundService.play("hitCrate");
+        spawnEnemyProjectile(
+          enemy.x + (Math.random() - 0.5) * 1.2,
+          1.75,
+          enemy.z + 1.6,
+          THREE.MathUtils.clamp(
+            runtimeRef.current.playerX + (Math.random() - 0.5) * 0.8,
+            ARENA_CONFIG.playerMinX,
+            ARENA_CONFIG.playerMaxX
+          ),
+          ARENA_CONFIG.playerZ,
+          POISON_PROJECTILE_SPEED * 1.25,
+          "#fbbf24"
+        );
+      }
+      if (enemy.hp <= 0) {
+        killEnemy(enemyIdx, enemy, { grantRage, particleCount });
+      }
+      return;
+    }
     if (enemy.kind === "SHELL_BRUTE" && enemy.shellArmorHp > 0 && !enemy.armorBroken) {
       enemy.hp -= rawDamage * 0.4;
       enemy.shellArmorHp -= rawDamage;
@@ -1826,6 +1913,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           const e = enemies[j];
           if (!e.active || e.dying) continue;
           if (e.id === b.lastHitEnemyId || e.id === b.secondLastHitEnemyId) continue;
+          // Quái #7 (Wraith): tàng hình 2s mỗi 5s, đạn xuyên qua không trúng khi đang ẩn
+          if (e.kind === "WRAITH" && (simElapsedRef.current + e.phase) % 5.0 < 2.0) continue;
 
           const tProj =
             segLenSq > 0
@@ -2290,6 +2379,86 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
                 spawnParticles(e.x - 0.55, 2.05, e.z + 1.0, "#38bdf8", 10, 0.8);
               }
             }
+          } else if (e.kind === "BOSS" && store.activeChapter === 4) {
+            // Boss 4 (Solar Vanguard): xen kẽ Solar Aegis (dựng khiên phản đòn) & Solar Lance (bắn 3 tia mặt trời)
+            if (e.castTimer > 0) {
+              e.castTimer = Math.max(0, e.castTimer - delta * freezeFactor);
+              if (boss4ShieldRef.current.active) {
+                if (Math.random() < 0.35) {
+                  spawnParticles(
+                    e.x + (Math.random() - 0.5) * 2.2,
+                    1.6 + Math.random() * 1.2,
+                    e.z + 1.4,
+                    "#fbbf24",
+                    1,
+                    0.8
+                  );
+                }
+                if (e.castTimer <= 0) {
+                  boss4ShieldRef.current.active = false;
+                  boss4ShieldRef.current.nextIsShield = false;
+                  e.attackCooldown = 2.4 + Math.random() * 0.6;
+                }
+              } else {
+                if (!e.castFired && e.castTimer <= 0.7) {
+                  e.castFired = true;
+                  const muzzleX = e.x + 0.65;
+                  const muzzleY = 2.0;
+                  const muzzleZ = e.z + 1.2;
+                  spawnParticles(muzzleX, muzzleY, muzzleZ, "#f59e0b", 18, 1.3);
+                  soundService.play("shootCannon");
+                  for (const offsetX of [-1.05, 0, 1.05]) {
+                    spawnEnemyProjectile(
+                      muzzleX,
+                      muzzleY,
+                      muzzleZ,
+                      THREE.MathUtils.clamp(
+                        runtimeRef.current.playerX + offsetX,
+                        ARENA_CONFIG.playerMinX,
+                        ARENA_CONFIG.playerMaxX
+                      ),
+                      ARENA_CONFIG.playerZ,
+                      POISON_PROJECTILE_SPEED * 1.12 * freezeFactor,
+                      "#f59e0b"
+                    );
+                  }
+                }
+                if (e.castTimer <= 0) {
+                  enemyUnitRefs.current[i]?.setMode("WALK");
+                  boss4ShieldRef.current.nextIsShield = true;
+                  e.attackCooldown = 2.4 + Math.random() * 0.6;
+                }
+              }
+            } else if (
+              e.z > ARENA_CONFIG.spawnZ + 0.8 &&
+              e.z < ARENA_CONFIG.defenseLineZ - 4.5
+            ) {
+              e.attackCooldown -= delta * freezeFactor;
+              if (e.attackCooldown <= 0) {
+                if (boss4ShieldRef.current.nextIsShield) {
+                  boss4ShieldRef.current.active = true;
+                  boss4ShieldRef.current.reflectHits = 0;
+                  e.castTimer = 2.5;
+                  e.castFired = true;
+                  spawnParticles(e.x, 1.8, e.z + 1.5, "#fbbf24", 16, 1.2);
+                } else {
+                  boss4ShieldRef.current.active = false;
+                  e.castTimer = 1.4;
+                  e.castFired = false;
+                  enemyUnitRefs.current[i]?.setMode("ATTACK", 1.4);
+                  spawnParticles(e.x + 0.65, 2.0, e.z + 1.1, "#f59e0b", 10, 0.85);
+                }
+              }
+            }
+          } else if (e.kind === "REGEN_BEAST") {
+            // Quái #8 (Regen Beast): tự hồi 4 HP/s nếu không bị bắn trúng trong 2s liên tiếp
+            e.attackCooldown = Math.max(0, e.attackCooldown - delta);
+            if (e.attackCooldown <= 0 && e.hp > 0 && e.hp < e.maxHp) {
+              e.hp = Math.min(e.maxHp, e.hp + 4 * delta);
+              if (Math.random() < 0.25) {
+                spawnParticles(e.x, 1.0 * e.scale, e.z, "#4ade80", 1, 0.55);
+              }
+            }
           }
         }
         if (Math.abs(e.knockbackVx) > 0.01 || Math.abs(e.knockbackVz) > 0.01) {
@@ -2589,6 +2758,36 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         const ratio = Math.max(0.01, e.hp / e.maxHp);
         hpFill.scale.x = ratio;
         hpFill.position.x = -(1 - ratio) * 0.55;
+      }
+
+      if (!e.dying && e.kind === "WRAITH") {
+        const isStealth = (simElapsedRef.current + e.phase) % 5.0 < 2.0;
+        if (isStealth) {
+          slot.scale.setScalar(e.scale * (0.42 + 0.08 * Math.sin(elapsed * 20)));
+          if (hpGroup) hpGroup.visible = false;
+        }
+      }
+    }
+
+    // Đồng bộ khiên Solar Aegis của Boss 4 (Solar Vanguard)
+    if (boss4ShieldMeshRef.current) {
+      let activeBoss4: EnemyEntity | null = null;
+      if (boss4ShieldRef.current.active) {
+        for (let i = BOSS_POOL_START; i < BOSS_POOL_END; i++) {
+          const cand = enemies[i];
+          if (cand.active && !cand.dying && cand.kind === "BOSS") {
+            activeBoss4 = cand;
+            break;
+          }
+        }
+      }
+      if (activeBoss4 && boss4ShieldRef.current.active) {
+        boss4ShieldMeshRef.current.visible = true;
+        boss4ShieldMeshRef.current.position.set(activeBoss4.x, 2.1, activeBoss4.z + 1.85);
+        const sPulse = 1 + 0.06 * Math.sin(elapsed * 12);
+        boss4ShieldMeshRef.current.scale.setScalar(sPulse);
+      } else {
+        boss4ShieldMeshRef.current.visible = false;
       }
     }
 
@@ -3143,6 +3342,32 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             color="#ef4444"
             transparent
             opacity={0.62}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+
+      {/* [BOSS 4 SOLAR VANGUARD] Khiên năng lượng Solar Aegis phản đạn */}
+      <group ref={boss4ShieldMeshRef} visible={false}>
+        <mesh>
+          <circleGeometry args={[2.35, 6]} />
+          <meshBasicMaterial
+            color="#f59e0b"
+            transparent
+            opacity={0.34}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh>
+          <ringGeometry args={[2.15, 2.45, 6]} />
+          <meshBasicMaterial
+            color="#fde047"
+            transparent
+            opacity={0.92}
+            side={THREE.DoubleSide}
             depthWrite={false}
             toneMapped={false}
           />

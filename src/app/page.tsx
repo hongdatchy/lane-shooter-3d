@@ -131,7 +131,7 @@ export default function HomePage() {
   }, [gameStatus, wave, activeChapter, showBootSplash]);
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col bg-[#0A0D14] lg:overflow-hidden">
+    <div className="min-h-screen md:h-screen flex flex-col bg-[#0A0D14] md:overflow-hidden">
       {/* Header visible on standard MENU after first-run check */}
       {!isInGame && !showBootSplash && !showFirstRunGate && <GameHeader />}
 
@@ -168,7 +168,7 @@ export default function HomePage() {
         !showBootSplash &&
         !showFirstRunGate &&
         (menuScreen === "LOBBY" || menuScreen === "ARMORY") && (
-          <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-[#111318]/95 backdrop-blur-md border-t border-[#272A32] h-14 px-2">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-[#111318]/95 backdrop-blur-md border-t border-[#272A32] h-14 px-2">
             {(
               [
                 { id: "hero", icon: <User className="w-5 h-5" />, label: trans.lobby.navHero },

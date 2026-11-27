@@ -73,6 +73,16 @@ export const ENEMY_MODEL_CONFIG: Record<EnemyVisualKind, EnemyModelSpec> = {
     rotationY: 0,
     targetHeight: 1.05,
   },
+  WRAITH: {
+    walkFile: "enemies/wraith.glb",
+    rotationY: 0,
+    targetHeight: 1.15,
+  },
+  REGEN_BEAST: {
+    walkFile: "enemies/regen_beast.glb",
+    rotationY: 0,
+    targetHeight: 1.2,
+  },
   BOSS_STAGE1: {
     walkFile: "bosses/stage1/iron-warden-mechanical.glb",
     rotationY: 0,
@@ -85,6 +95,11 @@ export const ENEMY_MODEL_CONFIG: Record<EnemyVisualKind, EnemyModelSpec> = {
   },
   BOSS_STAGE3: {
     walkFile: "bosses/stage3/chien-binh-thoi-gian-v2.glb",
+    rotationY: 0,
+    targetHeight: 1.35,
+  },
+  BOSS_STAGE4: {
+    walkFile: "bosses/stage4/solar-vanguard-v2.glb",
     rotationY: 0,
     targetHeight: 1.35,
   },

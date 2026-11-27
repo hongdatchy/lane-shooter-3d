@@ -319,12 +319,122 @@ export const STAGE_CATALOG_CH3: StageConfigDTO[] = [
   },
 ];
 
-export const MAX_PLAYABLE_CHAPTER = 3;
+// Cấu hình Cửa 4 (6 Wave): Quy tắc 2 quái mới (#7 Wraith, #8 Regen Beast) + 1 quái màn trước (#6 Bloater) -> Boss 4 (Solar Vanguard)
+export const STAGE_CATALOG_CH4: StageConfigDTO[] = [
+  {
+    stage: 1,
+    targetKills: 26,
+    normalSpeed: 3.7,
+    eliteSpeed: 3.6,
+    normalHp: 30,
+    eliteHp: 22,
+    normalScale: 1.2,
+    eliteScale: 1.28,
+    eliteChance: 0,
+    spawnMinInterval: 0.6,
+    spawnMaxInterval: 0.92,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "BLOATER", weight: 0.4, hp: 30, speed: 3.7, scale: 1.28 },
+      { kind: "WRAITH", weight: 0.6, hp: 22, speed: 4.1, scale: 1.18 },
+    ],
+  },
+  {
+    stage: 2,
+    targetKills: 32,
+    normalSpeed: 4.3,
+    eliteSpeed: 4.3,
+    normalHp: 24,
+    eliteHp: 24,
+    normalScale: 1.18,
+    eliteScale: 1.18,
+    eliteChance: 0,
+    spawnMinInterval: 0.5,
+    spawnMaxInterval: 0.8,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "WRAITH", weight: 1, hp: 24, speed: 4.3, scale: 1.18 },
+    ],
+  },
+  {
+    stage: 3,
+    targetKills: 28,
+    normalSpeed: 2.7,
+    eliteSpeed: 2.7,
+    normalHp: 46,
+    eliteHp: 46,
+    normalScale: 1.38,
+    eliteScale: 1.38,
+    eliteChance: 0,
+    spawnMinInterval: 0.58,
+    spawnMaxInterval: 0.9,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "REGEN_BEAST", weight: 1, hp: 46, speed: 2.7, scale: 1.38 },
+    ],
+  },
+  {
+    stage: 4,
+    targetKills: 38,
+    normalSpeed: 4.2,
+    eliteSpeed: 2.8,
+    normalHp: 26,
+    eliteHp: 50,
+    normalScale: 1.2,
+    eliteScale: 1.4,
+    eliteChance: 0,
+    spawnMinInterval: 0.5,
+    spawnMaxInterval: 0.8,
+    maxBatchSize: 3,
+    spawnPool: [
+      { kind: "BLOATER", weight: 0.3, hp: 34, speed: 3.7, scale: 1.3 },
+      { kind: "WRAITH", weight: 0.4, hp: 26, speed: 4.3, scale: 1.2 },
+      { kind: "REGEN_BEAST", weight: 0.3, hp: 50, speed: 2.8, scale: 1.4 },
+    ],
+  },
+  {
+    stage: 5,
+    targetKills: 44,
+    normalSpeed: 4.4,
+    eliteSpeed: 2.9,
+    normalHp: 28,
+    eliteHp: 56,
+    normalScale: 1.22,
+    eliteScale: 1.42,
+    eliteChance: 0,
+    spawnMinInterval: 0.46,
+    spawnMaxInterval: 0.74,
+    maxBatchSize: 4,
+    spawnPool: [
+      { kind: "BLOATER", weight: 0.3, hp: 36, speed: 3.8, scale: 1.32 },
+      { kind: "WRAITH", weight: 0.38, hp: 28, speed: 4.4, scale: 1.22 },
+      { kind: "REGEN_BEAST", weight: 0.32, hp: 56, speed: 2.9, scale: 1.42 },
+    ],
+  },
+  {
+    stage: 6,
+    targetKills: 1,
+    normalSpeed: 1.55,
+    eliteSpeed: 1.55,
+    normalHp: 4800,
+    eliteHp: 4800, // Wave 6: Boss 4 Solar Vanguard
+    normalScale: 5.3,
+    eliteScale: 5.3,
+    eliteChance: 1,
+    spawnMinInterval: 1.0,
+    spawnMaxInterval: 1.0,
+    maxBatchSize: 1,
+    isBossStage: true,
+  },
+];
+
+export const MAX_PLAYABLE_CHAPTER = 4;
 
 export const CHAPTER_STAGE_CATALOGS: Record<number, StageConfigDTO[]> = {
   1: STAGE_CATALOG,
   2: STAGE_CATALOG_CH2,
   3: STAGE_CATALOG_CH3,
+  4: STAGE_CATALOG_CH4,
 };
 
 // Số phát bắn cần để kích hoạt Overdrive Buff trên bệ làn phải (chỉ tăng DMG & ROF, không đổi súng)

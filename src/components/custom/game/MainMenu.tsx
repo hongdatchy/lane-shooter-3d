@@ -354,7 +354,7 @@ export function MainMenu() {
   }, [handleDeploy]);
 
   return (
-    <div className="w-full flex-1 flex flex-col overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none pb-16 lg:pb-3">
+    <div className="w-full flex-1 flex flex-col overflow-y-auto md:overflow-hidden md:max-h-[calc(100vh-3.5rem)] p-2 md:p-3 gap-2 select-none pb-16 md:pb-3">
       {postFirstRunGuideStep === "OPEN_ARMORY" && (
         <div
           className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-[1px]"
@@ -395,7 +395,7 @@ export function MainMenu() {
       {/* ─── MAIN 3-COLUMN DECK ─── */}
       <div className="grid grid-cols-12 gap-2 md:gap-3 flex-1 min-h-0 items-stretch">
         {/* ══ COL 1: HERO SHOWCASE ══ */}
-        <div className={`col-span-12 lg:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 min-h-0 border border-[#272A32] gap-1.5${mobileTab !== "hero" ? " hidden lg:flex" : ""}`}>
+        <div className={`col-span-12 md:col-span-4 flex flex-col bg-[#191B23] rounded-xl p-3 min-h-0 border border-[#272A32] gap-1.5${mobileTab !== "hero" ? " hidden md:flex" : ""}`}>
           {/* Hero Header */}
           <div className="flex items-center justify-between pb-1 shrink-0">
             <div className="flex flex-col min-w-0">
@@ -432,7 +432,7 @@ export function MainMenu() {
           </div>
 
           {/* Hero Visual */}
-          <div className="relative min-h-[145px] max-h-[220px] lg:flex-1 lg:max-h-none rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
+          <div className="relative min-h-[145px] max-h-[220px] md:flex-1 md:max-h-none rounded-lg overflow-hidden bg-[#0B0E15] flex items-center justify-center group shadow-inner">
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/30 to-transparent z-10 pointer-events-none" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#00F0FF]/10 via-transparent to-transparent pointer-events-none z-10" />
             <div
@@ -542,7 +542,7 @@ export function MainMenu() {
         </div>
 
         {/* ══ COL 2: MISSION TERMINAL & 2 MODES ══ */}
-        <div className={`col-span-12 lg:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32] gap-2.5${mobileTab !== "battle" ? " hidden lg:flex" : ""}`}>
+        <div className={`col-span-12 md:col-span-5 flex flex-col justify-between bg-[#1D1F27] rounded-xl p-3 md:p-4 min-h-0 relative border border-[#272A32] gap-2.5${mobileTab !== "battle" ? " hidden md:flex" : ""}`}>
           {/* Sector info bar */}
           <div className="flex items-center justify-between pb-1 shrink-0 gap-2">
             <div className="flex flex-col min-w-0">
@@ -1122,7 +1122,7 @@ export function MainMenu() {
         </div>
 
         {/* ══ COL 3: INTEL & LEADERBOARD ══ */}
-        <div className={`col-span-12 lg:col-span-3 flex flex-col bg-[#191B23] rounded-xl p-3 md:p-4 min-h-0 gap-3 border border-[#272A32]${mobileTab !== "intel" ? " hidden lg:flex" : ""}`}>
+        <div className={`col-span-12 md:col-span-3 flex flex-col bg-[#191B23] rounded-xl p-3 md:p-4 min-h-0 gap-3 border border-[#272A32]${mobileTab !== "intel" ? " hidden md:flex" : ""}`}>
           {/* Tactical Contracts */}
           <div className="shrink-0">
             <div className="flex items-center justify-between pb-2 border-b border-[#3B494B]/40">
@@ -1204,7 +1204,7 @@ export function MainMenu() {
               </div>
             </div>
 
-            <div className="flex flex-col flex-1 min-h-0 max-h-[360px] lg:max-h-none divide-y divide-[#3B494B]/20 overflow-y-auto pr-1 my-1 cyber-scroll">
+            <div className="flex flex-col flex-1 min-h-0 max-h-[360px] md:max-h-none divide-y divide-[#3B494B]/20 overflow-y-auto pr-1 my-1 cyber-scroll">
               {leaderboardError ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-3 text-center gap-1">
                   <span className="font-mono text-[11px] font-bold text-[#FFB4AB]">

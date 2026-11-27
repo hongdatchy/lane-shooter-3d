@@ -442,7 +442,7 @@ export function ArmoryScreen() {
   }
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#0A0D14] text-[#E1E2EC] relative overflow-y-auto lg:overflow-hidden lg:max-h-[calc(100vh-3.5rem)] pb-16 lg:pb-0 select-none">
+    <div className="w-full flex-1 flex flex-col bg-[#0A0D14] text-[#E1E2EC] relative overflow-y-auto md:overflow-hidden md:max-h-[calc(100vh-3.5rem)] pb-16 md:pb-0 select-none">
       {/* Subtle tactical backdrop */}
       <div
         className="absolute inset-0 opacity-15 pointer-events-none"
