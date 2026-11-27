@@ -26,7 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { CHAPTER_CATALOG, ChapterConfig } from "@/service/chapter-catalog";
-import { MAX_LOADOUT_SLOTS, getArmoryWeaponById } from "@/service/armory-catalog";
+import { getArmoryWeaponById } from "@/service/armory-catalog";
 import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import { useGameStore } from "@/state-manager/game-store";
@@ -71,11 +71,12 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
   const selectedChapterId = useGameStore((s) => s.selectedChapter);
   const saveData = useGameStore((s) => s.saveData);
   const selectChapter = useGameStore((s) => s.selectChapter);
-  const selectActiveLoadoutWeapon = useGameStore((s) => s.selectActiveLoadoutWeapon);
   const openLobby = useGameStore((s) => s.openLobby);
   const openArmory = useGameStore((s) => s.openArmory);
 
-  const loadoutIds = saveData.equippedLoadoutIds;
+  const equippedWeaponId = saveData.equippedLoadoutIds[0] ?? saveData.equippedWeaponId;
+  const equippedWeapon = getArmoryWeaponById(equippedWeaponId);
+  const equippedWeaponLevel = Math.max(1, saveData.weaponLevels[equippedWeapon.id] ?? 1);
 
   const assetsReady = useGameStore((s) => s.assetsReady);
   const assetsPercent = useGameStore((s) => s.assetsPercent);
@@ -727,73 +728,28 @@ export function WorldMapScreen({ onDeployCombat }: WorldMapScreenProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, slotIdx) => {
-              const slotId = loadoutIds[slotIdx];
-              const slotWeapon = slotId ? getArmoryWeaponById(slotId) : null;
-              const slotLevel = slotWeapon
-                ? Math.max(1, saveData.weaponLevels[slotWeapon.id] ?? 1)
-                : 1;
-              const isSelectedStarter = Boolean(
-                slotWeapon && saveData.equippedWeaponId === slotWeapon.id
-              );
-              const slotLabels = [
-                trans.worldMap.slot1Label,
-                trans.worldMap.slot2Label,
-                trans.worldMap.slot3Label,
-              ];
-
-              return (
-                <button
-                  key={slotIdx}
-                  type="button"
-                  onClick={() => {
-                    if (slotWeapon) {
-                      void selectActiveLoadoutWeapon(slotWeapon.id);
-                    } else {
-                      openArmory("ARSENAL");
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                    isSelectedStarter
-                      ? "bg-[#00F0FF]/15 border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.22)]"
-                      : "bg-[#272A32] border-transparent hover:border-[#3B494B]"
-                  }`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded bg-[#32353D] flex items-center justify-center ${
-                      slotWeapon ? "text-[#00F0FF]" : "text-[#849495]"
-                    }`}
-                  >
-                    {slotIdx === 0 ? (
-                      <Crosshair className="w-4 h-4" />
-                    ) : (
-                      <Swords className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex flex-col text-left">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`px-1 rounded font-mono text-[9px] font-bold ${
-                          isSelectedStarter || slotIdx === 0
-                            ? "bg-[#00F0FF]/20 text-[#00F0FF]"
-                            : "bg-[#FFC080]/20 text-[#FFC080]"
-                        }`}
-                      >
-                        {slotLabels[slotIdx]}
-                      </span>
-                      <span className="font-['Space_Grotesk'] text-[11px] text-[#DBFCFF] font-bold uppercase max-w-[110px] truncate">
-                        {slotWeapon ? slotWeapon.name : trans.worldMap.emptySlot}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[9px] text-[#B9CACB]">
-                      {slotWeapon
-                        ? `${slotWeapon.classLabel} · LV.${slotLevel}`
-                        : `CH.${unlockedChapter}`}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() => openArmory("ARSENAL")}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-[#00F0FF]/15 border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.22)] hover:bg-[#00F0FF]/20 transition-colors cursor-pointer"
+            >
+              <div className="w-7 h-7 rounded bg-[#32353D] flex items-center justify-center text-[#00F0FF]">
+                <Crosshair className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1 rounded font-mono text-[9px] font-bold bg-[#00F0FF]/20 text-[#00F0FF]">
+                    {trans.worldMap.slot1Label}
+                  </span>
+                  <span className="font-['Space_Grotesk'] text-[11px] text-[#DBFCFF] font-bold uppercase max-w-[140px] truncate">
+                    {equippedWeapon.name}
+                  </span>
+                </div>
+                <span className="font-mono text-[9px] text-[#B9CACB]">
+                  {equippedWeapon.classLabel} · LV.{equippedWeaponLevel}
+                </span>
+              </div>
+            </button>
           </div>
         </div>
 

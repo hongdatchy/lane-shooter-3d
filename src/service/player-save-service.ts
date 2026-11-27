@@ -3,7 +3,6 @@ import {
   ARMORY_WEAPONS,
   DEFAULT_LOADOUT_IDS,
   DEFAULT_UNLOCKED_WEAPON_IDS,
-  MAX_LOADOUT_SLOTS,
 } from "@/service/armory-catalog";
 
 export const PLAYER_SAVE_STORAGE_KEY = "lane_shooter_save_v1";
@@ -89,41 +88,61 @@ function normalizeUnlockedWeaponIds(
   return result.length > 0 ? result : [ARMORY_WEAPONS[0].id];
 }
 
+function pickHighestTierWeaponId(candidates: string[]): string | null {
+  let bestId: string | null = null;
+  let bestIdx = -1;
+  for (const id of candidates) {
+    const idx = ARMORY_WEAPONS.findIndex((w) => w.id === id);
+    if (idx > bestIdx) {
+      bestIdx = idx;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
 function normalizeLoadoutIds(
   rawLoadout: unknown,
   fallbackPrimary: string,
   unlockedWeaponIds: string[]
 ): string[] {
   const ownedSet = new Set(unlockedWeaponIds);
-  const result: string[] = [];
+  const validCandidates: string[] = [];
 
   if (Array.isArray(rawLoadout)) {
     for (const item of rawLoadout) {
       if (
         typeof item === "string" &&
         ownedSet.has(item) &&
-        !result.includes(item) &&
-        result.length < MAX_LOADOUT_SLOTS
+        !validCandidates.includes(item)
       ) {
-        result.push(item);
+        validCandidates.push(item);
       }
     }
   }
 
-  if (result.length > 0) {
-    return result;
+  if (validCandidates.length === 1) {
+    return [validCandidates[0]];
+  }
+  if (validCandidates.length > 1) {
+    const preferred =
+      fallbackPrimary &&
+      fallbackPrimary !== "pistol" &&
+      validCandidates.includes(fallbackPrimary)
+        ? fallbackPrimary
+        : pickHighestTierWeaponId(validCandidates) ?? validCandidates[0];
+    return [preferred];
   }
 
   if (ownedSet.has(fallbackPrimary)) {
-    result.push(fallbackPrimary);
+    return [fallbackPrimary];
   }
   for (const id of DEFAULT_LOADOUT_IDS) {
-    if (result.length >= MAX_LOADOUT_SLOTS) break;
-    if (ownedSet.has(id) && !result.includes(id)) {
-      result.push(id);
+    if (ownedSet.has(id)) {
+      return [id];
     }
   }
-  return result.length > 0 ? result : [unlockedWeaponIds[0] ?? ARMORY_WEAPONS[0].id];
+  return [unlockedWeaponIds[0] ?? ARMORY_WEAPONS[0].id];
 }
 
 function normalizeWeaponLevels(raw: unknown): Record<string, number> {
@@ -149,9 +168,6 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     typeof candidate.unlockedChapter === "number" && Number.isFinite(candidate.unlockedChapter)
       ? Math.max(1, candidate.unlockedChapter)
       : defaults.unlockedChapter;
-  const hadAkBefore =
-    Array.isArray(candidate.unlockedWeaponIds) &&
-    candidate.unlockedWeaponIds.includes("ak47");
   const unlockedWeaponIds = normalizeUnlockedWeaponIds(
     candidate.unlockedWeaponIds,
     unlockedChapter
@@ -165,15 +181,6 @@ function normalizeSaveData(raw: unknown): PlayerSaveData {
     rawEquipped,
     unlockedWeaponIds
   );
-  // Nâng cấp từ bản save cũ (chỉ có 1 súng mặc định): tự lắp thêm Súng 2 (AK Hyperion) vào ô 2
-  if (
-    !hadAkBefore &&
-    unlockedWeaponIds.includes("ak47") &&
-    equippedLoadoutIds.length === 1 &&
-    !equippedLoadoutIds.includes("ak47")
-  ) {
-    equippedLoadoutIds.push("ak47");
-  }
 
   const bestScore =
     typeof candidate.bestScore === "number" && Number.isFinite(candidate.bestScore)

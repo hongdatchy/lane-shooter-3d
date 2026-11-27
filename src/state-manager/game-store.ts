@@ -34,7 +34,6 @@ import { leaderboardService } from "@/service/leaderboard-service";
 import {
   ARMORY_WEAPONS,
   DEFAULT_LOADOUT_IDS,
-  MAX_LOADOUT_SLOTS,
   MAX_WEAPON_LEVEL,
   getArmoryWeaponById,
   getWeaponUpgradeCost,
@@ -124,7 +123,7 @@ interface GameState {
   stageTargetKills: number;
   kills: number;
 
-  // Active 3-Weapon Combat Loadout & Right-Lane Buff Gates (2 items per wave)
+  // Single Active Combat Weapon & Right-Lane Buff Gates (2 items per wave)
   combatLoadoutIds: string[];
   activeLoadoutSlot: number;
   overdriveLevel: number;
@@ -295,21 +294,6 @@ function resolveActiveCombatWeapon(state: {
     DEFAULT_LOADOUT_IDS[0];
   const level = resolveEffectiveWeaponLevel(state, id);
   return weaponService.resolveCombatWeapon(id, level);
-}
-
-// Trong các súng mang theo, ưu tiên cầm sẵn khẩu đứng sau trong danh sách ARMORY_WEAPONS (mạnh hơn)
-function pickStrongestLoadoutSlotIndex(loadoutIds: string[]): number {
-  if (loadoutIds.length <= 1) return 0;
-  let bestSlotIdx = 0;
-  let bestCatalogIdx = -1;
-  for (let i = 0; i < loadoutIds.length; i++) {
-    const catalogIdx = ARMORY_WEAPONS.findIndex((w) => w.id === loadoutIds[i]);
-    if (catalogIdx > bestCatalogIdx) {
-      bestCatalogIdx = catalogIdx;
-      bestSlotIdx = i;
-    }
-  }
-  return bestSlotIdx;
 }
 
 async function commitArmorySave(
@@ -617,7 +601,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   kills: 0,
 
   combatLoadoutIds: [...DEFAULT_LOADOUT_IDS],
-  activeLoadoutSlot: pickStrongestLoadoutSlotIndex(DEFAULT_LOADOUT_IDS),
+  activeLoadoutSlot: 0,
   overdriveLevel: 0,
   rightLaneGates: generateWaveRightLaneGates(1, {
     hp: INITIAL_MAX_HP,
@@ -936,7 +920,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     await commitArmorySave(nextSave, set);
   },
 
-  assignWeaponToLoadout: async (weaponId, slotIndex) => {
+  assignWeaponToLoadout: async (weaponId) => {
     const state = get();
     if (!state.platformReady || state.saveError || state.armorySaving) return;
     const weapon = ARMORY_WEAPONS.find((item) => item.id === weaponId);
@@ -948,40 +932,18 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       return;
     }
 
-    const current = [...state.saveData.equippedLoadoutIds];
-    const existingIdx = current.indexOf(weaponId);
-
-    if (typeof slotIndex === "number" && slotIndex >= 0 && slotIndex < MAX_LOADOUT_SLOTS) {
-      if (existingIdx !== -1) {
-        if (existingIdx === slotIndex) return;
-        if (slotIndex < current.length) {
-          const displaced = current[slotIndex];
-          current[slotIndex] = weaponId;
-          current[existingIdx] = displaced;
-        } else {
-          current.splice(existingIdx, 1);
-          current.push(weaponId);
-        }
-      } else if (slotIndex < current.length) {
-        current[slotIndex] = weaponId;
-      } else {
-        current.push(weaponId);
-      }
-    } else {
-      if (existingIdx !== -1) return;
-      if (current.length < MAX_LOADOUT_SLOTS) {
-        current.push(weaponId);
-      } else {
-        current[MAX_LOADOUT_SLOTS - 1] = weaponId;
-      }
+    if (
+      state.saveData.equippedLoadoutIds.length === 1 &&
+      state.saveData.equippedLoadoutIds[0] === weaponId &&
+      state.saveData.equippedWeaponId === weaponId
+    ) {
+      return;
     }
 
     const nextSave: PlayerSaveData = {
       ...state.saveData,
-      equippedWeaponId: current.includes(state.saveData.equippedWeaponId)
-        ? state.saveData.equippedWeaponId
-        : current[0],
-      equippedLoadoutIds: current,
+      equippedWeaponId: weaponId,
+      equippedLoadoutIds: [weaponId],
     };
     await commitArmorySave(nextSave, set);
   },
@@ -998,7 +960,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       equippedWeaponId: nextLoadout.includes(state.saveData.equippedWeaponId)
         ? state.saveData.equippedWeaponId
         : nextLoadout[0],
-      equippedLoadoutIds: nextLoadout,
+      equippedLoadoutIds: [nextLoadout[0]],
     };
     await commitArmorySave(nextSave, set);
   },
@@ -1006,12 +968,26 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   selectActiveLoadoutWeapon: async (weaponId) => {
     const state = get();
     if (!state.platformReady || state.saveError || state.armorySaving) return;
-    if (!state.saveData.equippedLoadoutIds.includes(weaponId)) return;
-    if (state.saveData.equippedWeaponId === weaponId) return;
+    const weapon = ARMORY_WEAPONS.find((item) => item.id === weaponId);
+    if (
+      !weapon ||
+      state.saveData.unlockedChapter < weapon.unlockChapter ||
+      !state.saveData.unlockedWeaponIds.includes(weaponId)
+    ) {
+      return;
+    }
+    if (
+      state.saveData.equippedWeaponId === weaponId &&
+      state.saveData.equippedLoadoutIds.length === 1 &&
+      state.saveData.equippedLoadoutIds[0] === weaponId
+    ) {
+      return;
+    }
 
     const nextSave: PlayerSaveData = {
       ...state.saveData,
       equippedWeaponId: weaponId,
+      equippedLoadoutIds: [weaponId],
     };
     await commitArmorySave(nextSave, set);
   },
@@ -1085,12 +1061,13 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         : Math.min(MAX_PLAYABLE_CHAPTER, Math.max(1, state.selectedChapter));
       const maxWaves = weaponService.getTotalStages(chapterId);
       const best = computeBestScore(state.player, state.leaderboard, state.saveData);
-      const loadout = state.devMode
-        ? [state.devWeaponId || DEFAULT_LOADOUT_IDS[0]]
-        : state.saveData.equippedLoadoutIds.length > 0
-          ? [...state.saveData.equippedLoadoutIds]
-          : [state.saveData.equippedWeaponId || DEFAULT_LOADOUT_IDS[0]];
-      const bestSlotIdx = state.devMode ? 0 : pickStrongestLoadoutSlotIndex(loadout);
+      const equippedWeaponId = state.devMode
+        ? state.devWeaponId || DEFAULT_LOADOUT_IDS[0]
+        : state.saveData.equippedLoadoutIds[0] ||
+          state.saveData.equippedWeaponId ||
+          DEFAULT_LOADOUT_IDS[0];
+      const loadout = [equippedWeaponId];
+      const bestSlotIdx = 0;
       const startingClones = state.devMode ? 0 : state.rewardedAdClaimed ? 1 : 0;
       const initialBuffs = createEmptyActiveBuffs(startingClones);
       const trans = getCurrentTrans();

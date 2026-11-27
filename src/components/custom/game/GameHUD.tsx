@@ -43,7 +43,6 @@ import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import {
   ARMORY_WEAPONS,
-  MAX_LOADOUT_SLOTS,
   MAX_WEAPON_LEVEL,
   getArmoryWeaponById,
   getWeaponImageUrl,
@@ -85,7 +84,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     stageTargetKills,
     kills,
     combatLoadoutIds,
-    activeLoadoutSlot,
     saveData,
     overdriveLevel,
     rightLaneGates,
@@ -115,8 +113,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     returnToMenu,
     togglePause,
     activateRage,
-    switchCombatWeaponSlot,
-    cycleCombatWeapon,
     setCameraMode,
     cycleCameraMode,
     toggleAutoFire,
@@ -157,16 +153,10 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     label: trans.camera[mode],
   }));
 
-  const loadoutWeapons = combatLoadoutIds.map((id) =>
-    weaponService.resolveCombatWeapon(
-      id,
-      devMode ? devWeaponLevel : saveData.weaponLevels[id] ?? 1
-    )
-  );
-  const weapon =
-    loadoutWeapons[activeLoadoutSlot] ??
-    loadoutWeapons[0] ??
-    weaponService.resolveCombatWeapon("pistol", 1);
+  const activeWeaponId = combatLoadoutIds[0] ?? devWeaponId ?? "pistol";
+  const weaponLv = devMode ? devWeaponLevel : saveData.weaponLevels[activeWeaponId] ?? 1;
+  const weapon = weaponService.resolveCombatWeapon(activeWeaponId, weaponLv);
+  const weaponArmorySpec = getArmoryWeaponById(weapon.id);
   const readySkillName = getArmoryWeaponById(weapon.id)?.rageSkillName ?? weapon.name;
   const ragingWeaponId = activeRageWeaponId ?? weapon.id;
   const ragingSkillName =
@@ -371,18 +361,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       if (!e.repeat && (e.code === "KeyV" || key === "v")) {
         useGameStore.getState().cycleCameraMode();
       }
-      if (!e.repeat && (e.code === "Digit1" || key === "1")) {
-        useGameStore.getState().switchCombatWeaponSlot(0);
-      }
-      if (!e.repeat && (e.code === "Digit2" || key === "2")) {
-        useGameStore.getState().switchCombatWeaponSlot(1);
-      }
-      if (!e.repeat && (e.code === "Digit3" || key === "3")) {
-        useGameStore.getState().switchCombatWeaponSlot(2);
-      }
-      if (!e.repeat && (e.code === "KeyQ" || key === "q")) {
-        useGameStore.getState().cycleCombatWeapon();
-      }
       if (
         !e.repeat &&
         (e.code === "KeyR" || e.code === "KeyE" || key === "r" || key === "e")
@@ -417,27 +395,12 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       syncKeys();
     };
 
-    let lastWheelAt = 0;
-    const handleWheel = (e: WheelEvent) => {
-      const curr = useGameStore.getState();
-      if (curr.gameStatus !== "PLAYING" || curr.cameraMode === "FREE_ORBIT") {
-        return;
-      }
-      if (Math.abs(e.deltaY) < 4) return;
-      const now = performance.now();
-      if (now - lastWheelAt < 90) return;
-      lastWheelAt = now;
-      curr.cycleCombatWeapon(e.deltaY > 0 ? 1 : -1);
-    };
-
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     window.addEventListener("keyup", handleKeyUp, { capture: true });
-    window.addEventListener("wheel", handleWheel, { passive: true });
     window.addEventListener("blur", handleBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
-      window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("blur", handleBlur);
     };
   }, []);
@@ -470,7 +433,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           score,
           goldEarned: lastGoldEarned,
           maxHp,
-          weaponId: combatLoadoutIds[activeLoadoutSlot] ?? devWeaponId,
+          weaponId: weapon.id,
           weaponLevel: devWeaponLevel,
           simSeconds: devSimSeconds,
           bossSpawnedAtSimSec: devBossSpawnedAtSimSec,
@@ -1391,94 +1354,27 @@ export function GameHUD({ containerRef }: GameHUDProps) {
       {!isInMenu && (
         <div className="pointer-events-auto w-full bg-[#191B23]/90 backdrop-blur-md border-t border-[#3B494B]/40 px-2.5 sm:px-5 py-2 sm:py-2.5 shadow-2xl">
           <div className="flex flex-col lg:grid lg:grid-cols-[auto_minmax(260px,1fr)_auto] items-stretch lg:items-center justify-between gap-2 lg:gap-4 max-w-[1600px] mx-auto">
-            {/* BOTTOM-LEFT: 3-Slot Weapon Loadout + Stats + Real Active Buff Chips */}
+            {/* BOTTOM-LEFT: Single Active Weapon + Stats + Real Active Buff Chips */}
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <div className="flex items-center gap-1.5 bg-[#0B0E15]/90 p-1 rounded-xl border border-[#3B494B]/40">
-                {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, idx) => {
-                  const slotId = combatLoadoutIds[idx];
-                  const slotWeapon = slotId ? loadoutWeapons[idx] : null;
-                  if (!slotWeapon) {
-                    return (
-                      <div
-                        key={`empty-${idx}`}
-                        title={trans.armory.combatNoteDesc}
-                        className="flex flex-col justify-between rounded-lg border border-dashed border-[#272A32] bg-[#191B23]/55 px-2.5 py-1.5 text-[10px] font-mono text-[#586568] opacity-60 select-none min-w-[78px]"
-                      >
-                        <span className="text-[9px] font-bold">[{idx + 1}]</span>
-                        <span className="max-w-[72px] truncate uppercase">
-                          {trans.worldMap.emptySlot}
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  const isActive = idx === activeLoadoutSlot;
-                  const slotLv = devMode ? devWeaponLevel : saveData.weaponLevels[slotWeapon.id] ?? 1;
-                  const slotArmorySpec = getArmoryWeaponById(slotWeapon.id);
-                  return (
-                    <button
-                      key={`${slotWeapon.id}-${idx}`}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.currentTarget.blur();
-                        switchCombatWeaponSlot(idx);
-                      }}
-                      className={`flex flex-col gap-0.5 rounded-lg border px-2 py-1 text-left transition-all cursor-pointer touch-none min-w-[88px] sm:min-w-[104px] ${
-                        isActive
-                          ? "border-[#00F0FF]/70 bg-[#00F0FF]/12 shadow-[0_0_16px_rgba(0,240,255,0.2)]"
-                          : "border-[#272A32] bg-[#1D1F27] opacity-75 hover:opacity-100 hover:border-[#3B494B]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1.5 w-full">
-                        <span
-                          className={`rounded px-1 py-0.5 font-mono text-[9px] font-extrabold leading-none ${
-                            isActive
-                              ? "bg-[#00F0FF] text-[#00363A]"
-                              : "bg-[#0B0E15] text-[#849495]"
-                          }`}
-                        >
-                          [{idx + 1}]
-                        </span>
-                        <img
-                          src={getWeaponImageUrl(slotArmorySpec)}
-                          alt={slotWeapon.name}
-                          className="h-3.5 w-5 rounded-sm object-cover border border-[#3B494B]/50 shrink-0"
-                        />
-                        <span
-                          className={`font-mono text-[9px] font-bold ${
-                            isActive ? "text-[#7DF4FF]" : "text-[#849495]"
-                          }`}
-                        >
-                          L{slotLv}
-                        </span>
-                      </div>
-                      <span
-                        className={`font-mono text-[10px] font-bold truncate max-w-[96px] ${
-                          isActive ? "text-[#DBFCFF]" : "text-[#B9CACB]"
-                        }`}
-                      >
-                        {slotWeapon.name}
-                      </span>
-                    </button>
-                  );
-                })}
-
-                {loadoutWeapons.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.currentTarget.blur();
-                      cycleCombatWeapon();
-                    }}
-                    title={trans.hud.keySwitchWeapon}
-                    className="self-stretch flex flex-col items-center justify-center rounded-lg border border-[#272A32] bg-[#1D1F27] px-2 font-mono text-[9px] font-bold text-[#00F0FF] hover:border-[#00F0FF]/60 hover:bg-[#272A32] cursor-pointer touch-none"
-                  >
-                    <span>[Q]</span>
-                    <span className="text-xs leading-none">↻</span>
-                  </button>
-                )}
+              <div className="flex items-center gap-2 rounded-xl border border-[#00F0FF]/55 bg-[#0B0E15]/90 px-2.5 py-1.5 shadow-[0_0_16px_rgba(0,240,255,0.16)]">
+                <img
+                  src={getWeaponImageUrl(weaponArmorySpec)}
+                  alt={weapon.name}
+                  className="h-7 w-10 rounded object-cover border border-[#3B494B]/60 shrink-0"
+                />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[9px] font-bold text-[#00F0FF] uppercase">
+                      {weaponArmorySpec.classLabel}
+                    </span>
+                    <span className="rounded bg-[#00F0FF]/18 px-1 py-0.5 font-mono text-[9px] font-extrabold leading-none text-[#7DF4FF]">
+                      L{weaponLv}
+                    </span>
+                  </div>
+                  <span className="font-['Space_Grotesk'] text-xs font-bold text-[#DBFCFF] truncate max-w-[125px] uppercase">
+                    {weapon.name}
+                  </span>
+                </div>
               </div>
 
               {/* Active Weapon Stats + Right-Lane Gates + Dynamic Buff Chips */}
@@ -1638,10 +1534,6 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   <div className="hidden lg:flex items-center justify-center gap-3 mt-1 font-mono text-[10px] text-[#849495]">
                     <span>
                       <strong className="text-[#DBFCFF]">A / D</strong> {trans.hud.keyMove}
-                    </span>
-                    <span className="text-[#3B494B]">•</span>
-                    <span>
-                      <strong className="text-[#00F0FF]">1-3 / Q</strong> {trans.hud.keySwitchWeapon}
                     </span>
                     <span className="text-[#3B494B]">•</span>
                     <span>

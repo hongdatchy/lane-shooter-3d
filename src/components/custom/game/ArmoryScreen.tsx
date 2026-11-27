@@ -13,16 +13,13 @@ import {
   Info,
   Lock,
   Map as MapIcon,
-  Plus,
   RotateCcw,
   Sparkles,
   Wrench,
-  X,
 } from "lucide-react";
 import {
   ARMORY_WEAPONS,
   ArmoryWeaponSpec,
-  MAX_LOADOUT_SLOTS,
   MAX_WEAPON_LEVEL,
   WeaponClass,
   getArmoryWeaponById,
@@ -143,7 +140,7 @@ function WeaponGridCard({
   weapon,
   level,
   isSelected,
-  loadoutSlotIndex,
+  isEquipped,
   chapterMet,
   isOwned,
   t,
@@ -152,7 +149,7 @@ function WeaponGridCard({
   weapon: ArmoryWeaponSpec;
   level: number;
   isSelected: boolean;
-  loadoutSlotIndex: number; // -1 if not in loadout
+  isEquipped: boolean;
   chapterMet: boolean;
   isOwned: boolean;
   t: TranslationData["armory"];
@@ -160,7 +157,7 @@ function WeaponGridCard({
 }) {
   const stats = getWeaponStatsAtLevel(weapon, level);
   const rofText = weapon.fireRateLabel ?? `${stats.fireRate}/s`;
-  const inLoadout = loadoutSlotIndex >= 0;
+  const inLoadout = isEquipped;
   const isUsable = chapterMet && isOwned;
 
   return (
@@ -200,7 +197,7 @@ function WeaponGridCard({
         {inLoadout ? (
           <span className="px-1.5 py-0.5 rounded bg-[#00F0FF] text-[#051018] shadow-[0_0_10px_rgba(0,240,255,0.45)] font-mono text-[9px] font-bold flex items-center gap-0.5 shrink-0">
             <Check className="w-2.5 h-2.5" strokeWidth={3} />
-            <span>{formatText(t.inLoadoutBadge, { slot: loadoutSlotIndex + 1 })}</span>
+            <span>{t.inLoadoutBadge}</span>
           </span>
         ) : !chapterMet ? (
           <span className="px-1.5 py-0.5 rounded bg-[#272A32] text-[#849495] font-mono text-[9px] flex items-center gap-0.5 shrink-0">
@@ -293,7 +290,6 @@ export function ArmoryScreen() {
   const openWorldMap = useGameStore((s) => s.openWorldMap);
   const unlockArmoryWeapon = useGameStore((s) => s.unlockArmoryWeapon);
   const assignWeaponToLoadout = useGameStore((s) => s.assignWeaponToLoadout);
-  const removeWeaponFromLoadout = useGameStore((s) => s.removeWeaponFromLoadout);
   const upgradeArmoryWeapon = useGameStore((s) => s.upgradeArmoryWeapon);
 
   const locale = useAppStore((s) => s.locale);
@@ -318,7 +314,12 @@ export function ArmoryScreen() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeArmory]);
 
-  const loadoutIds = saveData.equippedLoadoutIds;
+  const equippedWeaponId = saveData.equippedLoadoutIds[0] ?? saveData.equippedWeaponId;
+  const equippedWeapon = getArmoryWeaponById(equippedWeaponId);
+  const equippedWeaponLevel = Math.max(
+    1,
+    saveData.weaponLevels[equippedWeapon.id] ?? 1
+  );
   const ownedWeaponSet = useMemo(
     () => new Set(saveData.unlockedWeaponIds),
     [saveData.unlockedWeaponIds]
@@ -378,7 +379,7 @@ export function ArmoryScreen() {
   const inspectedOwned = ownedWeaponSet.has(inspectedWeapon.id);
   const inspectedUnlocked = inspectedChapterMet && inspectedOwned;
   const canAffordUnlock = saveData.gold >= inspectedWeapon.unlockCost;
-  const inspectedLoadoutSlot = loadoutIds.indexOf(inspectedWeapon.id);
+  const isInspectedEquipped = equippedWeapon.id === inspectedWeapon.id;
   const inspectedIsMax = inspectedLevel >= MAX_WEAPON_LEVEL;
   const inspectedStats = getWeaponStatsAtLevel(inspectedWeapon, inspectedLevel);
   const upgradeCost = getWeaponUpgradeCost(inspectedWeapon, inspectedLevel);
@@ -481,11 +482,8 @@ export function ArmoryScreen() {
         <div className="flex items-center gap-2 md:gap-3">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#191B23] border border-[#00F0FF]/35 font-mono text-[10px] text-[#00F0FF] font-bold">
             <Crosshair className="w-3 h-3" />
-            <span>
-              {formatText(t.loadoutSummary, {
-                count: loadoutIds.length,
-                max: MAX_LOADOUT_SLOTS,
-              })}
+            <span className="max-w-[180px] truncate uppercase">
+              {equippedWeapon.name} · LV.{equippedWeaponLevel}
             </span>
           </div>
 
@@ -574,145 +572,61 @@ export function ArmoryScreen() {
         />
       ) : (
         <div className="relative z-10 flex-1 grid grid-cols-12 gap-3 p-3 md:p-4 min-h-0">
-          {/* ══ LEFT COLUMN (2/3): ACTIVE 3-SLOT LOADOUT + FILTER BAR + WEAPON GRID ══ */}
+          {/* ══ LEFT COLUMN (2/3): SINGLE EQUIPPED WEAPON BAR + FILTER BAR + WEAPON GRID ══ */}
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-2.5 min-h-0">
-            {/* Active 3-Weapon Combat Loadout Bar */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-[#0F2133] via-[#131D2D] to-[#111622] border border-[#00F0FF]/70 rounded-xl p-3 flex flex-col gap-2.5 shrink-0 shadow-[0_0_28px_rgba(0,240,255,0.16),inset_0_1px_0_rgba(125,244,255,0.22)]">
+            {/* Active Single-Weapon Combat Strip */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#0F2133] via-[#131D2D] to-[#111622] border border-[#00F0FF]/70 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0 shadow-[0_0_28px_rgba(0,240,255,0.16),inset_0_1px_0_rgba(125,244,255,0.22)]">
               <div className="pointer-events-none absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-[#00F0FF] via-[#7DF4FF] to-[#FE9800]" />
               <div className="pointer-events-none -top-12 -left-10 absolute w-48 h-24 rounded-full bg-[#00F0FF]/15 blur-2xl" />
 
-              <div className="relative z-10 flex items-center justify-between gap-2">
-                <div className="font-mono text-[11px] font-bold text-[#7DF4FF] tracking-wider uppercase flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-[#00F0FF]/20 border border-[#00F0FF]/60 flex items-center justify-center text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)] shrink-0">
-                    <Crosshair className="w-3.5 h-3.5" />
-                  </span>
-                  <span className="drop-shadow-[0_0_8px_rgba(0,240,255,0.35)]">
+              <div className="relative z-10 flex items-center gap-2.5 min-w-0">
+                <span className="w-8 h-8 rounded-lg bg-[#00F0FF]/20 border border-[#00F0FF]/60 flex items-center justify-center text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)] shrink-0">
+                  <Crosshair className="w-4 h-4" />
+                </span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono text-[11px] font-bold text-[#7DF4FF] tracking-wider uppercase drop-shadow-[0_0_8px_rgba(0,240,255,0.35)]">
                     {t.activeLoadoutTitle}
                   </span>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#00F0FF]/15 border border-[#00F0FF]/50 font-mono text-[10px] text-[#E1FBFF] font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.18)] shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
-                  <span>
-                    {formatText(t.loadoutSummary, {
-                      count: loadoutIds.length,
-                      max: MAX_LOADOUT_SLOTS,
-                    })}
+                  <span className="font-mono text-[10px] text-[#9EB2B8] truncate">
+                    {t.loadoutSummary}
                   </span>
-                </span>
+                </div>
               </div>
 
-              <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {Array.from({ length: MAX_LOADOUT_SLOTS }, (_, slotIdx) => {
-                  const assignedId = loadoutIds[slotIdx];
-                  const slotWeapon = assignedId
-                    ? getArmoryWeaponById(assignedId)
-                    : null;
-                  const slotLv = slotWeapon
-                    ? Math.max(1, saveData.weaponLevels[slotWeapon.id] ?? 1)
-                    : 1;
-                  const canAssignInspected =
-                    inspectedUnlocked &&
-                    inspectedLoadoutSlot !== slotIdx &&
-                    canPersist;
-
-                  if (!slotWeapon) {
-                    return (
-                      <button
-                        key={slotIdx}
-                        type="button"
-                        disabled={!canAssignInspected}
-                        onClick={() =>
-                          void assignWeaponToLoadout(inspectedWeapon.id, slotIdx)
-                        }
-                        className="rounded-xl border border-dashed border-[#00F0FF]/40 bg-[#0A111D]/90 hover:border-[#00F0FF] hover:bg-[#111E30] px-3 py-2.5 flex items-center justify-between gap-2 transition-all cursor-pointer disabled:opacity-55 disabled:cursor-default"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="px-1.5 py-0.5 rounded bg-[#1B2738] border border-[#3B494B] font-mono text-[9px] font-bold text-[#7DF4FF]/80 shrink-0">
-                            {formatText(t.slotBadge, { slot: slotIdx + 1 })}
-                          </span>
-                          <span className="font-mono text-[10px] text-[#9EB2B8] truncate">
-                            {t.emptySlotHint}
-                          </span>
-                        </div>
-                        <span className="w-6 h-6 rounded-md bg-[#00F0FF]/15 border border-[#00F0FF]/40 flex items-center justify-center text-[#00F0FF] shrink-0">
-                          <Plus className="w-3.5 h-3.5" />
-                        </span>
-                      </button>
-                    );
-                  }
-
-                  const isInspectedHere = inspectedWeapon.id === slotWeapon.id;
-
-                  return (
-                    <div
-                      key={slotIdx}
-                      className={`group relative overflow-hidden rounded-xl border pl-3 pr-2 py-2 flex items-center justify-between gap-2 transition-all ${
-                        isInspectedHere
-                          ? "bg-gradient-to-r from-[#193048] via-[#152438] to-[#131C2B] border-[#7DF4FF] ring-1 ring-[#00F0FF]/60 shadow-[0_0_22px_rgba(0,240,255,0.28)]"
-                          : "bg-gradient-to-r from-[#152334] to-[#121926] border-[#00F0FF]/60 hover:border-[#7DF4FF] shadow-[0_4px_16px_rgba(0,240,255,0.12)]"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r ${
-                          isInspectedHere
-                            ? "bg-[#7DF4FF] shadow-[0_0_10px_#00F0FF]"
-                            : "bg-[#00F0FF] shadow-[0_0_8px_rgba(0,240,255,0.7)]"
-                        }`}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => handleSelectWeapon(slotWeapon.id)}
-                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer"
-                      >
-                        <div className="w-14 h-10 rounded-md overflow-hidden border border-[#00F0FF]/45 bg-[#080C14] shrink-0 shadow-[0_0_10px_rgba(0,240,255,0.14)]">
-                          <img
-                            src={getWeaponImageUrl(slotWeapon, false)}
-                            alt={slotWeapon.name}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                        <div className="flex flex-col min-w-0 gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold leading-none ${
-                                isInspectedHere
-                                  ? "bg-[#00F0FF] text-[#051018]"
-                                  : "bg-[#00F0FF]/25 text-[#7DF4FF] border border-[#00F0FF]/45"
-                              }`}
-                            >
-                              {formatText(t.slotBadge, { slot: slotIdx + 1 })}
-                            </span>
-                            <span className="px-1 py-0.5 rounded bg-[#FE9800]/15 border border-[#FE9800]/35 font-mono text-[9px] text-[#FE9800] font-bold leading-none">
-                              LV.{slotLv}
-                            </span>
-                          </div>
-                          <span className="font-['Space_Grotesk'] text-xs font-bold text-white uppercase truncate leading-tight">
-                            {slotWeapon.name}
-                          </span>
-                          <span className="font-mono text-[9px] text-[#7DF4FF]/85 uppercase truncate leading-none">
-                            {getClassLabel(slotWeapon.weaponClass, t)}
-                          </span>
-                        </div>
-                      </button>
-
-                      {loadoutIds.length > 1 && (
-                        <button
-                          type="button"
-                          title={t.removeSlotBtn}
-                          disabled={!canPersist}
-                          onClick={() =>
-                            void removeWeaponFromLoadout(slotWeapon.id)
-                          }
-                          className="p-1.5 rounded-lg bg-[#0B0E14]/50 hover:bg-[#93000A]/50 border border-transparent hover:border-[#FFB4AB]/40 text-[#9EB2B8] hover:text-[#FFB4AB] transition-colors cursor-pointer shrink-0 disabled:opacity-40"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectWeapon(equippedWeapon.id)}
+                className={`relative z-10 group flex items-center gap-3 rounded-xl border pl-3 pr-3.5 py-2 text-left transition-all cursor-pointer shrink-0 ${
+                  inspectedWeapon.id === equippedWeapon.id
+                    ? "bg-gradient-to-r from-[#193048] via-[#152438] to-[#131C2B] border-[#7DF4FF] ring-1 ring-[#00F0FF]/60 shadow-[0_0_22px_rgba(0,240,255,0.28)]"
+                    : "bg-gradient-to-r from-[#152334] to-[#121926] border-[#00F0FF]/60 hover:border-[#7DF4FF] shadow-[0_4px_16px_rgba(0,240,255,0.12)]"
+                }`}
+              >
+                <div className="w-16 h-10 rounded-md overflow-hidden border border-[#00F0FF]/45 bg-[#080C14] shrink-0 shadow-[0_0_10px_rgba(0,240,255,0.14)]">
+                  <img
+                    src={getWeaponImageUrl(equippedWeapon, false)}
+                    alt={equippedWeapon.name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="flex flex-col min-w-0 gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-[#00F0FF] text-[#051018] font-mono text-[9px] font-bold leading-none">
+                      {t.slotBadge}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#FE9800]/15 border border-[#FE9800]/35 font-mono text-[9px] text-[#FE9800] font-bold leading-none">
+                      LV.{equippedWeaponLevel}
+                    </span>
+                  </div>
+                  <span className="font-['Space_Grotesk'] text-xs sm:text-sm font-bold text-white uppercase truncate max-w-[190px] leading-tight">
+                    {equippedWeapon.name}
+                  </span>
+                  <span className="font-mono text-[9px] text-[#7DF4FF]/85 uppercase truncate leading-none">
+                    {getClassLabel(equippedWeapon.weaponClass, t)} · {t.dmgShort}{" "}
+                    {getWeaponStatsAtLevel(equippedWeapon, equippedWeaponLevel).damage}
+                  </span>
+                </div>
+              </button>
             </div>
 
             {/* Armory Header + Category Filters + Sort Toggle */}
@@ -788,7 +702,7 @@ export function ArmoryScreen() {
                     weapon={weapon}
                     level={Math.max(1, saveData.weaponLevels[weapon.id] ?? 1)}
                     isSelected={inspectedWeapon.id === weapon.id}
-                    loadoutSlotIndex={loadoutIds.indexOf(weapon.id)}
+                    isEquipped={equippedWeapon.id === weapon.id}
                     chapterMet={saveData.unlockedChapter >= weapon.unlockChapter}
                     isOwned={ownedWeaponSet.has(weapon.id)}
                     t={t}
@@ -1058,92 +972,29 @@ export function ArmoryScreen() {
               ) : (
                 <div className="rounded-xl bg-[#0E121B] border border-[#272A32] p-2.5 flex flex-col gap-2">
                   <div className="flex items-center justify-between font-mono text-[10px] text-[#7DF4FF] uppercase">
-                    <span>
-                      {formatText(t.assignSlotTitle, {
-                        count: loadoutIds.length,
-                        max: MAX_LOADOUT_SLOTS,
-                      })}
-                    </span>
-                    {inspectedLoadoutSlot >= 0 && loadoutIds.length > 1 && (
-                      <button
-                        type="button"
-                        disabled={!canPersist}
-                        onClick={() =>
-                          void removeWeaponFromLoadout(inspectedWeapon.id)
-                        }
-                        className="text-[#FFB4AB] hover:underline font-bold cursor-pointer disabled:opacity-40"
-                      >
-                        {t.removeSlotBtn}
-                      </button>
-                    )}
+                    <span>{t.assignSlotTitle}</span>
                   </div>
 
-                  {inspectedLoadoutSlot === -1 &&
-                    loadoutIds.length < MAX_LOADOUT_SLOTS && (
-                      <button
-                        type="button"
-                        disabled={!canPersist}
-                        onClick={() =>
-                          void assignWeaponToLoadout(inspectedWeapon.id)
-                        }
-                        className="w-full py-2 rounded-lg bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-xs font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>
-                          {armorySaving
-                            ? t.savingBtn
-                            : formatText(t.addToLoadoutBtn, {
-                                slot: loadoutIds.length + 1,
-                              })}
-                        </span>
-                      </button>
-                    )}
-
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {Array.from(
-                      { length: MAX_LOADOUT_SLOTS },
-                      (_, slotIdx) => {
-                        const isThisSlot = inspectedLoadoutSlot === slotIdx;
-                        const occupantId = loadoutIds[slotIdx];
-                        const occupantName = occupantId
-                          ? getArmoryWeaponById(occupantId).name
-                          : t.emptySlotHint;
-
-                        return (
-                          <button
-                            key={slotIdx}
-                            type="button"
-                            disabled={!canPersist || isThisSlot}
-                            title={occupantName}
-                            onClick={() =>
-                              void assignWeaponToLoadout(
-                                inspectedWeapon.id,
-                                slotIdx
-                              )
-                            }
-                            className={`py-2 px-1.5 rounded-lg border font-mono text-[10px] font-bold uppercase flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                              isThisSlot
-                                ? "bg-[#00F0FF]/20 border-[#00F0FF] text-[#00F0FF] cursor-default"
-                                : "bg-[#191B23] hover:bg-[#272A32] border-[#3B494B] hover:border-[#00F0FF]/60 text-[#E1E2EC] cursor-pointer disabled:opacity-50"
-                            }`}
-                          >
-                            <span>
-                              {isThisSlot
-                                ? formatText(t.inSlotActiveBtn, {
-                                    slot: slotIdx + 1,
-                                  })
-                                : formatText(t.assignToSlotBtn, {
-                                    slot: slotIdx + 1,
-                                  })}
-                            </span>
-                            <span className="text-[8px] font-normal text-[#849495] max-w-full truncate">
-                              {occupantName}
-                            </span>
-                          </button>
-                        );
+                  {isInspectedEquipped ? (
+                    <div className="w-full py-2.5 px-3 rounded-lg bg-[#00F0FF]/18 border border-[#00F0FF]/65 text-[#00F0FF] font-mono text-xs font-bold uppercase flex items-center justify-center gap-1.5">
+                      <Check className="w-4 h-4" strokeWidth={2.5} />
+                      <span>{t.inSlotActiveBtn}</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!canPersist}
+                      onClick={() =>
+                        void assignWeaponToLoadout(inspectedWeapon.id)
                       }
-                    )}
-                  </div>
+                      className="w-full py-2.5 px-3 rounded-lg bg-[#00F0FF] hover:bg-[#7DF4FF] text-[#051018] font-mono text-xs font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-[0_0_16px_rgba(0,240,255,0.28)] disabled:opacity-50"
+                    >
+                      <Crosshair className="w-4 h-4" />
+                      <span>
+                        {armorySaving ? t.savingBtn : t.addToLoadoutBtn}
+                      </span>
+                    </button>
+                  )}
                 </div>
               )}
 

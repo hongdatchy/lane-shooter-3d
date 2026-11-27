@@ -32,9 +32,9 @@ export interface ArmoryWeaponSpec {
 }
 
 export const MAX_WEAPON_LEVEL = 10;
-export const MAX_LOADOUT_SLOTS = 3;
+export const MAX_LOADOUT_SLOTS = 1;
 export const DEFAULT_UNLOCKED_WEAPON_IDS: string[] = ["pistol", "ak47"];
-export const DEFAULT_LOADOUT_IDS: string[] = ["pistol", "ak47"];
+export const DEFAULT_LOADOUT_IDS: string[] = ["ak47"];
 
 export function getWeaponUpgradeCost(weapon: ArmoryWeaponSpec, currentLevel: number): number {
   return weapon.upgradeBaseCost * currentLevel;

@@ -7,7 +7,6 @@ import { LeaderboardEntryDTO } from "@/dto/GameDTO";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import {
   ARMORY_WEAPONS,
-  MAX_LOADOUT_SLOTS,
   MAX_WEAPON_LEVEL,
   getArmoryWeaponById,
 } from "@/service/armory-catalog";
@@ -316,11 +315,7 @@ export function MainMenu() {
                   {equippedWeapon.name}
                 </span>
                 <span className="font-mono text-[9px] text-[#B9CACB]">
-                  {formatText(trans.lobby.weaponLoadoutCount, {
-                    count: loadoutIds.length,
-                    max: MAX_LOADOUT_SLOTS,
-                  })}{" "}
-                  · LV.{equippedWeaponLevel}
+                  {trans.lobby.weaponLoadoutCount} · LV.{equippedWeaponLevel}
                 </span>
               </div>
             </button>
