@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Crown,
   Flame,
+  Gauge,
   Heart,
   Loader2,
   Maximize2,
@@ -26,6 +27,7 @@ import {
   User,
   Volume2,
   VolumeX,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,11 +42,18 @@ import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 import { LanguageSwitcher } from "@/components/custom/common/language-switcher";
 import { startBackgroundPreload } from "@/service/asset-preloader";
 import {
+  ARMORY_WEAPONS,
   MAX_LOADOUT_SLOTS,
+  MAX_WEAPON_LEVEL,
   getArmoryWeaponById,
   getWeaponImageUrl,
 } from "@/service/armory-catalog";
 import { getRageSkillSpec } from "@/service/rage-catalog";
+import {
+  DEV_SPEED_OPTIONS,
+  buildDevBalanceReport,
+  logDevBalanceReportToConsole,
+} from "@/service/dev-mode-service";
 
 interface GameHUDProps {
   containerRef?: React.RefObject<HTMLDivElement | null>;
@@ -113,12 +122,32 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     toggleAutoFire,
     toggleMute,
     clearRewardBanner,
+    devMode,
+    devGameSpeed,
+    devWeaponId,
+    devWeaponLevel,
+    devChapter,
+    devSimSeconds,
+    devBossSpawnedAtSimSec,
+    devBossKilledAtSimSec,
+    devSimulatedDamageTaken,
+    devSimulatedEnemyBreaches,
+    devSimulatedProjectileHits,
+    devSimulatedFirstFailWave,
+    devBossBreachedLine,
+    devBossRemainingHpAtEnd,
+    devBossMaxHpAtEnd,
+    setDevMode,
+    setDevGameSpeed,
+    setDevConfig,
+    startDevTestRun,
   } = useGameStore();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [delayedResultReady, setDelayedResultReady] = useState(false);
   const [guestLoginDismissed, setGuestLoginDismissed] = useState(false);
   const [loggedInFromGuestModal, setLoggedInFromGuestModal] = useState(false);
+  const loggedDevSessionRef = useRef<number>(-1);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const trans = useTransClientSide();
@@ -128,7 +157,10 @@ export function GameHUD({ containerRef }: GameHUDProps) {
   }));
 
   const loadoutWeapons = combatLoadoutIds.map((id) =>
-    weaponService.resolveCombatWeapon(id, saveData.weaponLevels[id] ?? 1)
+    weaponService.resolveCombatWeapon(
+      id,
+      devMode ? devWeaponLevel : saveData.weaponLevels[id] ?? 1
+    )
   );
   const weapon =
     loadoutWeapons[activeLoadoutSlot] ??
@@ -214,7 +246,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     return () => clearTimeout(timer);
   }, [rewardBanner, clearRewardBanner]);
 
-  // Chờ 3s sau khi Win/Thua để người chơi xem nốt hiệu ứng nổ & hạ gục trước khi hiện popup
+  // Chờ 3s sau khi Win/Thua (hoặc 0.35s trong Dev Mode) để xem hiệu ứng trước khi hiện popup
   useEffect(() => {
     if (gameStatus !== "GAME_OVER" && gameStatus !== "VICTORY") {
       setDelayedResultReady(false);
@@ -223,9 +255,9 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     setDelayedResultReady(false);
     const timer = setTimeout(() => {
       setDelayedResultReady(true);
-    }, 3000);
+    }, devMode ? 350 : 3000);
     return () => clearTimeout(timer);
-  }, [gameStatus]);
+  }, [gameStatus, devMode]);
 
   const enterFullscreen = () => {
     const el = containerRef?.current;
@@ -418,12 +450,44 @@ export function GameHUD({ containerRef }: GameHUDProps) {
     (gameStatus === "GAME_OVER" || gameStatus === "VICTORY") &&
     delayedResultReady;
   const showGuestLoginPopup =
-    isMatchEnded && !player && !guestLoginDismissed && canPromptLogin;
+    !devMode && isMatchEnded && !player && !guestLoginDismissed && canPromptLogin;
   const nextChapterNumber = Math.min(MAX_PLAYABLE_CHAPTER, activeChapter + 1);
   const hasNextPlayableChapter =
     gameStatus === "VICTORY" &&
     activeChapter < MAX_PLAYABLE_CHAPTER &&
     saveData.unlockedChapter >= nextChapterNumber;
+  const devReport =
+    devMode && isMatchEnded
+      ? buildDevBalanceReport({
+          won: gameStatus === "VICTORY",
+          activeChapter,
+          reachedWave: wave,
+          maxWaves,
+          kills,
+          score,
+          goldEarned: lastGoldEarned,
+          maxHp,
+          weaponId: combatLoadoutIds[activeLoadoutSlot] ?? devWeaponId,
+          weaponLevel: devWeaponLevel,
+          simSeconds: devSimSeconds,
+          bossSpawnedAtSimSec: devBossSpawnedAtSimSec,
+          bossKilledAtSimSec: devBossKilledAtSimSec,
+          simulatedDamageTaken: devSimulatedDamageTaken,
+          simulatedEnemyBreaches: devSimulatedEnemyBreaches,
+          simulatedProjectileHits: devSimulatedProjectileHits,
+          simulatedFirstFailWave: devSimulatedFirstFailWave,
+          bossBreachedLine: devBossBreachedLine,
+          bossRemainingHp: devBossRemainingHpAtEnd,
+          bossMaxHp: devBossMaxHpAtEnd,
+        })
+      : null;
+
+  useEffect(() => {
+    if (devReport && loggedDevSessionRef.current !== sessionId) {
+      loggedDevSessionRef.current = sessionId;
+      logDevBalanceReportToConsole(devReport);
+    }
+  }, [devReport, sessionId]);
   const rageStatusText = icbmAiming
     ? trans.hud.rageAimingShort
     : icbmPending
@@ -533,6 +597,47 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 {score.toLocaleString()}
               </span>
             </div>
+
+            {devMode && (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[#FE9800]/55 bg-[#0B0E15]/95 px-2 py-1 font-mono text-[10px]">
+                <span className="flex items-center gap-1 font-bold text-[#FE9800]">
+                  <Wrench className="h-3 w-3" />
+                  DEV • 1 LANE
+                </span>
+                <span className="px-1.5 py-0.5 rounded font-bold bg-[#00F0FF]/15 text-[#7DF4FF]">
+                  MIỄN ĐẠN XA: {devSimulatedProjectileHits}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <Gauge className="h-3 w-3 text-[#00F0FF] mr-0.5" />
+                  {DEV_SPEED_OPTIONS.map((spd) => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={(e) => {
+                        e.currentTarget.blur();
+                        setDevGameSpeed(spd);
+                      }}
+                      className={`px-1.5 py-0.5 rounded font-bold cursor-pointer ${
+                        devGameSpeed === spd
+                          ? "bg-[#00F0FF] text-[#00363A]"
+                          : "bg-[#1D1F27] text-[#B9CACB] hover:text-white"
+                      }`}
+                    >
+                      x{spd}
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={devGameSpeed}
+                    onChange={(e) => setDevGameSpeed(Number(e.target.value))}
+                    title="Tùy chỉnh tốc độ 1..20x"
+                    className="w-10 h-5 px-1 ml-0.5 rounded bg-[#1D1F27] border border-[#3B494B] text-[#7DF4FF] text-center outline-none"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* TOP-RIGHT: Camera Selector Pills + Auto-Fire + Utility Controls */}
@@ -722,18 +827,26 @@ export function GameHUD({ containerRef }: GameHUDProps) {
           )}
         </AnimatePresence>
 
-        {/* Modal Pause / Guest Login Suggestion / Game Over / Victory */}
+        {/* Modal Pause / Dev Balance Report / Guest Login Suggestion / Game Over / Victory */}
         <AnimatePresence mode="wait">
           {(gameStatus === "PAUSED" || isMatchEnded) && (
             <motion.div
-              key={showGuestLoginPopup ? `${gameStatus}-guest-login` : gameStatus}
+              key={
+                devReport
+                  ? `${gameStatus}-dev-report`
+                  : showGuestLoginPopup
+                    ? `${gameStatus}-guest-login`
+                    : gameStatus
+              }
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              className={`pointer-events-auto my-auto max-h-full w-full max-w-md overflow-y-auto rounded-2xl border bg-[#191B23]/96 p-5 sm:p-6 text-center text-[#E1E2EC] backdrop-blur-xl ${
-                showGuestLoginPopup
-                  ? "border-[#00F0FF]/55 shadow-[0_0_55px_rgba(0,240,255,0.22)]"
-                  : "border-[#3B494B]/60 shadow-[0_0_50px_rgba(0,0,0,0.75)]"
+              className={`pointer-events-auto my-auto max-h-full w-full overflow-y-auto rounded-2xl border bg-[#191B23]/96 p-5 sm:p-6 text-center text-[#E1E2EC] backdrop-blur-xl ${
+                devReport
+                  ? "max-w-xl border-[#FE9800]/65 shadow-[0_0_55px_rgba(254,152,0,0.22)]"
+                  : showGuestLoginPopup
+                    ? "max-w-md border-[#00F0FF]/55 shadow-[0_0_55px_rgba(0,240,255,0.22)]"
+                    : "max-w-md border-[#3B494B]/60 shadow-[0_0_50px_rgba(0,0,0,0.75)]"
               }`}
             >
               {gameStatus === "PAUSED" && (
@@ -773,7 +886,196 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 </>
               )}
 
-              {showGuestLoginPopup && (
+              {devReport && (
+                <div className="flex flex-col gap-3 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-[#FE9800]/50 bg-[#FE9800]/15 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-[#FFC080]">
+                      <Wrench className="h-3.5 w-3.5" />
+                      <span>DEV BALANCE REPORT • MÀN {devReport.activeChapter}</span>
+                    </div>
+                    <span className="font-mono text-[11px] text-[#849495]">
+                      {devReport.simSeconds}s (1x)
+                    </span>
+                  </div>
+
+                  <div
+                    className={`rounded-xl border p-3.5 ${
+                      devReport.passRealCheck
+                        ? "border-[#10B981]/55 bg-[#10B981]/12"
+                        : "border-[#FF2A6D]/55 bg-[#93000A]/25"
+                    }`}
+                  >
+                    <div
+                      className={`font-['Space_Grotesk'] text-lg font-extrabold uppercase tracking-wide ${
+                        devReport.passRealCheck ? "text-[#34D399]" : "text-[#FFB4AB]"
+                      }`}
+                    >
+                      {devReport.passRealCheck ? "✓ " : "✕ "}
+                      {devReport.verdictLabel}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-[#E1E2EC]">
+                      {devReport.verdictReason}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-[#272A32] bg-[#0B0E15]/85 p-3 font-mono text-xs text-center">
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">QUÁI HẠ</span>
+                      <span className="text-base font-extrabold text-[#34D399] tabular-nums">
+                        {devReport.kills}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">GOLD / VÁN</span>
+                      <span className="text-base font-extrabold text-[#FE9800] tabular-nums">
+                        +{devReport.goldEarned.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">MÁU CÒN LẠI</span>
+                      <span className="text-base font-extrabold text-[#FFB4AB] tabular-nums">
+                        {devReport.simulatedRemainingHp}/{devReport.maxHp}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-[#849495]">DPS SÚNG</span>
+                      <span className="text-base font-extrabold text-[#7DF4FF] tabular-nums">
+                        {devReport.effectiveDps}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#3B494B]/45 bg-[#0B0E15]/85 p-3 font-mono text-xs flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-[#DBFCFF]">
+                      <span>Súng đang test:</span>
+                      <span className="font-bold text-[#FFC080]">
+                        #{devReport.testedWeapon.slotNumber} {devReport.testedWeapon.name} (Lv.
+                        {devReport.testedWeaponLevel})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[#B9CACB]">
+                      <span>Nâng cấp Lv.{devReport.testedWeaponLevel + 1}:</span>
+                      <span className="font-bold text-[#7DF4FF]">
+                        {devReport.upgradeRunsNeeded !== null &&
+                        devReport.upgradeCostNextLevel !== null
+                          ? `${devReport.upgradeCostNextLevel.toLocaleString()}G → Cần ${devReport.upgradeRunsNeeded} ván`
+                          : "ĐÃ MAX LV.10"}
+                      </span>
+                    </div>
+                    {devReport.nextWeapon && (
+                      <div className="flex items-center justify-between text-[#B9CACB] pt-1 border-t border-[#272A32]">
+                        <span>
+                          Súng sau (#{devReport.nextWeapon.weapon.slotNumber}{" "}
+                          {devReport.nextWeapon.weapon.name} • Ch.
+                          {devReport.nextWeapon.weapon.unlockChapter}):
+                        </span>
+                        <span className="font-bold text-[#FE9800]">
+                          {devReport.nextWeapon.weapon.unlockCost.toLocaleString()}G →{" "}
+                          {devReport.nextWeapon.runsNeeded} ván
+                        </span>
+                      </div>
+                    )}
+                    {devReport.nextChapterWeapon && (
+                      <div className="flex items-center justify-between text-[#849495] text-[11px]">
+                        <span>
+                          Súng Ch.{devReport.nextChapterWeapon.weapon.unlockChapter} (
+                          {devReport.nextChapterWeapon.weapon.name}):
+                        </span>
+                        <span className="font-bold text-[#FFC080]">
+                          {devReport.nextChapterWeapon.weapon.unlockCost.toLocaleString()}G →{" "}
+                          {devReport.nextChapterWeapon.runsNeeded} ván
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-[#849495] pt-1 border-t border-[#272A32]">
+                      Thực chiến: Quái lọt vạch {devReport.simulatedEnemyBreaches} • Miễn nhiễm đạn từ xa{" "}
+                      {devReport.simulatedProjectileHits} phát
+                      {devReport.bossKillSeconds !== null
+                        ? ` • Hạ Boss trong ${devReport.bossKillSeconds}s`
+                        : ""}
+                    </div>
+                  </div>
+
+                  {/* Quick Test Config right inside Dev Report */}
+                  <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
+                    <select
+                      value={devChapter}
+                      onChange={(e) => setDevConfig({ devChapter: Number(e.target.value) })}
+                      className="h-8 px-2 rounded bg-[#1D1F27] border border-[#3B494B] text-[#DBFCFF]"
+                    >
+                      {Array.from({ length: MAX_PLAYABLE_CHAPTER }, (_, idx) => idx + 1).map(
+                        (ch) => (
+                          <option key={ch} value={ch}>
+                            Màn {ch}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <select
+                      value={devWeaponId}
+                      onChange={(e) => setDevConfig({ devWeaponId: e.target.value })}
+                      className="h-8 px-2 rounded bg-[#1D1F27] border border-[#3B494B] text-[#FFC080]"
+                    >
+                      {ARMORY_WEAPONS.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          #{w.slotNumber} {w.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={devWeaponLevel}
+                      onChange={(e) => setDevConfig({ devWeaponLevel: Number(e.target.value) })}
+                      className="h-8 px-2 rounded bg-[#1D1F27] border border-[#3B494B] text-[#7DF4FF]"
+                    >
+                      {Array.from({ length: MAX_WEAPON_LEVEL }, (_, i) => i + 1).map((lv) => (
+                        <option key={lv} value={lv}>
+                          Lv.{lv}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => startDevTestRun()}
+                      className="flex-1 gap-2 bg-[#FE9800] text-[#1A1000] font-bold hover:bg-[#FFB86F]"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      CHẠY LẠI VỚI CẤU HÌNH TRÊN
+                    </Button>
+                    {devReport.nextWeapon && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          startDevTestRun({
+                            devWeaponId: devReport.nextWeapon!.weapon.id,
+                            devWeaponLevel: 1,
+                          })
+                        }
+                        className="gap-2 border-[#00F0FF]/55 bg-[#1D1F27] text-[#7DF4FF] hover:bg-[#272A32]"
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                        THỬ {devReport.nextWeapon.weapon.name}
+                      </Button>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDevMode(false);
+                      handleBackToMenu();
+                    }}
+                    className="w-full gap-2 border-[#3B494B] bg-[#1D1F27] text-[#B9CACB] hover:bg-[#272A32] hover:text-white"
+                  >
+                    THOÁT DEV MODE & VỀ SẢNH
+                  </Button>
+                </div>
+              )}
+
+              {!devReport && showGuestLoginPopup && (
                 <>
                   <div className="inline-flex items-center gap-1.5 rounded-full border border-[#00F0FF]/45 bg-[#00F0FF]/12 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-[#7DF4FF]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
@@ -884,7 +1186,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                 </>
               )}
 
-              {isMatchEnded && !showGuestLoginPopup && (
+              {!devReport && isMatchEnded && !showGuestLoginPopup && (
                 <>
                   <div
                     className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border ${
@@ -1068,7 +1370,7 @@ export function GameHUD({ containerRef }: GameHUDProps) {
                   }
 
                   const isActive = idx === activeLoadoutSlot;
-                  const slotLv = saveData.weaponLevels[slotWeapon.id] ?? 1;
+                  const slotLv = devMode ? devWeaponLevel : saveData.weaponLevels[slotWeapon.id] ?? 1;
                   const slotArmorySpec = getArmoryWeaponById(slotWeapon.id);
                   return (
                     <button

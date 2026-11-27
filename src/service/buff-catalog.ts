@@ -144,11 +144,16 @@ function pickRandomExcluding(candidates: BuffGateId[], excluded: Set<BuffGateId>
 }
 
 /**
- * Sinh đúng 2 Cổng Buff trên Làn Phải cho mỗi Wave (hết 2 item sẽ không mọc thêm cho tới Wave kế tiếp).
+ * Sinh đúng 2 Cổng Buff cho mỗi Wave (ở chế độ thường đặt ở Làn Phải; khi singleLane=true ở Dev Mode thì gom thẳng vào cùng 1 lane giữa).
  */
 export function generateWaveRightLaneGates(
   wave: number,
-  options: { hp: number; maxHp: number; activeBuffs: ActiveBuffsStateDTO }
+  options: {
+    hp: number;
+    maxHp: number;
+    activeBuffs: ActiveBuffsStateDTO;
+    singleLane?: boolean;
+  }
 ): RightLaneGateEntityDTO[] {
   const blocked = new Set<BuffGateId>();
   if (options.activeBuffs.clones >= MAX_PLAYER_CLONES) {
@@ -186,8 +191,8 @@ export function generateWaveRightLaneGates(
     return {
       slotIndex,
       buffId: spec.id,
-      x: pos.x,
-      z: pos.z,
+      x: options.singleLane ? ARENA_CONFIG.playerStartX : pos.x,
+      z: options.singleLane ? (slotIndex === 0 ? -5.5 : -11.5) : pos.z,
       hits: 0,
       targetHits: spec.targetHits,
       claimed: false,

@@ -33,6 +33,28 @@ export const ARENA_CONFIG = {
   ],
 } as const;
 
+export function getActiveLeftLaneBounds(narrowLane: boolean): {
+  minX: number;
+  maxX: number;
+  maxEnemyX: number;
+  centerX: number;
+} {
+  if (narrowLane) {
+    return {
+      minX: ARENA_CONFIG.playerStartX - 0.55,
+      maxX: ARENA_CONFIG.playerStartX + 0.55,
+      maxEnemyX: ARENA_CONFIG.playerStartX + 0.55,
+      centerX: ARENA_CONFIG.playerStartX,
+    };
+  }
+  return {
+    minX: ARENA_CONFIG.leftLaneMinX,
+    maxX: ARENA_CONFIG.dividerX,
+    maxEnemyX: ARENA_CONFIG.leftLaneMaxX,
+    centerX: (ARENA_CONFIG.leftLaneMinX + ARENA_CONFIG.dividerX) / 2,
+  };
+}
+
 // Cấu hình trạng thái Nộ (Mưa Đạn)
 export const RAGE_CONFIG = {
   maxRage: 100,
@@ -44,15 +66,51 @@ export const RAGE_CONFIG = {
   fanJitterDeg: 2.5,         // Độ lệch ngẫu nhiên mỗi tia (độ)
   fanOffsetWidth: 0.85,      // Độ rộng trải ngang ở đầu nòng
 
-  // Tốc độ & điểm tích nộ khi chiến đấu
-  regenPerSecond: 1,         // Nộ tự hồi mỗi giây (đặt > 0 nếu muốn tự hồi theo thời gian)
-  gainMultiplier: 2,         // Hệ số nhân tốc độ hồi nộ chung (VD: 2 = hồi nhanh gấp đôi)
-  gainPerHit: 10,
-  gainPerCannonHit: 2,
+  // Tốc độ & điểm tích nộ khi chiến đấu (đã giảm 1/2 so với bản trước)
+  regenPerSecond: 1,         // Nộ tự hồi mỗi giây
+  gainMultiplier: 1,         // Giảm từ 2 -> 1 (hồi nộ chậm lại 1/2)
+  gainPerHit: 2.5,
+  gainPerCannonHit: 2.4,
   gainPerNormalKill: 4,
   gainPerEliteKill: 10,
   gainPerCrateUpgrade: 15,
 } as const;
+
+// Hồi Nộ mỗi phát bắn trúng theo từng loại súng (cân bằng theo tốc bắn & số tia đạn)
+export const WEAPON_RAGE_GAIN_PER_HIT: Record<string, number> = {
+  pistol: 3.0,
+  ak47: 1.6,
+  shotgun: 0.9,
+  smg_neon: 0.8,
+  cryo_gun: 2.6,
+  minigun: 0.5,
+  tesla_gun: 2.2,
+  scatter: 0.75,
+  cannon: 2.6,
+  rocket_launcher: 3.6,
+  grenade_launcher: 2.4,
+  flamethrower: 0.55,
+  acid_sprayer: 0.75,
+  plasma_rifle: 0.6,
+  rail_gun: 4.2,
+  laser_cannon: 0.8,
+  vortex_gun: 4.0,
+  photon_burst: 2.2,
+  nuke_launcher: 8.0,
+  icbm: 2.6,
+  turret: 0.45,
+};
+
+export function getWeaponRageGainPerHit(
+  weaponId: string,
+  splashRadius = 0
+): number {
+  const configured = WEAPON_RAGE_GAIN_PER_HIT[weaponId];
+  if (typeof configured === "number") {
+    return configured;
+  }
+  return splashRadius > 0 ? RAGE_CONFIG.gainPerCannonHit : RAGE_CONFIG.gainPerHit;
+}
 
 // Cấu hình Nộ Tên Lửa Liên Lục Địa (Súng cuối - chỉ hiện ở màn cuối)
 export const ICBM_CONFIG = {

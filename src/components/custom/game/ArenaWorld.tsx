@@ -15,7 +15,13 @@ import {
 } from "@/dto/GameDTO";
 import { useGameStore } from "@/state-manager/game-store";
 import { weaponService } from "@/service/weapon-service";
-import { ARENA_CONFIG, ICBM_CONFIG, RAGE_CONFIG } from "@/service/game-constants";
+import {
+  ARENA_CONFIG,
+  ICBM_CONFIG,
+  RAGE_CONFIG,
+  getActiveLeftLaneBounds,
+  getWeaponRageGainPerHit,
+} from "@/service/game-constants";
 import { getRageSkillSpec } from "@/service/rage-catalog";
 import { gameInput } from "@/service/game-input";
 import { soundService } from "@/service/sound-service";
@@ -160,6 +166,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const combatLoadoutIds = useGameStore((s) => s.combatLoadoutIds);
   const activeLoadoutSlot = useGameStore((s) => s.activeLoadoutSlot);
   const weaponLevels = useGameStore((s) => s.saveData.weaponLevels);
+  const devMode = useGameStore((s) => s.devMode);
+  const devNarrowLane = useGameStore((s) => s.devNarrowLane);
+  const devWeaponLevel = useGameStore((s) => s.devWeaponLevel);
   const activeChapter = useGameStore((s) => s.activeChapter);
   const sessionId = useGameStore((s) => s.sessionId);
   const icbmAiming = useGameStore((s) => s.icbmAiming);
@@ -175,7 +184,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     combatLoadoutIds[activeLoadoutSlot] ?? combatLoadoutIds[0] ?? "pistol";
   const activeWeapon = weaponService.resolveCombatWeapon(
     activeWeaponId,
-    weaponLevels[activeWeaponId] ?? 1
+    devMode ? devWeaponLevel : weaponLevels[activeWeaponId] ?? 1
   );
 
   const playerGroupRef = useRef<THREE.Group>(null);
@@ -183,6 +192,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const fireCooldownRef = useRef(0);
   const shotCounterRef = useRef(0);
   const spawnTimerRef = useRef(0.5);
+  const simElapsedRef = useRef(0);
   const enemyIdSeqRef = useRef(1);
   const bossSpawnedStageRef = useRef(0);
   const rageBufferRef = useRef(0);
@@ -316,6 +326,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       secondLastHitEnemyId: -1,
       fromRage: false,
       homing: false,
+      weaponId: "",
     }))
   );
 
@@ -372,6 +383,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
     fireCooldownRef.current = 0;
     shotCounterRef.current = 0;
     spawnTimerRef.current = 0.45;
+    simElapsedRef.current = 0;
     bossSpawnedStageRef.current = 0;
     rageBufferRef.current = 0;
     rageUiSyncRef.current = 0;
@@ -481,6 +493,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       ricochetRemaining?: number;
       fromRage?: boolean;
       homing?: boolean;
+      weaponId?: string;
     }
   ) => {
     const pool = bulletsPoolRef.current;
@@ -503,6 +516,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       b.secondLastHitEnemyId = -1;
       b.fromRage = Boolean(modifiers?.fromRage);
       b.homing = Boolean(modifiers?.homing);
+      b.weaponId = modifiers?.weaponId ?? "";
       return;
     }
   };
@@ -591,7 +605,17 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       rageBufferRef.current += killGain * RAGE_CONFIG.gainMultiplier;
     }
 
-    const activeCh = useGameStore.getState().activeChapter;
+    const storeForKill = useGameStore.getState();
+    const activeCh = storeForKill.activeChapter;
+    if (isBoss && storeForKill.devMode) {
+      storeForKill.recordDevBossKilled(simElapsedRef.current);
+    } else if (
+      storeForKill.devMode &&
+      storeForKill.wave >= storeForKill.maxWaves &&
+      storeForKill.stageKills + 1 >= storeForKill.stageTargetKills
+    ) {
+      storeForKill.finalizeDevMatchTiming(simElapsedRef.current);
+    }
     const scorePts = isBoss
       ? activeCh === 3
         ? 1400
@@ -605,7 +629,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           : enemy.kind === "SKYWING" || enemy.kind === "DASHER"
             ? 15
             : 10;
-    useGameStore.getState().registerEnemyKill(scorePts);
+    storeForKill.registerEnemyKill(scorePts);
 
     // Quái #6 (Bloater): Khi chết phát nổ bán kính 2m gây sát thương xung quanh & người chơi nếu đứng sát
     if (isBloater) {
@@ -626,7 +650,11 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       const pdx = runtimeRef.current.playerX - enemy.x;
       const pdz = ARENA_CONFIG.playerZ - enemy.z;
       if (pdx * pdx + pdz * pdz <= blastSq) {
-        useGameStore.getState().damagePlayer(1);
+        const s = useGameStore.getState();
+        if (s.devMode && s.hp <= 1) {
+          s.finalizeDevMatchTiming(simElapsedRef.current);
+        }
+        s.damagePlayer(1, "BLOATER_BLAST");
       }
     }
   };
@@ -666,6 +694,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   const spawnEnemy = (stage: number, zOffset = 0) => {
     const pool = enemiesPoolRef.current;
     const store = useGameStore.getState();
+    const isNarrowDev = store.devMode && store.devNarrowLane;
+    const laneBounds = getActiveLeftLaneBounds(isNarrowDev);
     const stageCfg = weaponService.getStageConfig(stage, store.activeChapter);
     const slots = getChapterPoolSlots(store.activeChapter);
 
@@ -688,7 +718,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         e.castFired = false;
         e.id = enemyIdSeqRef.current++;
         e.kind = "BOSS";
-        e.x = (ARENA_CONFIG.leftLaneMinX + ARENA_CONFIG.leftLaneMaxX) / 2;
+        e.x = laneBounds.centerX;
         e.z = ARENA_CONFIG.spawnZ;
         e.speed = stageCfg.eliteSpeed;
         e.maxHp = stageCfg.eliteHp;
@@ -703,6 +733,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           store.activeChapter === 2 ? "SPAWN" : "WALK",
           store.activeChapter === 2 ? BOSS2_SPAWN_DURATION : undefined
         );
+        if (store.devMode) {
+          store.recordDevBossSpawn(simElapsedRef.current, stageCfg.eliteHp);
+        }
         runtimeRef.current.screenShake = 0.55;
         return;
       }
@@ -753,9 +786,9 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         customSpeed ?? (isEliteLike ? stageCfg.eliteSpeed : stageCfg.normalSpeed);
       const speedJitter = (0.94 + Math.random() * 0.14) / Math.pow(sizeFactor, 0.35);
 
-      const margin = Math.min(1.6, 0.55 * finalScale);
-      const minX = ARENA_CONFIG.leftLaneMinX + margin;
-      const maxX = ARENA_CONFIG.leftLaneMaxX - margin;
+      const margin = isNarrowDev ? 0.15 : Math.min(1.6, 0.55 * finalScale);
+      const minX = laneBounds.minX + margin;
+      const maxX = laneBounds.maxEnemyX - margin;
 
       e.active = true;
       e.dying = false;
@@ -772,7 +805,10 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       e.castFired = false;
       e.id = enemyIdSeqRef.current++;
       e.kind = chosenKind;
-      e.x = minX + Math.random() * Math.max(0.5, maxX - minX);
+      e.x =
+        minX < maxX
+          ? minX + Math.random() * (maxX - minX)
+          : laneBounds.centerX + (Math.random() - 0.5) * 0.4;
       e.z = ARENA_CONFIG.spawnZ - zOffset;
       e.speed = baseSpeed * speedJitter;
       e.maxHp = scaledHp;
@@ -789,49 +825,62 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
   };
 
   useFrame((state, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.05);
-    const store = useGameStore.getState();
+    const baseDelta = Math.min(rawDelta, 0.05);
+    const frameStore = useGameStore.getState();
 
-    // Giảm rung camera dần theo thời gian
+    // Giảm rung camera dần theo thời gian thực
     if (runtimeRef.current.screenShake > 0) {
-      runtimeRef.current.screenShake = Math.max(0, runtimeRef.current.screenShake - delta * 2.5);
+      runtimeRef.current.screenShake = Math.max(
+        0,
+        runtimeRef.current.screenShake - baseDelta * 2.5
+      );
     }
 
-    // 1. Điều khiển di chuyển ngang (chỉ khi đang PLAYING)
-    if (store.gameStatus === "PLAYING" && bossBiteRef.current.active) {
-      // Boss chạm người chơi: lao tới há hàm cắn 1 phát rồi mới chuyển sang Thất bại
-      const bite = bossBiteRef.current;
-      const boss = enemiesPoolRef.current[bite.enemyIndex];
-      if (!boss || !boss.active || boss.dying) {
-        bite.active = false;
-        store.damagePlayer(store.hp);
-      } else {
-        bite.elapsed += delta;
-        const totalDuration = 0.95;
-        const chompTime = 0.42;
-        const targetX = runtimeRef.current.playerX;
-        const targetZ = ARENA_CONFIG.playerZ - 0.48 * boss.scale;
-        const lungeT = Math.min(1, bite.elapsed / 0.34);
-        boss.x = THREE.MathUtils.lerp(bite.startX, targetX, lungeT);
-        boss.z = THREE.MathUtils.lerp(bite.startZ, targetZ, lungeT);
+    const stepArenaSimulation = (delta: number) => {
+      const store = useGameStore.getState();
+      const isNarrowDev = store.devMode && store.devNarrowLane;
+      const laneBounds = getActiveLeftLaneBounds(isNarrowDev);
+      if (store.gameStatus === "PLAYING") {
+        simElapsedRef.current += delta;
+      }
 
-        if (bite.elapsed >= chompTime && !bite.hasChomped) {
-          bite.hasChomped = true;
-          soundService.play("bossBite");
-          runtimeRef.current.screenShake = 1.25;
-          spawnParticles(runtimeRef.current.playerX, 0.95, ARENA_CONFIG.playerZ, "#ef4444", 38, 1.85);
-          spawnParticles(runtimeRef.current.playerX, 1.05, ARENA_CONFIG.playerZ, "#fde047", 16, 1.4);
-          if (playerGroupRef.current) {
-            playerGroupRef.current.position.y = -0.18;
-            playerGroupRef.current.rotation.x = -0.38;
+      // 1. Điều khiển di chuyển ngang (chỉ khi đang PLAYING)
+      if (store.gameStatus === "PLAYING" && bossBiteRef.current.active) {
+        // Boss chạm người chơi: lao tới há hàm cắn 1 phát rồi mới chuyển sang Thất bại
+        const bite = bossBiteRef.current;
+        const boss = enemiesPoolRef.current[bite.enemyIndex];
+        if (!boss || !boss.active || boss.dying) {
+          bite.active = false;
+          store.finalizeDevMatchTiming(simElapsedRef.current, 0, boss?.maxHp ?? 0);
+          store.damagePlayer(store.hp, "BOSS_BITE");
+        } else {
+          bite.elapsed += delta;
+          const totalDuration = 0.95;
+          const chompTime = 0.42;
+          const targetX = runtimeRef.current.playerX;
+          const targetZ = ARENA_CONFIG.playerZ - 0.48 * boss.scale;
+          const lungeT = Math.min(1, bite.elapsed / 0.34);
+          boss.x = THREE.MathUtils.lerp(bite.startX, targetX, lungeT);
+          boss.z = THREE.MathUtils.lerp(bite.startZ, targetZ, lungeT);
+
+          if (bite.elapsed >= chompTime && !bite.hasChomped) {
+            bite.hasChomped = true;
+            soundService.play("bossBite");
+            runtimeRef.current.screenShake = 1.25;
+            spawnParticles(runtimeRef.current.playerX, 0.95, ARENA_CONFIG.playerZ, "#ef4444", 38, 1.85);
+            spawnParticles(runtimeRef.current.playerX, 1.05, ARENA_CONFIG.playerZ, "#fde047", 16, 1.4);
+            if (playerGroupRef.current) {
+              playerGroupRef.current.position.y = -0.18;
+              playerGroupRef.current.rotation.x = -0.38;
+            }
+          }
+
+          if (bite.elapsed >= totalDuration) {
+            bite.active = false;
+            store.finalizeDevMatchTiming(simElapsedRef.current, boss.hp, boss.maxHp);
+            store.damagePlayer(store.hp, "BOSS_BITE");
           }
         }
-
-        if (bite.elapsed >= totalDuration) {
-          bite.active = false;
-          useGameStore.getState().damagePlayer(useGameStore.getState().hp);
-        }
-      }
     } else if (store.gameStatus === "PLAYING") {
       const moveDir = (gameInput.right ? 1 : 0) - (gameInput.left ? 1 : 0);
       const targetVx = moveDir * ARENA_CONFIG.playerSpeed;
@@ -842,8 +891,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
       );
       runtimeRef.current.playerX = THREE.MathUtils.clamp(
         runtimeRef.current.playerX + runtimeRef.current.playerVelocityX * delta,
-        ARENA_CONFIG.playerMinX,
-        ARENA_CONFIG.playerMaxX
+        isNarrowDev ? laneBounds.minX : ARENA_CONFIG.playerMinX,
+        isNarrowDev ? laneBounds.maxEnemyX : ARENA_CONFIG.playerMaxX
       );
 
       if (playerGroupRef.current) {
@@ -895,7 +944,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         "pistol";
       const weapon = weaponService.resolveCombatWeapon(
         combatId,
-        store.saveData.weaponLevels[combatId] ?? 1
+        store.devMode ? store.devWeaponLevel : store.saveData.weaponLevels[combatId] ?? 1
       );
       const baseRate = weaponService.getEffectiveFireRate(weapon, store.overdriveLevel);
       const baseDamage = weaponService.getEffectiveDamage(weapon, store.overdriveLevel);
@@ -926,7 +975,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         const trigWeaponId = store.pendingRageTrigger.weaponId;
         const trigWeapon = weaponService.resolveCombatWeapon(
           trigWeaponId,
-          store.saveData.weaponLevels[trigWeaponId] ?? 1
+          store.devMode ? store.devWeaponLevel : store.saveData.weaponLevels[trigWeaponId] ?? 1
         );
         const trigDmg = weaponService.getEffectiveDamage(trigWeapon, store.overdriveLevel);
         const enemies = enemiesPoolRef.current;
@@ -975,8 +1024,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           const mines = proximityMinesPoolRef.current;
           for (let m = 0; m < MAX_PROXIMITY_MINES; m++) {
             const mx = THREE.MathUtils.lerp(
-              ARENA_CONFIG.leftLaneMinX + 0.9,
-              ARENA_CONFIG.dividerX - 0.9,
+              isNarrowDev ? laneBounds.minX : laneBounds.minX + 0.9,
+              isNarrowDev ? laneBounds.maxEnemyX : laneBounds.maxX - 0.9,
               Math.random()
             );
             const mz = THREE.MathUtils.lerp(-28, 3.2, Math.random());
@@ -1013,7 +1062,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           soundService.play("cannonExplosion");
         } else if (trigWeaponId === "photon_burst") {
           // Supernova: Vụ nổ ánh sáng 15m quét sạch toàn sân
-          const centerX = (ARENA_CONFIG.leftLaneMinX + ARENA_CONFIG.dividerX) * 0.5;
+          const centerX = laneBounds.centerX;
           const centerZ = -10;
           const radius = 15.0;
           const radiusSq = radius * radius;
@@ -1205,7 +1254,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             2.4,
             [0.24, 0.24, 0.92],
             "#f43f5e",
-            { fromRage: true, homing: true }
+            { fromRage: true, homing: true, weaponId: weapon.id }
           );
           soundService.play("shootCannon");
         }
@@ -1215,8 +1264,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         // Blizzard: Mưa tuyết đóng băng toàn làn trái 70% slow
         if (Math.random() < 0.6) {
           const fx = THREE.MathUtils.lerp(
-            ARENA_CONFIG.leftLaneMinX,
-            ARENA_CONFIG.dividerX,
+            laneBounds.minX,
+            laneBounds.maxX,
             Math.random()
           );
           const fz = THREE.MathUtils.lerp(-28, 6, Math.random());
@@ -1236,8 +1285,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         }
         if (Math.random() < 0.55) {
           const ax = THREE.MathUtils.lerp(
-            ARENA_CONFIG.leftLaneMinX + 0.4,
-            ARENA_CONFIG.dividerX - 0.4,
+            isNarrowDev ? laneBounds.minX : laneBounds.minX + 0.4,
+            isNarrowDev ? laneBounds.maxEnemyX : laneBounds.maxX - 0.4,
             Math.random()
           );
           const az = THREE.MathUtils.lerp(-26, 5, Math.random());
@@ -1247,7 +1296,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
       if (isRaging && rageWeaponId === "laser_cannon") {
         // Superbeam (8s): Quét chùm tia laser khổng lồ dọc làn trái
-        const sweepAngle = Math.sin(state.clock.elapsedTime * 2.2) * 0.28;
+        const sweepAngle = Math.sin(simElapsedRef.current * 2.2) * (isNarrowDev ? 0.08 : 0.28);
         const originX = runtimeRef.current.playerX;
         const originZ = ARENA_CONFIG.playerZ - 1.1;
         if (laserBeamGroupRef.current) {
@@ -1280,7 +1329,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
       if (isRaging && rageWeaponId === "vortex_gun") {
         // Singularity (6s): Hố đen tâm làn trái hút và nghiền nát quái
-        const vxCenter = (ARENA_CONFIG.leftLaneMinX + ARENA_CONFIG.dividerX) * 0.5;
+        const vxCenter = laneBounds.centerX;
         const vzCenter = -12.5;
         if (vortexMeshRef.current) {
           vortexMeshRef.current.position.set(vxCenter, 0.55, vzCenter);
@@ -1420,6 +1469,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         pierceRemaining: Math.max(buffs.piercing ? 2 : 0, rageSpec?.pierceCount ?? 0),
         ricochetRemaining: buffs.ricochet ? 1 : 0,
         fromRage: isRaging,
+        weaponId: weapon.id,
       };
 
       if (shouldFire && fireCooldownRef.current <= 0) {
@@ -1485,7 +1535,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
         // Bắn đạn hỗ trợ từ các Bản sao [x2 CLONE] (tối đa +2 clone)
         if (buffs.clones > 0) {
-          const cloneOffsets = [-1.25, 1.25].slice(0, buffs.clones);
+          const cloneOffsets = (isNarrowDev ? [-0.45, 0.45] : [-1.25, 1.25]).slice(0, buffs.clones);
           const cloneDmg = Math.max(0.5, Number((effectiveDamage * 0.7).toFixed(1)));
           for (const offsetX of cloneOffsets) {
             const cx = THREE.MathUtils.clamp(
@@ -1520,7 +1570,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
             nearestEnemy = candidate;
           }
         }
-        const turretX = 4.35;
+        const turretX = isNarrowDev ? -0.95 : 4.35;
         const turretZ = 4.9;
         if (nearestEnemy) {
           const dx = nearestEnemy.x - turretX;
@@ -1542,7 +1592,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               effectiveSplash,
               [0.16, 0.16, 0.75],
               "#f59e0b",
-              { ...bulletModifiers, fromRage: isRaging }
+              { ...bulletModifiers, fromRage: isRaging, weaponId: "turret" }
             );
           }
         }
@@ -1694,8 +1744,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
               const bombRadiusSq = 2.6 * 2.6;
               for (let c = 0; c < 6; c++) {
                 const bx = THREE.MathUtils.lerp(
-                  ARENA_CONFIG.leftLaneMinX + 1.2,
-                  ARENA_CONFIG.leftLaneMaxX - 1.2,
+                  isNarrowDev ? laneBounds.minX : laneBounds.minX + 1.2,
+                  isNarrowDev ? laneBounds.maxEnemyX : laneBounds.maxX - 1.2,
                   (c % 3) / 2
                 );
                 const bz = THREE.MathUtils.lerp(-24, -2, c / 5);
@@ -1752,8 +1802,10 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
             const canGrantRage = !isRageLocked && !b.fromRage;
             if (canGrantRage) {
-              const hitGain =
-                b.splashRadius > 0 ? RAGE_CONFIG.gainPerCannonHit : RAGE_CONFIG.gainPerHit;
+              const hitGain = getWeaponRageGainPerHit(
+                b.weaponId || weapon.id,
+                b.splashRadius
+              );
               rageBufferRef.current +=
                 hitGain * RAGE_CONFIG.gainMultiplier * magnetRageMult;
             }
@@ -1836,6 +1888,38 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         useGameStore.getState().addRage(gain);
       }
 
+      // Dev Mode: Auto kích hoạt Nộ ngay khi đầy 100% (tự ngắm vào Boss/quái gần nhất nếu là AIM_TARGET)
+      const postRageState = useGameStore.getState();
+      if (
+        postRageState.devMode &&
+        postRageState.gameStatus === "PLAYING" &&
+        postRageState.rageReady &&
+        !postRageState.rageActive &&
+        !postRageState.icbmAiming &&
+        postRageState.icbmPending === null &&
+        postRageState.rageStrikesPending.length === 0
+      ) {
+        postRageState.activateRage();
+        const afterActivate = useGameStore.getState();
+        if (afterActivate.icbmAiming) {
+          let aimX = laneBounds.centerX;
+          let aimZ = -10;
+          let bestScoreZ = -Infinity;
+          const candList = enemiesPoolRef.current;
+          for (let k = 0; k < candList.length; k++) {
+            const cand = candList[k];
+            if (!cand.active || cand.dying) continue;
+            const priorityZ = cand.kind === "BOSS" ? cand.z + 100 : cand.z;
+            if (priorityZ > bestScoreZ) {
+              bestScoreZ = priorityZ;
+              aimX = cand.x;
+              aimZ = cand.z;
+            }
+          }
+          afterActivate.launchIcbm(aimX, aimZ, runtimeRef.current.playerX);
+        }
+      }
+
       // 5. Cập nhật quái di chuyển + Quái 2 bắn độc mỗi ~3s + Stun/Freeze (70% Blizzard)/Acid Meltdown + văng lùi
       const buffFreezeFactor =
         useGameStore.getState().activeBuffs.freezeTimeLeft > 0 ? 0.5 : 1;
@@ -1909,14 +1993,15 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
           if (e.kind === "SKYWING" || e.kind === "DASHER") {
             const weaveFreq = e.kind === "DASHER" ? 4.2 : 3.1;
-            const weaveAmp =
+            const rawWeaveAmp =
               e.kind === "DASHER" ? (e.enraged ? 4.2 : 3.1) : 2.4;
+            const weaveAmp = isNarrowDev ? rawWeaveAmp * 0.22 : rawWeaveAmp;
             const weaveVx =
-              Math.sin(state.clock.elapsedTime * weaveFreq + e.phase) * weaveAmp * freezeFactor;
+              Math.sin(simElapsedRef.current * weaveFreq + e.phase) * weaveAmp * freezeFactor;
             e.x = THREE.MathUtils.clamp(
               e.x + weaveVx * delta,
-              ARENA_CONFIG.leftLaneMinX + 0.65,
-              ARENA_CONFIG.dividerX - 0.65
+              isNarrowDev ? laneBounds.minX + 0.15 : laneBounds.minX + 0.65,
+              isNarrowDev ? laneBounds.maxEnemyX - 0.15 : laneBounds.maxX - 0.65
             );
           }
 
@@ -2069,11 +2154,11 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           e.knockbackVz *= damp;
 
           // Giữ quái không bị hất văng ra khỏi làn quái hoặc lùi quá cổng spawn
-          const margin = Math.min(2.8, e.radius);
+          const margin = isNarrowDev ? 0.15 : Math.min(2.8, e.radius);
           e.x = THREE.MathUtils.clamp(
             e.x,
-            ARENA_CONFIG.leftLaneMinX + margin * 0.4,
-            ARENA_CONFIG.dividerX - margin * 0.6
+            isNarrowDev ? laneBounds.minX + margin : laneBounds.minX + margin * 0.4,
+            isNarrowDev ? laneBounds.maxEnemyX - margin : laneBounds.maxX - margin * 0.6
           );
           e.z = Math.max(ARENA_CONFIG.spawnZ, e.z);
         }
@@ -2091,8 +2176,8 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           const reachedDefenseLine = bossFrontZ >= ARENA_CONFIG.playerZ - 0.55;
 
           if (touchPlayerDirect || reachedDefenseLine) {
-            if (useGameStore.getState().activeBuffs.shieldCharges > 0) {
-              useGameStore.getState().damagePlayer(1);
+            if (store.activeBuffs.shieldCharges > 0) {
+              useGameStore.getState().damagePlayer(1, "CREEP_BREACH");
               e.z = Math.max(ARENA_CONFIG.spawnZ, e.z - 6.5);
               e.stunTimer = 1.1;
               spawnParticles(runtimeRef.current.playerX, 1.1, ARENA_CONFIG.playerZ, "#bae6fd", 24, 1.6);
@@ -2129,7 +2214,11 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           if (isBloaterHit) {
             soundService.play("cannonExplosion");
           }
-          useGameStore.getState().damagePlayer(1);
+          const s = useGameStore.getState();
+          if (s.devMode && s.hp <= 1) {
+            s.finalizeDevMatchTiming(simElapsedRef.current);
+          }
+          s.damagePlayer(1, "CREEP_BREACH");
         }
       }
 
@@ -2153,7 +2242,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           proj.active = false;
           spawnParticles(proj.x, 1.0, proj.z, proj.color, 16, 1.3);
           runtimeRef.current.screenShake = Math.max(runtimeRef.current.screenShake, 0.35);
-          useGameStore.getState().damagePlayer(proj.damage);
+          useGameStore.getState().damagePlayer(proj.damage, "PROJECTILE");
           continue;
         }
 
@@ -2178,11 +2267,11 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
           e.hitFlash = Math.max(0, e.hitFlash - delta);
         }
         if (Math.abs(e.knockbackVx) > 0.01 || Math.abs(e.knockbackVz) > 0.01) {
-          const margin = Math.min(2.8, e.radius);
+          const margin = isNarrowDev ? 0.15 : Math.min(2.8, e.radius);
           e.x = THREE.MathUtils.clamp(
             e.x + e.knockbackVx * delta,
-            ARENA_CONFIG.leftLaneMinX + margin * 0.4,
-            ARENA_CONFIG.dividerX - margin * 0.6
+            isNarrowDev ? laneBounds.minX + margin : laneBounds.minX + margin * 0.4,
+            isNarrowDev ? laneBounds.maxEnemyX - margin : laneBounds.maxX - margin * 0.6
           );
           e.z = Math.max(ARENA_CONFIG.spawnZ, e.z + e.knockbackVz * delta);
           const damp = Math.exp(-ICBM_CONFIG.knockbackDamping * delta);
@@ -2211,6 +2300,26 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
         p.x += p.vx * delta;
         p.y = Math.max(0.05, p.y + p.vy * delta);
         p.z += p.vz * delta;
+      }
+    }
+    };
+
+    const speedMult =
+      frameStore.devMode && frameStore.gameStatus === "PLAYING"
+        ? Math.max(1, frameStore.devGameSpeed)
+        : 1;
+    const totalStepTime = baseDelta * speedMult;
+    const maxSubSteps = speedMult > 1 ? 24 : 1;
+    let remainingTime = totalStepTime;
+    let stepCount = 0;
+
+    while (remainingTime > 0.00001 && stepCount < maxSubSteps) {
+      const stepDt = speedMult > 1 ? Math.min(remainingTime, 0.03) : remainingTime;
+      stepArenaSimulation(stepDt);
+      remainingTime -= stepDt;
+      stepCount += 1;
+      if (useGameStore.getState().gameStatus !== frameStore.gameStatus) {
+        break;
       }
     }
 
@@ -2517,7 +2626,7 @@ export function ArenaWorld({ runtimeRef }: ArenaWorldProps) {
 
       {/* [TURRET DROP] Tháp súng tự động hỗ trợ bắn 10s */}
       {turretActive && (
-        <group position={[4.35, 0, 4.9]}>
+        <group position={[devMode && devNarrowLane ? -0.95 : 4.35, 0, 4.9]}>
           <mesh position={[0, 0.2, 0]} castShadow receiveShadow>
             <cylinderGeometry args={[0.62, 0.78, 0.4, 16]} />
             <meshStandardMaterial color="#334155" metalness={0.75} roughness={0.3} />

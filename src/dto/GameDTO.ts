@@ -141,6 +141,7 @@ export interface BulletEntity {
   secondLastHitEnemyId: number;
   fromRage: boolean;
   homing: boolean;
+  weaponId?: string;
 }
 
 export type RageSkillMode =

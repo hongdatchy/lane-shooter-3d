@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
-import { GitFork, Lock, Radar, Rocket } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Gauge, GitFork, Lock, Play, Radar, Rocket, ShieldCheck, Wrench } from "lucide-react";
 import { useGameStore } from "@/state-manager/game-store";
 import { LeaderboardEntryDTO } from "@/dto/GameDTO";
 import { startBackgroundPreload } from "@/service/asset-preloader";
-import { MAX_LOADOUT_SLOTS, getArmoryWeaponById } from "@/service/armory-catalog";
+import {
+  ARMORY_WEAPONS,
+  MAX_LOADOUT_SLOTS,
+  MAX_WEAPON_LEVEL,
+  getArmoryWeaponById,
+} from "@/service/armory-catalog";
 import { CHAPTER_CATALOG } from "@/service/chapter-catalog";
 import { MAX_PLAYABLE_CHAPTER } from "@/service/weapon-service";
+import { DEV_SPEED_OPTIONS, isLocalDevEnvironment } from "@/service/dev-mode-service";
 import { formatText, useTransClientSide } from "@/lang/useTransClientSide";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -131,6 +137,23 @@ export function MainMenu() {
   const saveData = useGameStore((s) => s.saveData);
   const saveError = useGameStore((s) => s.saveError);
   const highScore = useGameStore((s) => s.highScore);
+
+  const devMode = useGameStore((s) => s.devMode);
+  const devWeaponId = useGameStore((s) => s.devWeaponId);
+  const devWeaponLevel = useGameStore((s) => s.devWeaponLevel);
+  const devChapter = useGameStore((s) => s.devChapter);
+  const devGameSpeed = useGameStore((s) => s.devGameSpeed);
+  const devNarrowLane = useGameStore((s) => s.devNarrowLane);
+  const toggleDevMode = useGameStore((s) => s.toggleDevMode);
+  const setDevConfig = useGameStore((s) => s.setDevConfig);
+  const startDevTestRun = useGameStore((s) => s.startDevTestRun);
+  const setAssetsWaitingToStart = useGameStore((s) => s.setAssetsWaitingToStart);
+
+  const [isLocalEnv, setIsLocalEnv] = useState(false);
+
+  useEffect(() => {
+    setIsLocalEnv(isLocalDevEnvironment());
+  }, []);
 
   const leaderboard = useGameStore((s) => s.leaderboard);
   const leaderboardLoading = useGameStore((s) => s.leaderboardLoading);
@@ -582,6 +605,153 @@ export function MainMenu() {
                 >
                   {trans.lobby.retryBtn}
                 </button>
+              </div>
+            )}
+
+            {isLocalEnv && (
+              <div className="rounded-xl border border-[#FE9800]/55 bg-[#0B0E15]/95 p-2.5 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    id="btnToggleDevMode"
+                    onClick={toggleDevMode}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      devMode
+                        ? "bg-[#FE9800] text-[#1A1000] shadow-[0_0_16px_rgba(254,152,0,0.45)]"
+                        : "bg-[#272A32] hover:bg-[#32353D] border border-[#FE9800]/45 text-[#FFC080]"
+                    }`}
+                  >
+                    <Wrench className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {devMode ? "DEV TEST MODE: ĐANG BẬT" : "BẬT DEV TEST MODE (LOCAL)"}
+                    </span>
+                  </button>
+                  <span className="font-mono text-[9px] text-[#849495] uppercase hidden sm:inline">
+                    LOCAL SANDBOX • KHÔNG LƯU SAVE/BXH
+                  </span>
+                </div>
+
+                {devMode && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1 border-t border-[#3B494B]/40">
+                    <label className="flex flex-col gap-0.5 font-mono text-[9px] text-[#B9CACB]">
+                      <span>MÀN TEST</span>
+                      <select
+                        value={devChapter}
+                        onChange={(e) =>
+                          setDevConfig({ devChapter: Number(e.target.value) })
+                        }
+                        className="h-7 px-1.5 rounded bg-[#1D1F27] border border-[#3B494B] text-[11px] text-[#DBFCFF] outline-none"
+                      >
+                        {Array.from({ length: MAX_PLAYABLE_CHAPTER }, (_, idx) => idx + 1).map(
+                          (chId) => {
+                            const chInfo = CHAPTER_CATALOG.find((c) => c.id === chId);
+                            return (
+                              <option key={chId} value={chId}>
+                                Màn {chId}
+                                {chInfo ? ` (${chInfo.waves}W)` : ""}
+                              </option>
+                            );
+                          }
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-0.5 font-mono text-[9px] text-[#B9CACB] col-span-1 sm:col-span-2">
+                      <span>SÚNG TEST</span>
+                      <select
+                        value={devWeaponId}
+                        onChange={(e) => setDevConfig({ devWeaponId: e.target.value })}
+                        className="h-7 px-1.5 rounded bg-[#1D1F27] border border-[#3B494B] text-[11px] text-[#FFC080] outline-none"
+                      >
+                        {ARMORY_WEAPONS.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            #{w.slotNumber} {w.name} (Ch.{w.unlockChapter} • {w.unlockCost}G)
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="flex flex-col gap-0.5 font-mono text-[9px] text-[#B9CACB]">
+                      <span>LEVEL SÚNG</span>
+                      <select
+                        value={devWeaponLevel}
+                        onChange={(e) =>
+                          setDevConfig({ devWeaponLevel: Number(e.target.value) })
+                        }
+                        className="h-7 px-1.5 rounded bg-[#1D1F27] border border-[#3B494B] text-[11px] text-[#7DF4FF] outline-none"
+                      >
+                        {Array.from({ length: MAX_WEAPON_LEVEL }, (_, i) => i + 1).map((lv) => (
+                          <option key={lv} value={lv}>
+                            Lv.{lv}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="col-span-2 flex flex-wrap items-center gap-1">
+                      <span className="font-mono text-[9px] text-[#849495] mr-1 flex items-center gap-1">
+                        <Gauge className="w-3 h-3 text-[#00F0FF]" /> TỐC ĐỘ:
+                      </span>
+                      {DEV_SPEED_OPTIONS.map((spd) => (
+                        <button
+                          key={spd}
+                          type="button"
+                          onClick={() => setDevConfig({ devGameSpeed: spd })}
+                          className={`px-2 py-1 rounded font-mono text-[10px] font-bold cursor-pointer ${
+                            devGameSpeed === spd
+                              ? "bg-[#00F0FF] text-[#00363A]"
+                              : "bg-[#1D1F27] text-[#B9CACB] border border-[#3B494B]"
+                          }`}
+                        >
+                          x{spd}
+                        </button>
+                      ))}
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={devGameSpeed}
+                        onChange={(e) =>
+                          setDevConfig({ devGameSpeed: Number(e.target.value) })
+                        }
+                        title="Tùy chỉnh tốc độ 1..20x"
+                        className="w-11 h-6 px-1 rounded bg-[#1D1F27] border border-[#3B494B] font-mono text-[10px] font-bold text-[#7DF4FF] text-center outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDevConfig({ devNarrowLane: !devNarrowLane })}
+                        className={`ml-auto px-2 py-1 rounded font-mono text-[10px] font-bold flex items-center gap-1 cursor-pointer border ${
+                          devNarrowLane
+                            ? "bg-[#10B981]/20 border-[#10B981]/50 text-[#6EE7B7]"
+                            : "bg-[#1D1F27] border-[#3B494B] text-[#849495]"
+                        }`}
+                      >
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>{devNarrowLane ? "GOM 1 LANE: ON" : "GOM 1 LANE: OFF"}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!assetsReady) {
+                          setDevConfig({});
+                          setAssetsWaitingToStart(true);
+                          return;
+                        }
+                        startDevTestRun();
+                      }}
+                      className="col-span-2 h-8 px-3 rounded-lg bg-[#FE9800] hover:bg-[#FFB86F] text-[#1A1000] font-['Space_Grotesk'] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_16px_rgba(254,152,0,0.3)]"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>
+                        {assetsReady
+                          ? "CHẠY TEST NGAY (1 LANE • AUTO NỘ • MIỄN ĐẠN XA)"
+                          : `ĐANG TẢI MODEL (${assetsPercent}%)...`}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

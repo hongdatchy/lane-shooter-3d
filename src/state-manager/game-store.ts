@@ -11,7 +11,16 @@ import {
   RightLaneGateEntityDTO,
 } from "@/dto/GameDTO";
 import { MAX_PLAYABLE_CHAPTER, weaponService } from "@/service/weapon-service";
-import { ARENA_CONFIG, ICBM_CONFIG, RAGE_CONFIG } from "@/service/game-constants";
+import {
+  ARENA_CONFIG,
+  ICBM_CONFIG,
+  RAGE_CONFIG,
+  getActiveLeftLaneBounds,
+} from "@/service/game-constants";
+import {
+  DEV_SPEED_OPTIONS,
+  isLocalDevEnvironment,
+} from "@/service/dev-mode-service";
 import { getRageSkillSpec } from "@/service/rage-catalog";
 import {
   MAX_PLAYER_CLONES,
@@ -147,7 +156,31 @@ interface GameState {
   assetsPercent: number;
   assetsError: string | null;
   assetsWaitingToStart: boolean;
+
+  // Local-only Developer Balance & Test Mode
+  devMode: boolean;
+  devNarrowLane: boolean;
+  devGameSpeed: number;
+  devWeaponId: string;
+  devWeaponLevel: number;
+  devChapter: number;
+  devSimSeconds: number;
+  devBossSpawnedAtSimSec: number | null;
+  devBossKilledAtSimSec: number | null;
+  devSimulatedDamageTaken: number;
+  devSimulatedEnemyBreaches: number;
+  devSimulatedProjectileHits: number;
+  devSimulatedFirstFailWave: number | null;
+  devBossBreachedLine: boolean;
+  devBossRemainingHpAtEnd: number;
+  devBossMaxHpAtEnd: number;
 }
+
+export type DamageSourceKind =
+  | "CREEP_BREACH"
+  | "PROJECTILE"
+  | "BLOATER_BLAST"
+  | "BOSS_BITE";
 
 interface GameActions {
   initPlatformAndProfile: () => Promise<void>;
@@ -192,8 +225,38 @@ interface GameActions {
   tickBuffTimers: (delta: number) => void;
   registerEnemyKill: (points: number) => void;
   registerGateHit: (slotIndex: 0 | 1) => { claimed: boolean; buff: BuffGateSpecDTO | null };
-  damagePlayer: (amount: number) => void;
+  damagePlayer: (amount: number, sourceKind?: DamageSourceKind) => void;
   clearRewardBanner: () => void;
+
+  // Local-only Dev Test Mode actions
+  toggleDevMode: () => void;
+  setDevMode: (enabled: boolean) => void;
+  setDevGameSpeed: (speed: number) => void;
+  setDevConfig: (
+    config: Partial<{
+      devWeaponId: string;
+      devWeaponLevel: number;
+      devChapter: number;
+      devNarrowLane: boolean;
+      devGameSpeed: number;
+    }>
+  ) => void;
+  startDevTestRun: (
+    overrides?: Partial<{
+      devWeaponId: string;
+      devWeaponLevel: number;
+      devChapter: number;
+      devGameSpeed: number;
+      devNarrowLane: boolean;
+    }>
+  ) => void;
+  recordDevBossSpawn: (simSeconds: number, bossMaxHp: number) => void;
+  recordDevBossKilled: (simSeconds: number) => void;
+  finalizeDevMatchTiming: (
+    simSeconds: number,
+    bossRemainingHp?: number,
+    bossMaxHp?: number
+  ) => void;
 }
 
 const INITIAL_MAX_HP = 5;
@@ -203,16 +266,28 @@ const CAMERA_ORDER: CameraMode[] = ["TOP_DOWN", "THIRD_PERSON", "FREE_ORBIT"];
 let authChangeUnsubscribe: (() => void) | null = null;
 let initInFlightPromise: Promise<void> | null = null;
 
+function resolveEffectiveWeaponLevel(
+  state: Pick<GameState, "devMode" | "devWeaponLevel" | "saveData">,
+  weaponId: string
+): number {
+  if (state.devMode) {
+    return Math.max(1, Math.min(MAX_WEAPON_LEVEL, Math.floor(state.devWeaponLevel)));
+  }
+  return state.saveData.weaponLevels[weaponId] ?? 1;
+}
+
 function resolveActiveCombatWeapon(state: {
   combatLoadoutIds: string[];
   activeLoadoutSlot: number;
   saveData: PlayerSaveData;
+  devMode: boolean;
+  devWeaponLevel: number;
 }) {
   const id =
     state.combatLoadoutIds[state.activeLoadoutSlot] ??
     state.combatLoadoutIds[0] ??
     DEFAULT_LOADOUT_IDS[0];
-  const level = state.saveData.weaponLevels[id] ?? 1;
+  const level = resolveEffectiveWeaponLevel(state, id);
   return weaponService.resolveCombatWeapon(id, level);
 }
 
@@ -388,6 +463,12 @@ function syncPostMatchOutcome(input: {
 }): number {
   const state = useGameStore.getState();
   const earnedGold = Math.max(0, Math.round(input.score));
+
+  // Dev Balance Test Mode: strictly sandboxed — never writes real save, guest rewards, or leaderboard
+  if (state.devMode) {
+    return earnedGold;
+  }
+
   const matchSessionId = state.sessionId;
 
   if (!input.player) {
@@ -543,6 +624,23 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   assetsPercent: 0,
   assetsError: null,
   assetsWaitingToStart: false,
+
+  devMode: false,
+  devNarrowLane: true,
+  devGameSpeed: 1,
+  devWeaponId: "pistol",
+  devWeaponLevel: 1,
+  devChapter: 1,
+  devSimSeconds: 0,
+  devBossSpawnedAtSimSec: null,
+  devBossKilledAtSimSec: null,
+  devSimulatedDamageTaken: 0,
+  devSimulatedEnemyBreaches: 0,
+  devSimulatedProjectileHits: 0,
+  devSimulatedFirstFailWave: null,
+  devBossBreachedLine: false,
+  devBossRemainingHpAtEnd: 0,
+  devBossMaxHpAtEnd: 0,
 
   initPlatformAndProfile: async () => {
     if (get().platformReady && get().profileLoaded) return;
@@ -922,18 +1020,18 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     soundService.unlock();
     safeNotifyPlatform((adapter) => adapter.notifyGameplayStart());
     set((state) => {
-      const chapterId = Math.min(
-        MAX_PLAYABLE_CHAPTER,
-        Math.max(1, state.selectedChapter)
-      );
+      const chapterId = state.devMode
+        ? Math.min(MAX_PLAYABLE_CHAPTER, Math.max(1, state.devChapter))
+        : Math.min(MAX_PLAYABLE_CHAPTER, Math.max(1, state.selectedChapter));
       const maxWaves = weaponService.getTotalStages(chapterId);
       const best = computeBestScore(state.player, state.leaderboard, state.saveData);
-      const loadout =
-        state.saveData.equippedLoadoutIds.length > 0
+      const loadout = state.devMode
+        ? [state.devWeaponId || DEFAULT_LOADOUT_IDS[0]]
+        : state.saveData.equippedLoadoutIds.length > 0
           ? [...state.saveData.equippedLoadoutIds]
           : [state.saveData.equippedWeaponId || DEFAULT_LOADOUT_IDS[0]];
-      const bestSlotIdx = pickStrongestLoadoutSlotIndex(loadout);
-      const startingClones = state.rewardedAdClaimed ? 1 : 0;
+      const bestSlotIdx = state.devMode ? 0 : pickStrongestLoadoutSlotIndex(loadout);
+      const startingClones = state.devMode ? 0 : state.rewardedAdClaimed ? 1 : 0;
       const initialBuffs = createEmptyActiveBuffs(startingClones);
       const trans = getCurrentTrans();
       return {
@@ -959,6 +1057,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           hp: INITIAL_MAX_HP,
           maxHp: INITIAL_MAX_HP,
           activeBuffs: initialBuffs,
+          singleLane: state.devMode && state.devNarrowLane,
         }),
         activeBuffs: initialBuffs,
         rewardBanner:
@@ -981,6 +1080,17 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         icbmPending: null,
         rageStrikesPending: [],
         rewardedAdClaimed: false,
+        autoFire: state.devMode ? true : state.autoFire,
+        devSimSeconds: 0,
+        devBossSpawnedAtSimSec: null,
+        devBossKilledAtSimSec: null,
+        devSimulatedDamageTaken: 0,
+        devSimulatedEnemyBreaches: 0,
+        devSimulatedProjectileHits: 0,
+        devSimulatedFirstFailWave: null,
+        devBossBreachedLine: false,
+        devBossRemainingHpAtEnd: 0,
+        devBossMaxHpAtEnd: 0,
         sessionId: state.sessionId + 1,
       };
     });
@@ -992,7 +1102,11 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
       MAX_PLAYABLE_CHAPTER,
       Math.max(1, state.activeChapter + 1)
     );
-    set({ selectedChapter: nextChapter });
+    set(
+      state.devMode
+        ? { devChapter: nextChapter, selectedChapter: nextChapter }
+        : { selectedChapter: nextChapter }
+    );
     get().startGame();
   },
 
@@ -1007,7 +1121,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const nextId = state.combatLoadoutIds[slotIndex];
     const nextWeapon = weaponService.resolveCombatWeapon(
       nextId,
-      state.saveData.weaponLevels[nextId] ?? 1
+      resolveEffectiveWeaponLevel(state, nextId)
     );
     set({
       activeLoadoutSlot: slotIndex,
@@ -1213,30 +1327,40 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     const weaponId = state.aimingWeaponId ?? resolveActiveCombatWeapon(state).id;
     const weapon = weaponService.resolveCombatWeapon(
       weaponId,
-      state.saveData.weaponLevels[weaponId] ?? 1
+      resolveEffectiveWeaponLevel(state, weaponId)
     );
     const armory = getArmoryWeaponById(weaponId);
     const spec = getRageSkillSpec(weaponId);
     const effectiveDamage = weaponService.getEffectiveDamage(weapon, state.overdriveLevel);
     const skillName = armory?.rageSkillName ?? weapon.name;
     const baseSeq = state.rageStrikeBatchSeq + 1;
+    const isSingleLaneDev = state.devMode && state.devNarrowLane;
+    const devLaneBounds = isSingleLaneDev ? getActiveLeftLaneBounds(true) : null;
 
     let strikes: OrbitalStrikePendingDTO[] = [];
     if (weaponId === "cannon") {
-      const offsets: Array<[number, number, number]> = [
-        [0, 0, 0.45],
-        [-2.2, -3.4, 1.05],
-        [2.2, -6.8, 1.65],
-      ];
+      const offsets: Array<[number, number, number]> = isSingleLaneDev
+        ? [
+            [0, 0, 0.45],
+            [-0.4, -3.4, 1.05],
+            [0.4, -6.8, 1.65],
+          ]
+        : [
+            [0, 0, 0.45],
+            [-2.2, -3.4, 1.05],
+            [2.2, -6.8, 1.65],
+          ];
       strikes = offsets.map(([ox, oz, delay], idx) => ({
         seq: baseSeq + idx,
         kind: "cannon",
         startX,
         startZ: ARENA_CONFIG.playerZ,
-        targetX: Math.max(
-          ARENA_CONFIG.leftLaneMinX + 1.2,
-          Math.min(ARENA_CONFIG.dividerX - 1.0, targetX + ox)
-        ),
+        targetX: devLaneBounds
+          ? Math.max(devLaneBounds.minX, Math.min(devLaneBounds.maxEnemyX, targetX + ox))
+          : Math.max(
+              ARENA_CONFIG.leftLaneMinX + 1.2,
+              Math.min(ARENA_CONFIG.dividerX - 1.0, targetX + ox)
+            ),
         targetZ: Math.max(-34, Math.min(8, targetZ + oz)),
         delaySeconds: delay,
         radius: spec.aoeRadius ?? 6,
@@ -1249,7 +1373,9 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
           kind: "nuke",
           startX,
           startZ: ARENA_CONFIG.playerZ,
-          targetX,
+          targetX: devLaneBounds
+            ? Math.max(devLaneBounds.minX, Math.min(devLaneBounds.maxEnemyX, targetX))
+            : targetX,
           targetZ,
           delaySeconds: 1.0,
           radius: spec.aoeRadius ?? 12,
@@ -1258,20 +1384,28 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         },
       ];
     } else {
-      const icbmOffsets: Array<[number, number]> = [
-        [0, 0],
-        [-3.4, -4.5],
-        [3.4, -4.5],
-      ];
+      const icbmOffsets: Array<[number, number]> = isSingleLaneDev
+        ? [
+            [0, 0],
+            [-0.45, -4.5],
+            [0.45, -4.5],
+          ]
+        : [
+            [0, 0],
+            [-3.4, -4.5],
+            [3.4, -4.5],
+          ];
       strikes = icbmOffsets.map(([ox, oz], idx) => ({
         seq: baseSeq + idx,
         kind: "icbm",
         startX,
         startZ: ARENA_CONFIG.playerZ,
-        targetX: Math.max(
-          -ARENA_CONFIG.width / 2 + 1.5,
-          Math.min(ARENA_CONFIG.width / 2 - 1.5, targetX + ox)
-        ),
+        targetX: devLaneBounds
+          ? Math.max(devLaneBounds.minX, Math.min(devLaneBounds.maxEnemyX, targetX + ox))
+          : Math.max(
+              -ARENA_CONFIG.width / 2 + 1.5,
+              Math.min(ARENA_CONFIG.width / 2 - 1.5, targetX + ox)
+            ),
         targetZ: Math.max(-34, Math.min(8, targetZ + oz)),
         delaySeconds: ICBM_CONFIG.impactDelaySeconds,
         radius: spec.aoeRadius ?? ICBM_CONFIG.explosionRadius,
@@ -1402,10 +1536,12 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         score: finalScore,
         lastGoldEarned: earnedGold,
         highScore: Math.max(nextHighScore, finalScore),
-        selectedChapter: Math.min(
-          MAX_PLAYABLE_CHAPTER,
-          Math.max(state.selectedChapter, state.activeChapter + 1)
-        ),
+        selectedChapter: state.devMode
+          ? state.selectedChapter
+          : Math.min(
+              MAX_PLAYABLE_CHAPTER,
+              Math.max(state.selectedChapter, state.activeChapter + 1)
+            ),
         gameStatus: "VICTORY",
         rage: 0,
         rageReady: false,
@@ -1456,6 +1592,7 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
         hp: state.hp,
         maxHp: state.maxHp,
         activeBuffs: carriedBuffs,
+        singleLane: state.devMode && state.devNarrowLane,
       }),
       rewardBanner: bannerText,
     });
@@ -1561,11 +1698,19 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     return { claimed: true, buff: spec };
   },
 
-  damagePlayer: (amount) => {
+  damagePlayer: (amount, sourceKind = "CREEP_BREACH") => {
     const state = get();
     if (state.gameStatus !== "PLAYING") return;
 
-    if (state.activeBuffs.shieldCharges > 0) {
+    // Dev Balance Test Mode: KHÔNG bất tử trước quái/Boss chạm vạch; CHỈ miễn nhiễm đạn bắn từ xa (kể cả đạn Boss)
+    if (state.devMode && sourceKind === "PROJECTILE") {
+      set({
+        devSimulatedProjectileHits: state.devSimulatedProjectileHits + 1,
+      });
+      return;
+    }
+
+    if (sourceKind !== "BOSS_BITE" && state.activeBuffs.shieldCharges > 0) {
       const nextCharges = state.activeBuffs.shieldCharges - 1;
       soundService.play("hitCrate");
       set({
@@ -1578,6 +1723,21 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
     }
 
     const nextHp = Math.max(0, state.hp - amount);
+    const nextSimDmg = state.devSimulatedDamageTaken + amount;
+    const isBossBite = sourceKind === "BOSS_BITE";
+    if (state.devMode) {
+      set({
+        devSimulatedDamageTaken: nextSimDmg,
+        devSimulatedEnemyBreaches:
+          state.devSimulatedEnemyBreaches + (isBossBite ? 0 : 1),
+        devBossBreachedLine: state.devBossBreachedLine || isBossBite,
+        devSimulatedFirstFailWave:
+          state.devSimulatedFirstFailWave === null && nextHp <= 0
+            ? state.wave
+            : state.devSimulatedFirstFailWave,
+      });
+    }
+
     soundService.play(nextHp <= 0 ? "gameOver" : "playerHit");
     if (nextHp <= 0) {
       safeNotifyPlatform((adapter) => adapter.notifyGameplayStop());
@@ -1611,6 +1771,114 @@ export const useGameStore = create<GameState & GameActions>()((set, get) => ({
   },
 
   clearRewardBanner: () => set({ rewardBanner: null }),
+
+  toggleDevMode: () => {
+    if (!isLocalDevEnvironment()) return;
+    const curr = get();
+    const nextEnabled = !curr.devMode;
+    set({
+      devMode: nextEnabled,
+      devNarrowLane: true,
+      devGameSpeed: nextEnabled ? (curr.devGameSpeed > 1 ? curr.devGameSpeed : 2) : 1,
+    });
+  },
+
+  setDevMode: (enabled) => {
+    if (enabled && !isLocalDevEnvironment()) return;
+    const curr = get();
+    set({
+      devMode: enabled,
+      devNarrowLane: true,
+      devGameSpeed: enabled ? (curr.devGameSpeed > 1 ? curr.devGameSpeed : 2) : 1,
+    });
+  },
+
+  setDevGameSpeed: (speed) => {
+    if (!isLocalDevEnvironment()) return;
+    const valid = Math.max(1, Math.min(20, Number(speed) || 1));
+    set({ devGameSpeed: DEV_SPEED_OPTIONS.includes(valid as 1 | 2 | 5 | 10) ? valid : valid });
+  },
+
+  setDevConfig: (config) => {
+    if (!isLocalDevEnvironment()) return;
+    set((curr) => ({
+      devWeaponId: config.devWeaponId ?? curr.devWeaponId,
+      devWeaponLevel:
+        config.devWeaponLevel !== undefined
+          ? Math.max(1, Math.min(MAX_WEAPON_LEVEL, Math.floor(config.devWeaponLevel)))
+          : curr.devWeaponLevel,
+      devChapter:
+        config.devChapter !== undefined
+          ? Math.max(1, Math.min(MAX_PLAYABLE_CHAPTER, Math.floor(config.devChapter)))
+          : curr.devChapter,
+      devNarrowLane: config.devNarrowLane ?? curr.devNarrowLane,
+      devGameSpeed:
+        config.devGameSpeed !== undefined
+          ? Math.max(1, Math.min(20, Number(config.devGameSpeed) || 1))
+          : curr.devGameSpeed,
+    }));
+  },
+
+  startDevTestRun: (overrides) => {
+    if (!isLocalDevEnvironment()) return;
+    set((curr) => ({
+      devMode: true,
+      devNarrowLane: overrides?.devNarrowLane ?? true,
+      devWeaponId: overrides?.devWeaponId ?? curr.devWeaponId,
+      devWeaponLevel:
+        overrides?.devWeaponLevel !== undefined
+          ? Math.max(1, Math.min(MAX_WEAPON_LEVEL, Math.floor(overrides.devWeaponLevel)))
+          : curr.devWeaponLevel,
+      devChapter:
+        overrides?.devChapter !== undefined
+          ? Math.max(1, Math.min(MAX_PLAYABLE_CHAPTER, Math.floor(overrides.devChapter)))
+          : curr.devChapter,
+      devGameSpeed:
+        overrides?.devGameSpeed !== undefined
+          ? Math.max(1, Math.min(20, Number(overrides.devGameSpeed) || 2))
+          : curr.devGameSpeed > 1
+            ? curr.devGameSpeed
+            : 2,
+    }));
+    get().startGame();
+  },
+
+  recordDevBossSpawn: (simSeconds, bossMaxHp) =>
+    set((curr) =>
+      curr.devMode
+        ? {
+            devBossSpawnedAtSimSec: curr.devBossSpawnedAtSimSec ?? simSeconds,
+            devBossMaxHpAtEnd: bossMaxHp,
+            devBossRemainingHpAtEnd: bossMaxHp,
+          }
+        : {}
+    ),
+
+  recordDevBossKilled: (simSeconds) =>
+    set((curr) =>
+      curr.devMode
+        ? {
+            devBossKilledAtSimSec: simSeconds,
+            devSimSeconds: simSeconds,
+            devBossRemainingHpAtEnd: 0,
+          }
+        : {}
+    ),
+
+  finalizeDevMatchTiming: (simSeconds, bossRemainingHp, bossMaxHp) =>
+    set((curr) =>
+      curr.devMode
+        ? {
+            devSimSeconds: simSeconds,
+            devBossRemainingHpAtEnd:
+              bossRemainingHp !== undefined
+                ? Math.max(0, bossRemainingHp)
+                : curr.devBossRemainingHpAtEnd,
+            devBossMaxHpAtEnd:
+              bossMaxHp !== undefined ? Math.max(0, bossMaxHp) : curr.devBossMaxHpAtEnd,
+          }
+        : {}
+    ),
 }));
 
 export default useGameStore;
