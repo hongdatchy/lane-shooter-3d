@@ -458,22 +458,107 @@ export function MainMenu() {
                 {/* Cyber 2-Lane tactical backdrop */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   <div
-                    className="w-full h-full opacity-25"
+                    className="w-full h-full mode-card-anim"
                     style={{
                       background:
                         "radial-gradient(circle at 50% 25%, rgba(0, 240, 255, 0.35), transparent 65%)",
+                      animation: "mode-glow-breathe 3.6s ease-in-out infinite",
                     }}
                   />
                   <svg
                     viewBox="0 0 200 220"
-                    className="absolute inset-x-0 top-0 w-full h-[65%] opacity-30 group-hover:opacity-45 transition-opacity"
+                    className="absolute inset-x-0 top-0 w-full h-[65%] opacity-45 group-hover:opacity-75 transition-opacity"
                     preserveAspectRatio="none"
                   >
-                    <path d="M55,200 L85,20" stroke="#00F0FF" strokeWidth="1.5" strokeDasharray="6 6" />
-                    <path d="M100,200 L100,20" stroke="#00DBE9" strokeWidth="1" />
-                    <path d="M145,200 L115,20" stroke="#FE9800" strokeWidth="1.5" strokeDasharray="6 6" />
-                    <rect x="64" y="65" width="24" height="12" rx="2" fill="#00F0FF" fillOpacity="0.3" />
-                    <rect x="114" y="90" width="24" height="12" rx="2" fill="#FE9800" fillOpacity="0.4" />
+                    {/* Outer road edges & center divider */}
+                    <path d="M86,18 L36,205" stroke="#00F0FF" strokeWidth="1" strokeOpacity="0.45" />
+                    <path d="M100,18 L100,205" stroke="#00DBE9" strokeWidth="1.2" strokeOpacity="0.55" />
+                    <path d="M114,18 L164,205" stroke="#FE9800" strokeWidth="1" strokeOpacity="0.45" />
+
+                    {/* Scrolling 3D perspective lane dashes */}
+                    <path
+                      d="M93,18 L68,205"
+                      stroke="#00F0FF"
+                      strokeWidth="1.5"
+                      strokeDasharray="6 8"
+                      className="mode-card-anim"
+                      style={{ animation: "mode-lane-scroll 0.65s linear infinite" }}
+                    />
+                    <path
+                      d="M107,18 L132,205"
+                      stroke="#FE9800"
+                      strokeWidth="1.5"
+                      strokeDasharray="6 8"
+                      className="mode-card-anim"
+                      style={{ animation: "mode-lane-scroll 0.65s linear infinite" }}
+                    />
+
+                    {/* Approaching buff gates (scaled down road perspective) */}
+                    {[
+                      { anim: "mode-gate-left 3.2s cubic-bezier(0.55, 0.08, 0.85, 0.6) infinite", main: "#00F0FF", trim: "#DBFCFF", fillOpacity: 0.26 },
+                      { anim: "mode-gate-right 3.2s cubic-bezier(0.55, 0.08, 0.85, 0.6) -1.6s infinite", main: "#FE9800", trim: "#FFDCBD", fillOpacity: 0.28 },
+                    ].map((gate, idx) => (
+                      <g
+                        key={idx}
+                        className="mode-card-anim"
+                        style={{
+                          transformBox: "view-box",
+                          transformOrigin: "0px 0px",
+                          animation: gate.anim,
+                        }}
+                      >
+                        <rect
+                          x="-22"
+                          y="-6"
+                          width="44"
+                          height="12"
+                          rx="2"
+                          fill={gate.main}
+                          fillOpacity={gate.fillOpacity}
+                          stroke={gate.main}
+                          strokeWidth="1.2"
+                          strokeOpacity="0.85"
+                        />
+                        <line x1="-16" y1="0" x2="16" y2="0" stroke={gate.trim} strokeWidth="1.2" strokeOpacity="0.7" />
+                      </g>
+                    ))}
+
+                    {/* Player runner weaving between lanes + rapid laser tracers */}
+                    <g
+                      className="mode-card-anim"
+                      style={{
+                        transformBox: "view-box",
+                        transformOrigin: "0px 0px",
+                        animation: "mode-runner-strafe 4.2s ease-in-out infinite",
+                      }}
+                    >
+                      {[
+                        { fill: "#7DF4FF", delay: "0s" },
+                        { fill: "#00F0FF", delay: "-0.35s" },
+                      ].map((bolt, idx) => (
+                        <rect
+                          key={idx}
+                          x="-1.5"
+                          y="-5"
+                          width="3"
+                          height="10"
+                          rx="1.5"
+                          fill={bolt.fill}
+                          className="mode-card-anim"
+                          style={{
+                            transformBox: "view-box",
+                            transformOrigin: "0px 0px",
+                            animation: `mode-laser-bolt 0.7s linear ${bolt.delay} infinite`,
+                          }}
+                        />
+                      ))}
+                      <polygon
+                        points="0,-9 -8,6 0,2 8,6"
+                        fill="#00F0FF"
+                        stroke="#DBFCFF"
+                        strokeWidth="1"
+                      />
+                    </g>
                   </svg>
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/80 to-transparent" />
                 </div>
@@ -527,19 +612,122 @@ export function MainMenu() {
                 {/* 360° Arena backdrop */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   <div
-                    className="w-full h-full opacity-20"
+                    className="w-full h-full mode-card-anim"
                     style={{
                       background:
                         "radial-gradient(circle at 50% 35%, rgba(254, 152, 0, 0.35), transparent 65%)",
+                      animation: "mode-glow-breathe 4.2s ease-in-out -1.5s infinite",
                     }}
                   />
                   <svg
                     viewBox="0 0 200 200"
-                    className="absolute inset-x-0 top-2 w-full h-[55%] opacity-25"
+                    className="absolute inset-x-0 top-2 w-full h-[55%] opacity-40"
                   >
-                    <circle cx="100" cy="80" r="65" fill="none" stroke="#FE9800" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx="100" cy="80" r="42" fill="none" stroke="#FFC080" strokeWidth="1" />
+                    <defs>
+                      <linearGradient id="survivorRadarSweep" x1="0%" y1="0%" x2="100%" y2="50%">
+                        <stop offset="0%" stopColor="#FE9800" stopOpacity="0" />
+                        <stop offset="100%" stopColor="#FE9800" stopOpacity="0.38" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Faint tactical crosshair axes */}
+                    <line x1="30" y1="80" x2="170" y2="80" stroke="#FE9800" strokeWidth="0.7" strokeOpacity="0.22" />
+                    <line x1="100" y1="10" x2="100" y2="150" stroke="#FE9800" strokeWidth="0.7" strokeOpacity="0.22" />
+
+                    {/* Rotating tactical rings */}
+                    <circle
+                      cx="100"
+                      cy="80"
+                      r="65"
+                      fill="none"
+                      stroke="#FE9800"
+                      strokeWidth="1.1"
+                      strokeDasharray="4 4"
+                      className="mode-card-anim"
+                      style={{
+                        transformBox: "view-box",
+                        transformOrigin: "100px 80px",
+                        animation: "mode-radar-spin 20s linear infinite",
+                      }}
+                    />
+                    <circle
+                      cx="100"
+                      cy="80"
+                      r="42"
+                      fill="none"
+                      stroke="#FFC080"
+                      strokeWidth="1"
+                      strokeDasharray="18 7 4 7"
+                      className="mode-card-anim"
+                      style={{
+                        transformBox: "view-box",
+                        transformOrigin: "100px 80px",
+                        animation: "mode-radar-spin-reverse 14s linear infinite",
+                      }}
+                    />
                     <circle cx="100" cy="80" r="18" fill="none" stroke="#FE9800" strokeWidth="1.5" />
+
+                    {/* Expanding sonar wave pulse */}
+                    <circle
+                      cx="100"
+                      cy="80"
+                      r="64"
+                      fill="none"
+                      stroke="#FE9800"
+                      strokeWidth="1.4"
+                      className="mode-card-anim"
+                      style={{
+                        transformBox: "view-box",
+                        transformOrigin: "100px 80px",
+                        animation: "mode-radar-pulse 2.8s ease-out infinite",
+                      }}
+                    />
+
+                    {/* Rotating radar sweep wedge */}
+                    <g
+                      className="mode-card-anim"
+                      style={{
+                        transformBox: "view-box",
+                        transformOrigin: "100px 80px",
+                        animation: "mode-radar-spin 4s linear infinite",
+                      }}
+                    >
+                      <path
+                        d="M100,80 L100,15 A65,65 0 0,1 153.2,42.7 Z"
+                        fill="url(#survivorRadarSweep)"
+                      />
+                      <line
+                        x1="100"
+                        y1="80"
+                        x2="153.2"
+                        y2="42.7"
+                        stroke="#FE9800"
+                        strokeWidth="1.3"
+                        strokeOpacity="0.75"
+                      />
+                    </g>
+
+                    {/* Hostile blips & survivor core */}
+                    {[
+                      { cx: 62, cy: 54, fill: "#FE9800", delay: "0s" },
+                      { cx: 144, cy: 62, fill: "#FF6B4A", delay: "-0.8s" },
+                      { cx: 132, cy: 118, fill: "#FE9800", delay: "-1.5s" },
+                    ].map((blip, idx) => (
+                      <circle
+                        key={idx}
+                        cx={blip.cx}
+                        cy={blip.cy}
+                        r="2.2"
+                        fill={blip.fill}
+                        className="mode-card-anim"
+                        style={{
+                          transformBox: "view-box",
+                          transformOrigin: `${blip.cx}px ${blip.cy}px`,
+                          animation: `mode-blip-ping 2.4s ease-in-out ${blip.delay} infinite`,
+                        }}
+                      />
+                    ))}
+                    <circle cx="100" cy="80" r="3" fill="#FFC080" />
                   </svg>
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E15] via-[#0B0E15]/82 to-transparent" />
                 </div>
